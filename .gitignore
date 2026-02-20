@@ -27,5 +27,9 @@ archivo_reportes/
 # History data
 history/
 
+# Podcast outputs
+podcasts/
+
 # Large binaries
 *.pdf
+*.mp3
