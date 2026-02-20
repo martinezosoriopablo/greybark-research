@@ -1,14 +1,16 @@
 @echo off
 REM ============================================================================
 REM GREY BARK ADVISORS - GENERADOR AUTOMATICO DE REPORTES
-REM Version: 5.0 ULTIMATE (Enero 2026)
-REM 
+REM Version: 6.0 (Febrero 2026)
+REM
 REM FUNCIONALIDADES:
 REM - Auto-deteccion AM/PM segun hora Chile
 REM - Captura de datos: Equity, Bonds, FX, Commodities, Newsletters
 REM - Generacion de reportes: Finanzas + No Finanzas
 REM - Conversion HTML profesional
+REM - Generacion automatica de podcast (Claude API + Edge TTS)
 REM - Envio automatico por email con base de datos de clientes
+REM - Archivado automatico de reportes
 REM - Sistema de logs completo
 REM ============================================================================
 
@@ -95,7 +97,7 @@ REM PASO 1: CAPTURA DE DATOS
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 1/5: CAPTURANDO DATOS DE MERCADOS %EMOJI%
+echo PASO 1/6: CAPTURANDO DATOS DE MERCADOS %EMOJI%
 echo ============================================================================
 echo.
 echo Recopilando datos de:
@@ -139,7 +141,7 @@ REM PASO 2: GENERACION DE REPORTES MARKDOWN
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 2/5: GENERANDO REPORTES MARKDOWN 📝
+echo PASO 2/6: GENERANDO REPORTES MARKDOWN 📝
 echo ============================================================================
 echo.
 echo Generando 2 versiones:
@@ -178,7 +180,7 @@ REM PASO 3: CONVERSION A HTML
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 3/5: CONVIRTIENDO A HTML PROFESIONAL 🎨
+echo PASO 3/6: CONVIRTIENDO A HTML PROFESIONAL 🎨
 echo ============================================================================
 echo.
 echo Generando HTML con:
@@ -209,11 +211,41 @@ echo [OK] Archivos HTML generados en html_out\
 echo.
 
 REM ============================================================================
-REM PASO 4: ENVIO DE EMAILS
+REM PASO 4: GENERAR PODCAST
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 4/5: ENVIANDO REPORTES POR EMAIL 📧
+echo PASO 4/6: GENERANDO PODCAST DE MERCADOS 🎙️
+echo ============================================================================
+echo.
+echo Generando podcast con:
+echo   - Extraccion de texto del HTML finanzas
+echo   - Guion conversacional via Claude API
+echo   - Audio MP3 con Edge TTS ^(voz chilena^)
+echo.
+
+echo [%date% %time%] PASO 4: Generando podcast %MODE%... >> logs\report_log.txt
+
+%PYTHON% generar_podcast.py --turno %MODE% >> logs\podcast_%MODE%.log 2>&1
+
+if %errorlevel% neq 0 (
+    echo [%date% %time%] ADVERTENCIA: No se pudo generar podcast >> logs\report_log.txt
+    echo [WARN] No se pudo generar el podcast - continuando sin el...
+    echo       Ver: logs\podcast_%MODE%.log
+) else (
+    echo [%date% %time%] Podcast generado OK >> logs\report_log.txt
+    echo [OK] Podcast generado exitosamente
+    echo       Ubicacion: podcasts\
+)
+
+echo.
+
+REM ============================================================================
+REM PASO 5: ENVIO DE EMAILS
+REM ============================================================================
+
+echo ============================================================================
+echo PASO 5/6: ENVIANDO REPORTES POR EMAIL 📧
 echo ============================================================================
 echo.
 echo Sistema de distribucion:
@@ -222,7 +254,7 @@ echo   - Segmentacion automatica por audiencia
 echo   - Tracking de envios
 echo.
 
-echo [%date% %time%] PASO 4: Enviando emails... >> logs\report_log.txt
+echo [%date% %time%] PASO 5: Enviando emails... >> logs\report_log.txt
 
 REM Enviar reporte profesional
 echo Enviando reporte PROFESIONAL...
@@ -251,11 +283,11 @@ echo [%date% %time%] Proceso de emails completado >> logs\report_log.txt
 echo.
 
 REM ============================================================================
-REM PASO 5: ARCHIVAR REPORTES GENERADOS
+REM PASO 6: ARCHIVAR REPORTES GENERADOS
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 5/5: ARCHIVANDO REPORTES 📁
+echo PASO 6/6: ARCHIVANDO REPORTES 📁
 echo ============================================================================
 echo.
 
@@ -312,8 +344,18 @@ for %%f in (html_out\daily_report_%MODE%_*.html) do (
 )
 
 echo.
+echo Podcast:
+if exist "podcasts\podcast_greybark_*_%MODE%.mp3" (
+    for %%f in (podcasts\podcast_greybark_*_%MODE%.mp3) do (
+        echo   - %%f
+    )
+) else (
+    echo   - No generado
+)
+
+echo.
 echo [ESTADISTICAS]
-echo - Costo estimado: ~$0.28 USD
+echo - Costo estimado: ~$0.32 USD (reportes + podcast)
 echo - Destinatarios: Ver clients_database.json
 echo - Logs detallados: logs\
 echo.
