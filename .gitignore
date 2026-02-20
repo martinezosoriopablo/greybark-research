@@ -22,6 +22,7 @@ wsj_chrome_profile/
 daily_report_*.md
 daily_market_snapshot*.json
 html_out/
+archivo_reportes/
 
 # History data
 history/
