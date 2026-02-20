@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "created": "2026-01-27T18:37:35.691675",
+    "last_updated": "2026-01-27T18:37:35.691675",
+    "version": "1.0"
+  },
+  "clients": [
+    {
+      "id": 1,
+      "name": "Pablo Martínez",
+      "email": "pabloalfonsomartinezosorio@gmail.com",
+      "type": "internal",
+      "reports": [
+        "AM_pro",
+        "PM_pro",
+        "weekly_quant"
+      ],
+      "active": true,
+      "notes": "Fundador - recibe todos los reportes"
+    },
+    {
+      "id": 2,
+      "name": "Nicolas Guinez",
+      "email": "nicolas.guinezt@gmail.com",
+      "type": "professional",
+      "reports": [
+        "AM_pro",
+        "PM_pro",
+        "weekly_quant"
+      ],
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": 3,
+      "name": "José Navarrete",
+      "email": "josemnavarrete85@gmail.com",
+      "type": "professional",
+      "reports": [
+        "AM_pro",
+        "PM_pro"
+      ],
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": 4,
+      "name": "Felipe Wilson",
+      "email": "fwilson@sfc.cl",
+      "type": "professional",
+      "reports": [
+        "AM_pro",
+        "PM_pro",
+        "weekly_quant"
+      ],
+      "active": true,
+      "notes": "SFC Capital"
+    },
+    {
+      "id": 5,
+      "name": "Test - General",
+      "email": "martinezosoriopablo@gmail.com",
+      "type": "retail",
+      "reports": [
+        "AM_general"
+      ],
+      "active": true,
+      "notes": "Cliente de prueba - versión general"
+    }
+  ]
+}
