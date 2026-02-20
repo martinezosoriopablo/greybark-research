@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / secrets
+.env
+*.env
+
+# Logs and debug
+logs/
+*.log
+
+# Chrome profiles
+wsj_chrome_profile/
+
+# IDE / editors
+.ipynb_checkpoints/
+.claude/
+
+# Generated reports (daily outputs)
+daily_report_*.md
+daily_market_snapshot*.json
+html_out/
+
+# History data
+history/
+
+# Large binaries
+*.pdf
