@@ -1,12 +1,13 @@
 @echo off
 REM ============================================================================
 REM GREY BARK ADVISORS - GENERADOR AUTOMATICO DE REPORTES
-REM Version: 6.0 (Febrero 2026)
+REM Version: 7.0 (Febrero 2026)
 REM
 REM FUNCIONALIDADES:
 REM - Auto-deteccion AM/PM segun hora Chile
 REM - Captura de datos: Equity, Bonds, FX, Commodities, Newsletters
 REM - Generacion de reportes: Finanzas + No Finanzas
+REM - Intelligence Briefing: Substack + Telegram + RSS analizado con Claude
 REM - Conversion HTML profesional
 REM - Generacion automatica de podcast (Claude API + Edge TTS)
 REM - Envio automatico por email con base de datos de clientes
@@ -97,7 +98,7 @@ REM PASO 1: CAPTURA DE DATOS
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 1/6: CAPTURANDO DATOS DE MERCADOS %EMOJI%
+echo PASO 1/7: CAPTURANDO DATOS DE MERCADOS %EMOJI%
 echo ============================================================================
 echo.
 echo Recopilando datos de:
@@ -141,7 +142,7 @@ REM PASO 2: GENERACION DE REPORTES MARKDOWN
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 2/6: GENERANDO REPORTES MARKDOWN 📝
+echo PASO 2/7: GENERANDO REPORTES MARKDOWN 📝
 echo ============================================================================
 echo.
 echo Generando 2 versiones:
@@ -176,11 +177,41 @@ echo [OK] Reportes markdown generados
 echo.
 
 REM ============================================================================
-REM PASO 3: CONVERSION A HTML
+REM PASO 3: INTELLIGENCE BRIEFING (Substack + Telegram + RSS)
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 3/6: CONVIRTIENDO A HTML PROFESIONAL 🎨
+echo PASO 3/7: INTELLIGENCE BRIEFING 🔍
+echo ============================================================================
+echo.
+echo Recolectando inteligencia de:
+echo   - Substack: ~15 analistas macro/mercados
+echo   - Telegram: Bloomberg, FT, Economist
+echo   - RSS: Bloomberg, FT, WSJ, Reuters
+echo   - Analisis y clasificacion con Claude API
+echo.
+
+echo [%date% %time%] PASO 3: Intelligence Briefing %MODE%... >> logs\report_log.txt
+
+%PYTHON% greybark-intelligence\main.py --mode %MODE% >> logs\intelligence_%MODE%.log 2>&1
+
+if %errorlevel% neq 0 (
+    echo [%date% %time%] ADVERTENCIA: No se pudo generar Intelligence Briefing >> logs\report_log.txt
+    echo [WARN] No se pudo generar el Intelligence Briefing - continuando sin el...
+    echo       Ver: logs\intelligence_%MODE%.log
+) else (
+    echo [%date% %time%] Intelligence Briefing generado OK >> logs\report_log.txt
+    echo [OK] Intelligence Briefing generado e inyectado en reportes
+)
+
+echo.
+
+REM ============================================================================
+REM PASO 4: CONVERSION A HTML
+REM ============================================================================
+
+echo ============================================================================
+echo PASO 4/7: CONVIRTIENDO A HTML PROFESIONAL 🎨
 echo ============================================================================
 echo.
 echo Generando HTML con:
@@ -191,7 +222,7 @@ echo   - Logo Grey Bark Advisors
 echo   - Compatible con Gmail, Outlook, Apple Mail
 echo.
 
-echo [%date% %time%] PASO 3: Convirtiendo a HTML... >> logs\report_log.txt
+echo [%date% %time%] PASO 4: Convirtiendo a HTML... >> logs\report_log.txt
 
 %PYTHON% html_formatter.py >> logs\html_formatter_%MODE%.log 2>&1
 
@@ -211,11 +242,11 @@ echo [OK] Archivos HTML generados en html_out\
 echo.
 
 REM ============================================================================
-REM PASO 4: GENERAR PODCAST
+REM PASO 5: GENERAR PODCAST
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 4/6: GENERANDO PODCAST DE MERCADOS 🎙️
+echo PASO 5/7: GENERANDO PODCAST DE MERCADOS 🎙️
 echo ============================================================================
 echo.
 echo Generando podcast con:
@@ -224,7 +255,7 @@ echo   - Guion conversacional via Claude API
 echo   - Audio MP3 con Edge TTS ^(voz chilena^)
 echo.
 
-echo [%date% %time%] PASO 4: Generando podcast %MODE%... >> logs\report_log.txt
+echo [%date% %time%] PASO 5: Generando podcast %MODE%... >> logs\report_log.txt
 
 %PYTHON% generar_podcast.py --turno %MODE% >> logs\podcast_%MODE%.log 2>&1
 
@@ -241,11 +272,11 @@ if %errorlevel% neq 0 (
 echo.
 
 REM ============================================================================
-REM PASO 5: ENVIO DE EMAILS
+REM PASO 6: ENVIO DE EMAILS
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 5/6: ENVIANDO REPORTES POR EMAIL 📧
+echo PASO 6/7: ENVIANDO REPORTES POR EMAIL 📧
 echo ============================================================================
 echo.
 echo Sistema de distribucion:
@@ -254,7 +285,7 @@ echo   - Segmentacion automatica por audiencia
 echo   - Tracking de envios
 echo.
 
-echo [%date% %time%] PASO 5: Enviando emails... >> logs\report_log.txt
+echo [%date% %time%] PASO 6: Enviando emails... >> logs\report_log.txt
 
 REM Enviar reporte profesional
 echo Enviando reporte PROFESIONAL...
@@ -283,11 +314,11 @@ echo [%date% %time%] Proceso de emails completado >> logs\report_log.txt
 echo.
 
 REM ============================================================================
-REM PASO 6: ARCHIVAR REPORTES GENERADOS
+REM PASO 7: ARCHIVAR REPORTES GENERADOS
 REM ============================================================================
 
 echo ============================================================================
-echo PASO 6/6: ARCHIVANDO REPORTES 📁
+echo PASO 7/7: ARCHIVANDO REPORTES 📁
 echo ============================================================================
 echo.
 
@@ -355,7 +386,7 @@ if exist "podcasts\podcast_greybark_*_%MODE%.mp3" (
 
 echo.
 echo [ESTADISTICAS]
-echo - Costo estimado: ~$0.32 USD (reportes + podcast)
+echo - Costo estimado: ~$0.55 USD (reportes + intelligence + podcast)
 echo - Destinatarios: Ver clients_database.json
 echo - Logs detallados: logs\
 echo.

@@ -30,6 +30,12 @@ history/
 # Podcast outputs
 podcasts/
 
+# Telegram session files
+*.session
+
+# Intelligence Pipeline data
+greybark-intelligence/data/
+
 # Large binaries
 *.pdf
 *.mp3

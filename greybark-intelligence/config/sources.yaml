@@ -1,0 +1,165 @@
+# sources.yaml - Fuentes del Intelligence Pipeline de Greybark Research
+# Para agregar o quitar fuentes, solo editar este archivo.
+
+# ============================================================
+# SUBSTACK RSS FEEDS
+# Cada Substack expone RSS en: https://[nombre].substack.com/feed
+# ============================================================
+substacks:
+  # --- Tier 1: Macro / Economía (Imprescindibles) ---
+  - name: "Chartbook"
+    author: "Adam Tooze"
+    feed: "https://adamtooze.substack.com/feed"
+    category_hint: "geopolitica"
+    priority: high
+
+  - name: "The Overshoot"
+    author: "Matt Klein"
+    feed: "https://theovershoot.co/feed"
+    category_hint: "macro"
+    priority: high
+
+  - name: "Fed Guy"
+    author: "Joseph Wang"
+    feed: "https://fedguy.com/feed"
+    category_hint: "fed_bancos_centrales"
+    priority: high
+
+  - name: "SAHM"
+    author: "Claudia Sahm"
+    feed: "https://stayathomemacro.substack.com/feed"
+    category_hint: "fed_bancos_centrales"
+    priority: high
+
+  - name: "Apricitas Economics"
+    author: "Joey Politano"
+    feed: "https://apricitas.substack.com/feed"
+    category_hint: "macro"
+    priority: high
+
+  - name: "Kyla Scanlon"
+    author: "Kyla Scanlon"
+    feed: "https://kylascanlon.substack.com/feed"
+    category_hint: "macro"
+    priority: high
+
+  # --- Tier 2: Trading Macro / Mercados ---
+  - name: "Capital Flows"
+    author: "Anónimo"
+    feed: "https://capitalflowsresearch.substack.com/feed"
+    category_hint: "macro"
+    priority: medium
+
+  - name: "Citrini Research"
+    author: "Citrini"
+    feed: "https://citriniresearch.substack.com/feed"
+    category_hint: "equity"
+    priority: medium
+
+  - name: "FX Macro Guy"
+    author: "Anónimo"
+    feed: "https://fxmacro.substack.com/feed"
+    category_hint: "fed_bancos_centrales"
+    priority: medium
+
+  - name: "Kaoboy Musings"
+    author: "Kaoboy"
+    feed: "https://kaoboy.substack.com/feed"
+    category_hint: "macro"
+    priority: medium
+
+  - name: "Michael Green"
+    author: "Michael Green"
+    feed: "https://michaelwgreen.substack.com/feed"
+    category_hint: "macro"
+    priority: medium
+
+  # --- Tier 3: Geopolítica / Energía / Commodities ---
+  - name: "Doomberg"
+    author: "Anónimo"
+    feed: "https://doomberg.substack.com/feed"
+    category_hint: "commodities"
+    priority: medium
+
+  - name: "China Talk"
+    author: "Jordan Schneider"
+    feed: "https://chinatalk.substack.com/feed"
+    category_hint: "geopolitica"
+    priority: medium
+
+  - name: "Net Interest"
+    author: "Marc Rubinstein"
+    feed: "https://netinterest.substack.com/feed"
+    category_hint: "equity"
+    priority: medium
+
+  - name: "Cassandra Unchained"
+    author: "Michael Burry"
+    feed: "https://cassandraunchained.substack.com/feed"
+    category_hint: "macro"
+    priority: medium
+
+# ============================================================
+# CANALES DE TELEGRAM
+# Requiere api_id y api_hash en .env
+# ============================================================
+telegram_channels:
+  - name: "Bloomberg"
+    handle: "Bloomberg"
+    max_messages_per_day: 30
+    priority: high
+
+  - name: "The Economist Official"
+    handle: "TheEconomistOfficial"
+    max_messages_per_day: 15
+    priority: high
+
+  - name: "Financial Times"
+    handle: "financialTimesJournal"
+    max_messages_per_day: 20
+    priority: high
+
+  - name: "Trade Watcher"
+    handle: "TradeWatcher"
+    max_messages_per_day: 20
+    priority: high
+
+  - name: "Business Finance News"
+    handle: "news_finance"
+    max_messages_per_day: 20
+    priority: medium
+
+  - name: "CNBC International"
+    handle: "CNBCi"
+    max_messages_per_day: 15
+    priority: medium
+
+  - name: "Economist Telegram"
+    handle: "The_Economist_Telegram"
+    max_messages_per_day: 10
+    priority: medium
+
+# ============================================================
+# RSS DE MEDIOS TRADICIONALES
+# Feeds RSS estándar procesables con feedparser
+# ============================================================
+rss_feeds:
+  - name: "Reuters Business"
+    feed: "https://www.reutersagency.com/feed/?taxonomy=best-sectors&post_type=best"
+    priority: high
+
+  - name: "Bloomberg Markets"
+    feed: "https://feeds.bloomberg.com/markets/news.rss"
+    priority: high
+
+  - name: "WSJ Markets"
+    feed: "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+    priority: high
+
+  - name: "FT Home"
+    feed: "https://www.ft.com/rss/home"
+    priority: medium
+
+  - name: "FRED Releases"
+    feed: "https://research.stlouisfed.org/feeds/series/popular"
+    priority: medium
