@@ -41,7 +41,7 @@ PODCAST_OUT_DIR = os.path.join(SCRIPT_DIR, "podcasts")
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
 TTS_VOICE = "es-CL-CatalinaNeural"
 TTS_RATE = "+10%"
-MAX_GUION_CHARS = 5000
+MAX_GUION_CHARS = 10000
 
 # ============================================================================
 # HELPERS
@@ -129,7 +129,7 @@ def extraer_texto_html(html_path):
     return fecha_text, dashboard, content
 
 
-def generar_guion_claude(fecha, dashboard, contenido):
+def generar_guion_claude(fecha, dashboard, contenido, turno="AM"):
     """Llama a Claude para convertir el reporte en guión de podcast."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -137,6 +137,14 @@ def generar_guion_claude(fecha, dashboard, contenido):
         return None, None
 
     client = anthropic.Anthropic(api_key=api_key)
+
+    # Adaptar saludo y despedida según turno AM/PM
+    if turno == "PM":
+        saludo = f"Buenas tardes, soy Camila, tu analista de Greybark Research y esto es tu Reporte de Cierre de Mercados del {fecha}"
+        despedida = "Esto ha sido tu Reporte de Cierre de Mercados de Greybark Research. Que tengas una excelente tarde."
+    else:
+        saludo = f"Buenos días, soy Camila, tu analista de Greybark Research y esto es tu Reporte de Mercados del {fecha}"
+        despedida = "Esto ha sido tu Reporte de Mercados de Greybark Research. Que tengas un excelente día."
 
     prompt = f"""Convierte este reporte de mercados en un guión de podcast hablado en español chileno.
 
@@ -158,12 +166,25 @@ INSTRUCCIONES:
   - "US$901.5B" → "901 mil quinientos millones de dólares"
   - No uses siglas como "Q4", di "cuarto trimestre"
   - No uses "/" ni "&", escribe las palabras completas
+- PRONUNCIACIÓN DE TÉRMINOS EN INGLÉS: El audio se genera con voz en español, por lo que los términos en inglés deben escribirse de forma fonética para que suenen naturales:
+  - "S&P 500" → "ese and pi quinientos"
+  - "NASDAQ" → "násdaq"
+  - "Dow Jones" → "dau yons"
+  - "yield" → "yield"
+  - "spread" → "espred"
+  - "rally" → "rali"
+  - "sell-off" → "sel of"
+  - "VIX" → "vix"
+  - "ETF" → "e te efe"
+  - "Fed" → "fed"
+  - "FOMC" → "efe o eme ce"
+  - Para otros términos en inglés, escríbelos fonéticamente en español
 - Elimina tablas y datos redundantes
 - Agrega transiciones naturales entre secciones ("Pasando a...", "En cuanto a...", "Ahora bien...")
 - NO uses markdown, asteriscos, ni formato especial - solo texto plano para ser leído
-- Comienza exactamente con: "Buenos días, soy Camila, tu analista de Greybark Research y esto es tu Reporte de Mercados del {fecha}"
-- Termina exactamente con: "Esto ha sido tu Reporte de Mercados de Greybark Research. Que tengas un excelente día."
-- Duración objetivo: 3-4 minutos de lectura (~2500-3500 caracteres)
+- Comienza exactamente con: "{saludo}"
+- Termina exactamente con: "{despedida}"
+- Duración objetivo: 4-6 minutos de lectura (~4000-6000 caracteres). Cubre TODOS los temas del reporte sin omitir ninguno
 - No incluyas emojis ni caracteres especiales
 
 Escribe SOLO el guión, sin explicaciones ni comentarios."""
@@ -196,7 +217,10 @@ Escribe SOLO el guión, sin explicaciones ni comentarios."""
             cut_point = guion[:MAX_GUION_CHARS].rfind(".")
             if cut_point > MAX_GUION_CHARS * 0.7:
                 guion = guion[:cut_point + 1]
-                guion += "\n\nEsto ha sido tu Reporte de Mercados de Greybark Research. Que tengas un excelente día."
+                if turno == "PM":
+                    guion += "\n\nEsto ha sido tu Reporte de Cierre de Mercados de Greybark Research. Que tengas una excelente tarde."
+                else:
+                    guion += "\n\nEsto ha sido tu Reporte de Mercados de Greybark Research. Que tengas un excelente día."
             else:
                 guion = guion[:MAX_GUION_CHARS]
             log("INFO", f"Guión recortado a {len(guion):,} caracteres")
@@ -292,7 +316,7 @@ def main():
     log("OK", f"Texto extraído: {len(contenido):,} caracteres")
 
     # 3. Generar guión con Claude
-    guion, costo = generar_guion_claude(fecha_texto, dashboard, contenido)
+    guion, costo = generar_guion_claude(fecha_texto, dashboard, contenido, turno)
     if not guion:
         log("ERROR", "No se pudo generar el guión")
         sys.exit(1)
