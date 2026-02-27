@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Asset Allocation - Greybark Research</title>
+    <style>
+        /* =====================================================
+           GREYBARK RESEARCH - Asset Allocation Report Template
+           Matching Macro Report design system
+           ===================================================== */
+
+        :root {
+            --primary: #1a1a1a;
+            --secondary: #3a3a3a;
+            --accent: #dd6b20;
+            --text: #1a1a1a;
+            --text-medium: #4a4a4a;
+            --text-light: #717171;
+            --border: #e0e0e0;
+            --bg-light: #f7f7f7;
+            --success: #276749;
+            --warning: #dd6b20;
+            --danger: #c53030;
+            --neutral-badge: #744210;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: var(--text);
+            background: white;
+        }
+
+        .report-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 40px;
+        }
+
+        /* Header — matches Macro Report */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .logo-section h1 {
+            font-family: 'Archio Black', 'Archio', 'Arial Black', 'Segoe UI', sans-serif;
+            font-size: 24pt;
+            color: var(--primary);
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .logo-section .subtitle {
+            font-size: 14pt;
+            color: var(--accent);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .report-info {
+            text-align: right;
+            font-size: 9pt;
+            color: var(--text-medium);
+        }
+
+        .report-info .date {
+            font-size: 11pt;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Sections — matches Macro Report */
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 14pt;
+            color: var(--primary);
+            font-weight: 700;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        .section-number {
+            color: var(--accent);
+            margin-right: 10px;
+        }
+
+        h3 {
+            font-size: 11pt;
+            color: var(--secondary);
+            font-weight: 600;
+            margin: 15px 0 10px 0;
+            padding-left: 10px;
+            border-left: 3px solid var(--accent);
+        }
+
+        /* Key Points Box — matches Macro key-takeaways */
+        .key-points {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid var(--accent);
+            margin: 15px 0;
+        }
+
+        .key-points h4 {
+            font-size: 10pt;
+            color: var(--primary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .key-points ul {
+            margin-left: 20px;
+        }
+
+        .key-points li {
+            margin-bottom: 5px;
+            color: var(--text-medium);
+        }
+
+        /* Tables — matches Macro Report */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 9pt;
+        }
+
+        th {
+            background: var(--primary);
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        /* View Cards */
+        .view-card {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+
+        .view-header {
+            background: var(--bg-light);
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .view-region {
+
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .view-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 3px;
+        }
+
+        .badge-constructivo { background: #c6f6d5; color: var(--success); }
+        .badge-neutral { background: #fefce8; color: var(--neutral-badge); }
+        .badge-cauteloso { background: #fed7d7; color: var(--danger); }
+        .badge-ow { background: #c6f6d5; color: var(--success); }
+        .badge-uw { background: #fed7d7; color: var(--danger); }
+        .badge-n { background: #fefce8; color: var(--neutral-badge); }
+
+        .view-body {
+            padding: 15px;
+        }
+
+        .view-tesis {
+            font-style: italic;
+            color: var(--text);
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .arguments-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .arguments-column h4 {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin: 0 0 10px 0;
+        }
+
+        .arguments-column.pro h4 { color: var(--success); }
+        .arguments-column.contra h4 { color: var(--danger); }
+
+        .arguments-column ul {
+            margin: 0;
+            padding-left: 15px;
+            font-size: 10pt;
+        }
+
+        .arguments-column li {
+            margin-bottom: 8px;
+        }
+
+        .argument-dato {
+            font-size: 9pt;
+            color: var(--text-light);
+            display: block;
+            margin-top: 2px;
+        }
+
+        .trigger-box {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 3px;
+            padding: 10px 15px;
+            margin-top: 15px;
+            font-size: 10pt;
+        }
+
+        .trigger-box strong {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        /* Scenario Cards */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .scenario-card {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 15px;
+        }
+
+        .scenario-card.base {
+            border-color: var(--accent);
+            border-width: 2px;
+        }
+
+        .scenario-name {
+
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .scenario-prob {
+
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .scenario-desc {
+            font-size: 10pt;
+            color: var(--text-light);
+            margin: 10px 0;
+        }
+
+        /* Risk Cards */
+        .risk-card {
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--danger);
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .risk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .risk-name {
+
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .risk-metrics {
+
+            font-size: 11px;
+            color: var(--text-light);
+        }
+
+        .risk-metrics span {
+            margin-left: 15px;
+        }
+
+        .risk-body {
+            font-size: 10pt;
+        }
+
+        .risk-hedge {
+            background: var(--bg-light);
+            padding: 10px;
+            border-radius: 3px;
+            margin-top: 10px;
+            font-size: 10pt;
+        }
+
+        .risk-hedge strong {
+
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        /* Calendar */
+        .calendar-table th {
+            background: var(--secondary);
+        }
+
+        .relevancia-alta { color: var(--danger); font-weight: 600; }
+        .relevancia-media { color: var(--warning); }
+
+        /* Triggers List */
+        .triggers-list {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 15px 20px;
+        }
+
+        .triggers-list h4 {
+
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--danger);
+            margin: 0 0 10px 0;
+        }
+
+        .triggers-list ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 10pt;
+        }
+
+        .triggers-list li {
+            margin-bottom: 5px;
+        }
+
+        /* Footer — matches Macro Report */
+        .footer {
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 2px solid var(--primary);
+            font-size: 8pt;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .disclaimer {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-light);
+            border-radius: 5px;
+            font-size: 7pt;
+            line-height: 1.4;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                padding: 20px;
+                font-size: 10pt;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+
+            .view-card, .risk-card, .scenario-card {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Postura Badge */
+        .postura-badge {
+            display: inline-block;
+
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 3px;
+            margin: 10px 0;
+        }
+
+        .postura-neutral { background: #e2e8f0; color: var(--text); }
+        .postura-constructivo { background: #c6f6d5; color: var(--success); }
+        .postura-cauteloso { background: #fed7d7; color: var(--danger); }
+        .postura-agresivo { background: #fefcbf; color: #975a16; }
+
+        /* Stance Spectrum */
+        .stance-spectrum {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 18px 24px;
+            margin: 20px 0;
+        }
+        .stance-spectrum-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #718096;
+            margin-bottom: 14px;
+        }
+        .stance-spectrum-bar {
+            display: flex;
+            align-items: stretch;
+            height: 38px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .stance-spectrum-segment {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .spectrum-cauteloso { background: #fed7d7; color: #9b2c2c; }
+        .spectrum-neutral { background: #e2e8f0; color: #4a5568; }
+        .spectrum-constructivo { background: #c6f6d5; color: #276749; }
+        .spectrum-agresivo { background: #fefcbf; color: #975a16; }
+        .spectrum-active {
+            outline: 3px solid #2d3748;
+            outline-offset: -3px;
+            z-index: 1;
+            font-size: 12px;
+        }
+        .spectrum-active::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 7px solid #2d3748;
+        }
+        .stance-spectrum-labels {
+            display: flex;
+            font-size: 9px;
+            color: #a0aec0;
+            margin-top: 10px;
+        }
+        .stance-spectrum-labels span {
+            flex: 1;
+            text-align: center;
+        }
+
+        /* Conviction Meter */
+        .conviction-meter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .conviction-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .conviction-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+        }
+
+        .conviction-label {
+
+            font-size: 10px;
+            color: var(--text-light);
+            min-width: 60px;
+        }
+
+        /* Positioning Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .dashboard-panel {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .dashboard-panel-title {
+
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            background: var(--primary);
+            color: white;
+            padding: 8px 12px;
+        }
+
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 0.5fr 1fr;
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10pt;
+            align-items: center;
+        }
+
+        .dashboard-row:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        .dashboard-asset {
+
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .dash-ow { color: var(--success); font-weight: 600; }
+        .dash-uw { color: var(--danger); font-weight: 600; }
+        .dash-n { color: var(--text-light); }
+
+        .dash-arrow {
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .dash-arrow-up { color: var(--success); }
+        .dash-arrow-down { color: var(--danger); }
+        .dash-arrow-flat { color: var(--text-light); }
+
+        .dash-conviction {
+
+            font-size: 9px;
+            color: var(--text-light);
+        }
+
+        .dashboard-postura-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .dashboard-postura-label {
+
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-light);
+            margin-bottom: 10px;
+        }
+
+        .dashboard-postura-sesgo {
+
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .dashboard-postura-conv {
+
+            font-size: 10px;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        /* Model Portfolios */
+        .portfolios-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 9.5pt;
+        }
+
+        .portfolios-table th {
+
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            background: var(--primary);
+            color: white;
+            padding: 8px 10px;
+            text-align: center;
+        }
+
+        .portfolios-table th:first-child {
+            text-align: left;
+        }
+
+        .portfolios-table td {
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+
+            font-size: 10px;
+        }
+
+        .portfolios-table td:first-child {
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .portfolios-table tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        .portfolios-table .total-row td {
+            font-weight: 700;
+            border-top: 2px solid var(--primary);
+            background: var(--bg-light);
+        }
+
+        .port-risk-score {
+
+            font-size: 9px;
+            color: var(--text-light);
+        }
+
+        .pct-change-up { color: var(--success); font-size: 9px; }
+        .pct-change-down { color: var(--danger); font-size: 9px; }
+        .pct-change-flat { color: var(--text-light); font-size: 9px; }
+
+        /* Focus List */
+        .focus-category {
+            margin-bottom: 20px;
+        }
+
+        .focus-category-title {
+
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--secondary);
+            margin-bottom: 8px;
+        }
+
+        .focus-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+        }
+
+        .focus-table th {
+            font-size: 9px;
+            padding: 8px 10px;
+        }
+
+        .focus-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .focus-table tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        .focus-ticker {
+
+            font-weight: 600;
+            font-size: 11px;
+            color: var(--primary);
+        }
+
+        .focus-name {
+            font-size: 10px;
+            color: var(--text-light);
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header — matches Macro Report -->
+        <header class="header">
+            <div class="logo-section">
+                <h1>GREYBARK RESEARCH</h1>
+                <div class="subtitle">Reporte Asset Allocation</div>
+            </div>
+            <div class="report-info">
+                <div class="date">{{fecha_reporte}}</div>
+                <div>Comite de Inversion</div>
+            </div>
+        </header>
+
+    <!-- 1. RESUMEN EJECUTIVO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">1.</span> Resumen Ejecutivo</h2>
+
+        <p>{{intro_paragraph}}</p>
+
+        <div style="margin: 20px 0;">
+            <span class="postura-badge postura-{{postura_class}}">{{postura_view}} con sesgo {{postura_sesgo}}</span>
+            <div class="conviction-meter">
+                <span class="conviction-label">Conviccion:</span>
+                <div class="conviction-bar">
+                    <div class="conviction-fill" style="width: {{conviccion_pct}}%;"></div>
+                </div>
+                <span class="conviction-label">{{conviccion_text}}</span>
+            </div>
+        </div>
+
+        <div class="stance-spectrum">
+            <div class="stance-spectrum-title">Espectro de Posturas del Comite</div>
+            <div class="stance-spectrum-bar">
+                <div class="stance-spectrum-segment spectrum-cauteloso {{spectrum_active_cauteloso}}">CAUTELOSO</div>
+                <div class="stance-spectrum-segment spectrum-neutral {{spectrum_active_neutral}}">NEUTRAL</div>
+                <div class="stance-spectrum-segment spectrum-constructivo {{spectrum_active_constructivo}}">CONSTRUCTIVO</div>
+                <div class="stance-spectrum-segment spectrum-agresivo {{spectrum_active_agresivo}}">AGRESIVO</div>
+            </div>
+            <div class="stance-spectrum-labels">
+                <span>Defensivo / Risk-Off</span>
+                <span>Selectivo / Sin sesgo</span>
+                <span>Risk-On selectivo</span>
+                <span>Full Risk-On</span>
+            </div>
+        </div>
+
+        <div class="key-points">
+            <h4>Key Points</h4>
+            <ul>
+                {{key_points_html}}
+            </ul>
+        </div>
+
+        <p><strong>Principal catalizador a monitorear:</strong> {{catalizador}}</p>
+    </section>
+
+    <!-- 2. DASHBOARD DE POSICIONAMIENTO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">2.</span> Dashboard de Posicionamiento</h2>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-panel">
+                <div class="dashboard-panel-title">Renta Variable</div>
+                {{dashboard_rv_rows}}
+            </div>
+            <div class="dashboard-panel">
+                <div class="dashboard-panel-title">Renta Fija</div>
+                {{dashboard_rf_rows}}
+            </div>
+        </div>
+        <div class="dashboard-grid">
+            <div class="dashboard-panel">
+                <div class="dashboard-panel-title">Commodities &amp; FX</div>
+                {{dashboard_comm_rows}}
+            </div>
+            <div class="dashboard-panel dashboard-postura-panel">
+                <div class="dashboard-postura-label">Postura General</div>
+                <span class="postura-badge postura-{{postura_class}}">{{postura_view}}</span>
+                <div class="dashboard-postura-sesgo">{{postura_sesgo}}</div>
+                <div class="dashboard-postura-conv">Conviccion: {{conviccion_text}}</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. EL MES EN REVISION -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">3.</span> El Mes en Revision</h2>
+
+        <h3>3.1 Economia Global</h3>
+        <p>{{economia_global_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Indicador</th>
+                    <th>Actual</th>
+                    <th>Anterior</th>
+                    <th>Sorpresa</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{economia_global_tabla}}
+            </tbody>
+        </table>
+
+        <h3>3.2 Mercados Financieros</h3>
+        <p>{{mercados_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset</th>
+                    <th>Retorno Mes</th>
+                    <th>YTD / Cambio</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{mercados_tabla}}
+            </tbody>
+        </table>
+
+        <h3>3.3 Politica y Geopolitica</h3>
+        <p>{{geopolitica_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Evento</th>
+                    <th>Impacto</th>
+                    <th>Prob. Escalacion</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{geopolitica_tabla}}
+            </tbody>
+        </table>
+
+        <h3>3.4 Chile y Economia Local</h3>
+        <p>{{chile_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Indicador</th>
+                    <th>Valor</th>
+                    <th>Tendencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{chile_tabla}}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- 4. ESCENARIOS MACRO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">4.</span> Escenarios Macro</h2>
+
+        <p><strong>Escenario Base:</strong> {{escenario_base}} ({{escenario_base_prob}}%) - {{escenario_base_desc}}</p>
+
+        <div class="scenario-grid">
+            {{scenarios_html}}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Escenario</th>
+                    <th>Prob</th>
+                    <th>Equities</th>
+                    <th>Bonds</th>
+                    <th>USD</th>
+                    <th>Commodities</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{scenarios_table}}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- 5. VIEWS POR REGION -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">5.</span> Views por Region</h2>
+
+        {{regional_views_html}}
+    </section>
+
+    <!-- 6. IMPLICANCIAS POR ASSET CLASS -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">6.</span> Implicancias por Asset Class</h2>
+
+        <h3>6.1 Renta Variable</h3>
+        <p><strong>View Global:</strong> {{equity_view_global}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Region</th>
+                    <th>View</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{equity_regions_table}}
+            </tbody>
+        </table>
+
+        <p><strong>Sectores preferidos:</strong> {{sectores_preferidos}}<br>
+        <strong>Sectores a evitar:</strong> {{sectores_evitar}}<br>
+        <strong>Factor tilt:</strong> {{factor_tilt}}</p>
+
+        <h3>6.2 Renta Fija</h3>
+        <p><strong>View Tasas:</strong> {{rf_view_tasas}} | <strong>Duration:</strong> {{rf_view_duration}} | <strong>Credito:</strong> {{rf_view_credito}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tramo</th>
+                    <th>View</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{rf_curva_table}}
+            </tbody>
+        </table>
+
+        <div class="key-points">
+            <h4>Chile Especifico</h4>
+            <ul>
+                <li><strong>TPM Path:</strong> {{chile_tpm_path}}</li>
+                <li><strong>Carry Trade:</strong> {{chile_carry_trade}}</li>
+                <li><strong>Recomendacion:</strong> {{chile_rf_recomendacion}}</li>
+            </ul>
+        </div>
+
+        <h3>6.3 Monedas</h3>
+        <p><strong>View USD:</strong> {{fx_view_usd}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Par</th>
+                    <th>View</th>
+                    <th>Target 3M</th>
+                    <th>Target 12M</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{fx_table}}
+            </tbody>
+        </table>
+
+        <h3>6.4 Commodities</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Commodity</th>
+                    <th>View</th>
+                    <th>Target</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{commodities_table}}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- 7. RIESGOS Y MONITOREO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">7.</span> Riesgos y Que Monitorear</h2>
+
+        <h3>Top 3 Riesgos</h3>
+        {{risks_html}}
+
+        <h3>Calendario de Eventos Clave</h3>
+        <table class="calendar-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Evento</th>
+                    <th>Relevancia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{calendar_table}}
+            </tbody>
+        </table>
+
+        <div class="triggers-list">
+            <h4>Triggers para Reconvocar Comite</h4>
+            <ul>
+                {{triggers_html}}
+            </ul>
+        </div>
+    </section>
+
+    <!-- 8. PORTAFOLIOS MODELO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">8.</span> Portafolios Modelo</h2>
+
+        <table class="portfolios-table">
+            <thead>
+                <tr>
+                    <th>Asset Class</th>
+                    {{portfolios_header_html}}
+                </tr>
+            </thead>
+            <tbody>
+                {{portfolios_body_html}}
+            </tbody>
+        </table>
+
+        <p style="font-size: 9pt; color: var(--text-light); margin-top: 10px;">
+            Las flechas indican cambios vs mes anterior: <span class="pct-change-up">&#9650;</span> aumento,
+            <span class="pct-change-down">&#9660;</span> reduccion, <span class="pct-change-flat">&#8594;</span> sin cambio.
+            Porcentajes suman 100% por perfil.
+        </p>
+    </section>
+
+    <!-- 9. FOCUS LIST -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">9.</span> Focus List — Instrumentos Recomendados</h2>
+
+        {{focus_list_html}}
+
+        <p style="font-size: 9pt; color: var(--text-light); margin-top: 15px;">
+            <strong>Nota:</strong> Los instrumentos listados son recomendaciones del Comite de Inversion y no constituyen asesoría personalizada.
+            OW = Overweight, N = Neutral, UW = Underweight. Consulte con su asesor antes de operar.
+        </p>
+    </section>
+
+    <!-- Footer — matches Macro Report -->
+    <footer class="footer">
+        <div>GREYBARK RESEARCH | Reporte Asset Allocation | {{fecha_reporte}}</div>
+        <div class="disclaimer">
+            Este documento es solo para fines informativos y no constituye una recomendacion de inversion.
+            Las opiniones expresadas son las del Comite de Inversion de Greybark Research a la fecha indicada y estan sujetas a cambios sin previo aviso.
+            El rendimiento pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.
+        </div>
+    </footer>
+    </div>
+</body>
+</html>
