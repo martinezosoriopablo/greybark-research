@@ -43,18 +43,18 @@ INPUT_DIR = Path(".")
 OUTPUT_DIR = Path("html_out")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-LOGO_URL = "https://i.imgur.com/kYvSADf.png"
+# Paleta Greybark Research (unificada con reportes mensuales)
+PRIMARY_BLACK = "#1a1a1a"
+ACCENT_ORANGE = "#dd6b20"
+GREEN_TEXT = "#276749"
+RED_TEXT = "#c53030"
+TEXT_MEDIUM = "#4a4a4a"
+TEXT_LIGHT = "#717171"
+BG_EVEN = "#f7f7f7"
+BORDER_COLOR = "#e0e0e0"
+WHITE = "#ffffff"
 
-# Colores globales
-BLACK_BAR = "#0b1220"
-WHITE_ON_BLACK = "#ffffff"
-GREEN_TEXT = "#059669"
-RED_TEXT = "#dc2626"
-GRAY_TEXT = "#374151"
-BG_ODD = "#ffffff"
-BG_EVEN = "#fbfdff"
-
-# Plantilla con CSS extra para impresión (PDF)
+# Plantilla Greybark Research (unificada con reportes mensuales)
 HTML_TEMPLATE = """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="es">
 <head>
@@ -62,67 +62,65 @@ HTML_TEMPLATE = """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{title}</title>
   <style type="text/css">
-    body {{ margin: 0; padding: 0; -webkit-text-size-adjust: 100%; font-family: sans-serif; }}
+    body {{ margin: 0; padding: 0; -webkit-text-size-adjust: 100%; font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 10pt; color: #4a4a4a; }}
     table {{ border-collapse: collapse; }}
-    
-    /* ESTILOS ESPECÍFICOS PARA PDF / IMPRESIÓN */
     @media print {{
         div, table, tr, td, th {{
-            page-break-inside: avoid !important; /* Evita cortar tablas a la mitad */
+            page-break-inside: avoid !important;
         }}
-        body {{ 
-            background-color: #ffffff !important; 
-        }}
+        body {{ background-color: #ffffff !important; }}
     }}
   </style>
 </head>
-<body style="margin:0; padding:0; background-color:#f3f4f6;">
-  <div style="width: 100%; max-width: 800px; margin: 0 auto; background-color: #ffffff;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ffffff;">
-        <tr>
-          <td align="center" style="padding:20px;">
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-radius:12px; overflow:hidden;">
-              
-              <tr>
-                <td style="background-color:#000000; padding:22px 26px;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                    <tr>
-                      <td valign="middle" width="110">
-                        <img src="{logo_url}" alt="Grey Bark Advisors" width="84" height="84" style="display:block; width:84px; height:auto;" />
-                      </td>
-                      <td valign="middle" style="padding-left:16px;">
-                        <div style="color:#ffffff; font-size:26px; font-weight:900; line-height:1.15;">
-                          Reporte de Mercados
-                        </div>
-                        <div style="color:#d1d5db; font-size:14px; margin-top:8px;">
-                          {date_str}
-                          <span style="display:inline-block; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:900; text-transform:uppercase; margin-left:8px; {badge_style}">
-                            {report_type}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
+<body style="margin:0; padding:0; background-color:#ffffff;">
+  <div style="width:100%; max-width:1000px; margin:0 auto; background-color:#ffffff;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ffffff;">
+      <tr>
+        <td style="padding:20px 40px;">
 
-              <tr>
-                <td style="padding:26px; font-size:14px; line-height:1.6; color:#111827;">
-                  {content_html}
-                </td>
-              </tr>
+          <!-- HEADER -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom:3px solid #1a1a1a; padding-bottom:15px; margin-bottom:25px;">
+            <tr>
+              <td valign="bottom">
+                <div style="font-family:'Arial Black','Segoe UI',sans-serif; font-size:20pt; font-weight:900; color:#1a1a1a; text-transform:uppercase; letter-spacing:1px; line-height:1.1;">
+                  GREYBARK RESEARCH
+                </div>
+                <div style="font-size:12pt; color:#dd6b20; font-weight:500; margin-top:2px;">
+                  Reporte Diario de Mercados
+                  <span style="display:inline-block; padding:3px 10px; border-radius:4px; font-size:10px; font-weight:900; text-transform:uppercase; margin-left:8px; {badge_style}">
+                    {report_type}
+                  </span>
+                </div>
+              </td>
+              <td valign="bottom" style="text-align:right;">
+                <div style="font-size:11pt; font-weight:600; color:#1a1a1a;">{date_str}</div>
+                <div style="font-size:9pt; color:#717171;">Perspectivas de Mercado</div>
+              </td>
+            </tr>
+          </table>
 
-              <tr>
-                <td style="background-color:#f9fafb; padding:18px 26px; border-top:1px solid #e5e7eb;">
-                  <div style="text-align:center; color:#6b7280; font-size:12px;">
-                    <strong style="color:#111827;">Grey Bark Advisors</strong> • Reporte Automatizado<br/>
-                  </div>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
+          <!-- CONTENT -->
+          <div style="font-size:10pt; line-height:1.6; color:#4a4a4a;">
+            {content_html}
+          </div>
+
+          <!-- FOOTER -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:40px; border-top:2px solid #1a1a1a; padding-top:15px;">
+            <tr>
+              <td style="text-align:center; font-size:8pt; color:#717171;">
+                <div>GREYBARK RESEARCH | Reporte Diario | {date_str}</div>
+                <div style="margin-top:10px; padding:10px; background:#f7f7f7; border-radius:5px; font-size:7pt; line-height:1.4;">
+                  Este documento es solo para fines informativos y no constituye una recomendacion de inversion.
+                  Las proyecciones y estimaciones contenidas en este reporte estan basadas en supuestos que pueden no materializarse.
+                  El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.
+                </div>
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>
@@ -155,10 +153,10 @@ def format_date_from_stem(stem: str) -> str:
 # (Se mantienen iguales para asegurar el estilo inline)
 
 def convert_dashboard_to_html(lines):
-    s_table = "width: 100%; margin: 14px 0; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; border-collapse: separate; border-spacing: 0; overflow: hidden; page-break-inside: avoid;"
-    s_td_base = "padding: 9px 8px; text-align: center; font-family: sans-serif; line-height: 1.15; border-bottom: 1px solid #eef2f7;"
-    s_header = f"background: {BLACK_BAR}; color: {WHITE_ON_BLACK}; font-size: 14px; font-weight: 900; text-transform: uppercase; text-align: left; padding-left: 12px;"
-    s_val = f"background: #ffffff; color: {GRAY_TEXT}; font-size: 11px; font-weight: 600;"
+    s_table = f"width:100%; margin:14px 0; background:{WHITE}; border:1px solid {BORDER_COLOR}; border-radius:8px; border-collapse:separate; border-spacing:0; overflow:hidden; page-break-inside:avoid;"
+    s_td_base = f"padding:9px 8px; text-align:center; font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif; line-height:1.15; border-bottom:1px solid {BORDER_COLOR};"
+    s_header = f"background:{PRIMARY_BLACK}; color:{WHITE}; font-size:9pt; font-weight:700; text-transform:uppercase;"
+    s_val = f"background:{WHITE}; color:{TEXT_MEDIUM}; font-size:9pt; font-weight:600;"
 
     html_parts = [f'<table style="{s_table}" cellpadding="0" cellspacing="0" border="0">']
     data_lines = [l.strip() for l in lines if l.strip() and not l.strip().startswith('=') and 'DASHBOARD' not in l.upper()]
@@ -168,18 +166,18 @@ def convert_dashboard_to_html(lines):
         changes = [c.strip() for c in data_lines[1].split() if c.strip()]
         values  = [v.strip() for v in data_lines[2].split() if v.strip()]
 
-        html_parts.append('<tr>' + ''.join(f'<td style="{s_td_base} {s_header}">{h}</td>' for h in headers[:5]) + '</tr>')
-        
+        html_parts.append('<tr>' + ''.join(f'<td style="{s_td_base} {s_header}">{h}</td>' for h in headers[:6]) + '</tr>')
+
         row_cells = []
-        for c in changes[:5]:
-            color = "#111827"
+        for c in changes[:6]:
+            color = PRIMARY_BLACK
             if '%' in c:
                 if '+' in c: color = GREEN_TEXT
                 elif '-' in c: color = RED_TEXT
-            s_change = f"background: #ffffff; color: {color}; font-size: 14px; font-weight: 900;"
+            s_change = f"background:{WHITE}; color:{color}; font-size:12pt; font-weight:900;"
             row_cells.append(f'<td style="{s_td_base} {s_change}">{c}</td>')
         html_parts.append('<tr>' + ''.join(row_cells) + '</tr>')
-        html_parts.append('<tr>' + ''.join(f'<td style="{s_td_base} {s_val}">{v}</td>' for v in values[:5]) + '</tr>')
+        html_parts.append('<tr>' + ''.join(f'<td style="{s_td_base} {s_val}">{v}</td>' for v in values[:6]) + '</tr>')
 
     html_parts.append('</table>')
     return "\n".join(html_parts)
@@ -213,12 +211,11 @@ def infer_block_cols(lines, default_cols=5) -> int:
     return default_cols
 
 def convert_market_table_to_html(lines):
-    # Agregamos page-break-inside: avoid para el PDF
-    s_table = "width: 100%; margin: 14px 0; font-family: sans-serif; font-size: 11px; border: 1px solid #e5e7eb; border-radius: 12px; border-collapse: separate; border-spacing: 0; overflow: hidden; page-break-inside: avoid;"
-    s_th = f"background: {BLACK_BAR}; color: {WHITE_ON_BLACK}; padding: 9px 10px; font-weight: 900; font-size: 11px; border-bottom: 1px solid #111827; white-space: nowrap;"
-    s_td = "padding: 8px 10px; border-bottom: 1px solid #eef2f7; font-size: 11px; color: #111827; white-space: nowrap;"
-    s_section = f"background: {BLACK_BAR}; color: {WHITE_ON_BLACK}; text-align: center; font-weight: 900; padding: 10px; text-transform: uppercase; letter-spacing: 0.45px; font-size: 11px; border-bottom: 0;"
-    s_sub = f"background: {BLACK_BAR}; color: {WHITE_ON_BLACK}; font-weight: 900; font-size: 11px; padding: 9px 10px;"
+    s_table = f"width:100%; margin:14px 0; font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif; font-size:9pt; border:1px solid {BORDER_COLOR}; border-radius:8px; border-collapse:separate; border-spacing:0; overflow:hidden; page-break-inside:avoid;"
+    s_th = f"background:{PRIMARY_BLACK}; color:{WHITE}; padding:10px 8px; font-weight:700; font-size:9pt; border-bottom:1px solid {PRIMARY_BLACK}; white-space:nowrap;"
+    s_td = f"padding:8px 8px; border-bottom:1px solid {BORDER_COLOR}; font-size:9pt; color:{PRIMARY_BLACK}; white-space:nowrap;"
+    s_section = f"background:{PRIMARY_BLACK}; color:{WHITE}; text-align:center; font-weight:700; padding:10px; text-transform:uppercase; letter-spacing:0.45px; font-size:9pt; border-bottom:0;"
+    s_sub = f"background:{PRIMARY_BLACK}; color:{WHITE}; font-weight:700; font-size:9pt; padding:9px 10px;"
 
     html_parts = [f'<table style="{s_table}" cellpadding="0" cellspacing="0">']
 
@@ -260,7 +257,7 @@ def convert_market_table_to_html(lines):
         if not parts: continue
         if header_seen and expected_cols and not vix_parts: parts = normalize_row(parts, expected_cols)
 
-        bg_color = BG_ODD if row_count % 2 == 0 else BG_EVEN
+        bg_color = WHITE if row_count % 2 == 0 else BG_EVEN
         row_count += 1
 
         tds = []
@@ -322,6 +319,54 @@ def process_markdown_content(text):
         result.append(line); i += 1
     return "\n".join(result)
 
+def apply_inline_styles(html):
+    """Inyecta estilos Greybark en tags generados por markdown.markdown()."""
+    # h2 — section title: 14pt, orange bottom border
+    html = re.sub(
+        r'<h2>(.*?)</h2>',
+        r'<h2 style="font-size:14pt; font-weight:700; color:#1a1a1a; border-bottom:2px solid #dd6b20; padding-bottom:8px; margin:25px 0 15px 0;">\1</h2>',
+        html
+    )
+    # h3 — subsection: 11pt, orange left border
+    html = re.sub(
+        r'<h3>(.*?)</h3>',
+        r'<h3 style="font-size:11pt; font-weight:600; color:#3a3a3a; margin:15px 0 10px 0; padding-left:10px; border-left:3px solid #dd6b20;">\1</h3>',
+        html
+    )
+    # h1 — keep large for report title
+    html = re.sub(
+        r'<h1>(.*?)</h1>',
+        r'<h1 style="font-size:16pt; font-weight:700; color:#1a1a1a; margin:20px 0 10px 0;">\1</h1>',
+        html
+    )
+    # p — body text
+    html = re.sub(
+        r'<p>',
+        '<p style="font-size:10pt; color:#4a4a4a; line-height:1.6; margin:8px 0;">',
+        html
+    )
+    # li — list items
+    html = re.sub(
+        r'<li>',
+        '<li style="font-size:10pt; color:#4a4a4a; margin-bottom:5px;">',
+        html
+    )
+    # strong — bold in primary black
+    html = re.sub(
+        r'<strong>',
+        '<strong style="color:#1a1a1a;">',
+        html
+    )
+    # Resumen Ejecutivo — wrap in orange-bordered box
+    html = re.sub(
+        r'(<h2[^>]*>.*?Resumen Ejecutivo.*?</h2>)(.*?)(?=<h2|$)',
+        lambda m: m.group(1) + '<div style="background:#f7f7f7; border-left:4px solid #dd6b20; padding:15px; border-radius:5px; margin-bottom:20px;">' + m.group(2) + '</div>',
+        html,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+    return html
+
+
 def build_files(md_path: Path):
     text = md_path.read_text(encoding="utf-8", errors="replace")
     title = "Reporte de Mercados"
@@ -330,13 +375,13 @@ def build_files(md_path: Path):
 
     report_type = detect_report_type_from_name(md_path.stem)
     if report_type == "AM":
-        badge_style = "background-color:#facc15; color:#000000;"
+        badge_style = f"background-color:{ACCENT_ORANGE}; color:{WHITE};"
     elif report_type == "PM":
-        badge_style = "background-color:#2563eb; color:#ffffff;"
+        badge_style = f"background-color:{PRIMARY_BLACK}; color:{WHITE};"
     elif report_type == "SEMANAL":
-        badge_style = "background-color:#059669; color:#ffffff;"  # Verde para semanal
+        badge_style = f"background-color:{GREEN_TEXT}; color:{WHITE};"
     else:
-        badge_style = "background-color:#6b7280; color:#ffffff;"
+        badge_style = f"background-color:{TEXT_LIGHT}; color:{WHITE};"
 
     processed = process_markdown_content(text)
     if markdown:
@@ -344,8 +389,10 @@ def build_files(md_path: Path):
     else:
         content_html = processed.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
 
+    content_html = apply_inline_styles(content_html)
+
     final_html = HTML_TEMPLATE.format(
-        title=title, logo_url=LOGO_URL, date_str=format_date_from_stem(md_path.stem),
+        title=title, date_str=format_date_from_stem(md_path.stem),
         report_type=report_type, badge_style=badge_style, content_html=content_html
     )
 
@@ -359,10 +406,10 @@ def build_files(md_path: Path):
         out_pdf = OUTPUT_DIR / (md_path.stem + ".pdf")
         options = {
             'page-size': 'A4',
-            'margin-top': '0.75in',
-            'margin-right': '0.75in',
-            'margin-bottom': '0.75in',
-            'margin-left': '0.75in',
+            'margin-top': '0.5in',
+            'margin-right': '0.5in',
+            'margin-bottom': '0.5in',
+            'margin-left': '0.5in',
             'encoding': "UTF-8",
             'no-outline': None
         }
