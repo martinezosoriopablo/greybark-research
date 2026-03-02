@@ -1,0 +1,29 @@
+# Greybark Research - Dependencies
+# Install: pip install -r requirements.txt
+
+# Core
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# AI Council (Claude API)
+anthropic>=0.7.0
+
+# Financial Data APIs
+fredapi>=0.5.0
+yfinance>=0.2.25
+
+# Econometric Models
+statsmodels>=0.14.0
+pmdarima>=2.0.0
+
+# Visualization (charts for reports)
+matplotlib>=3.7.0
+
+# HTML Parsing (daily reports)
+beautifulsoup4>=4.12.0
+
+# Optional: LSTM predictor (requires GPU)
+# torch>=2.0.0

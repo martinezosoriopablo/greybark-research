@@ -1,0 +1,1609 @@
+# =============================================================================
+# GREYBARK RESEARCH - ÍNDICE MAESTRO DE REPORTES
+# =============================================================================
+# Estructura de cada reporte: Secciones + Charts + Datos
+# Fecha: 22 Enero 2026 | Actualizado: 11 Febrero 2026
+# Versión: 4.1 - v4.0 + Estado de implementación + Earnings AV Premium
+# =============================================================================
+
+# =============================================================================
+# 🆕 v4.0: ARQUITECTURA AI COUNCIL
+# =============================================================================
+# 
+# El diferenciador clave de Greybark Research: no vendemos reportes, vendemos un
+# DEPARTAMENTO DE RESEARCH COMPLETO con especialistas que debaten.
+#
+#   MÚLTIPLES FUENTES GLOBALES
+#           ↓
+#      5 IAS SPECIALISTS
+#           ↓
+#      AI COUNCIL (debate)
+#           ↓
+#    CONSENSO + DISENSOS
+#           ↓
+#       REPORTES
+#
+# =============================================================================
+
+ai_council:
+  
+  descripcion: |
+    El AI Council replica la dinámica de un comité de inversiones profesional.
+    5 Intelligent Analyst Specialists (IAS) procesan información y DEBATEN
+    para producir recomendaciones más robustas que un solo analista.
+  
+  valor_propuesta: |
+    "Acceso a un departamento de research completo con especialistas que
+    procesan información global y debaten para darte mejores decisiones."
+  
+  especialistas:
+    
+    ias_macro:
+      nombre: "IAS Macro"
+      expertise:
+        - "Regímenes económicos (recession/slowdown/moderate/expansion/late_cycle)"
+        - "Bancos centrales (Fed, BCE, BCCh)"
+        - "Leading indicators"
+        - "China credit impulse"
+        - "Geopolítica market-relevant"
+      output: "Contexto macro, clasificación de régimen, catalizadores"
+      alimenta_reportes: ["Macro", "Asset Allocation"]
+    
+    ias_renta_variable:
+      nombre: "IAS Renta Variable"
+      expertise:
+        - "Earnings analysis (beat rate, revisions)"
+        - "Valuaciones (P/E, EV/EBITDA)"
+        - "Análisis sectorial"
+        - "Factor analysis (value, growth, momentum, quality)"
+        - "Market breadth"
+      output: "Recomendaciones equity, sectores, factores"
+      alimenta_reportes: ["Renta Variable", "Asset Allocation"]
+    
+    ias_renta_fija:
+      nombre: "IAS Renta Fija"
+      expertise:
+        - "Duration positioning"
+        - "Credit spreads (IG, HY por rating)"
+        - "Curvas de tasas (US, Chile)"
+        - "Chile profundo (Swap CÁMARA, breakeven)"
+        - "Carry trade analysis"
+      output: "Duration, credit allocation, oportunidades Chile"
+      alimenta_reportes: ["Renta Fija", "Asset Allocation"]
+    
+    ias_riesgo:
+      nombre: "IAS Riesgo"
+      expertise:
+        - "VaR (95%, 99%)"
+        - "Expected Shortfall"
+        - "Stress testing (6 escenarios)"
+        - "Correlaciones dinámicas"
+        - "Tail risks"
+        - "LSTM price predictions"
+      output: "Métricas de riesgo, alertas, hedging"
+      alimenta_reportes: ["Macro", "Asset Allocation"]
+    
+    ias_asset_allocation:
+      nombre: "IAS Asset Allocation"
+      expertise:
+        - "Construcción de portafolio"
+        - "5 perfiles de riesgo"
+        - "13 asset classes"
+        - "Tactical vs strategic"
+        - "Track record"
+      output: "Portafolios modelo, cambios tácticos, accountability"
+      alimenta_reportes: ["Asset Allocation"]
+  
+  dinamica_debate:
+    descripcion: |
+      Los IAS no operan en silos. DEBATEN entre sí para contrastar perspectivas
+      y producir recomendaciones más robustas.
+    
+    ejemplo:
+      situacion: "Fed más hawkish de lo esperado"
+      debate:
+        ias_macro: "Régimen → SLOWDOWN, probabilidad recesión sube"
+        ias_renta_fija: "Extender duración, pero cuidado con crédito HY"
+        ias_renta_variable: "Rotar a Quality y Defensivos, reducir Cyclicals"
+        ias_riesgo: "VaR sube 15%, activar hedge con puts"
+        ias_asset_allocation: "Consenso: reducir equity 5%. Disenso: timing del hedge"
+      output: "Recomendación integra todas las perspectivas + documenta disenso"
+    
+    valor:
+      - "Evita sesgo de un solo analista"
+      - "Identifica blind spots"
+      - "Documenta disensos (no solo consenso)"
+      - "Recomendaciones más robustas"
+
+# =============================================================================
+# 🆕 v4.0: FUENTES DE INFORMACIÓN
+# =============================================================================
+
+fuentes_informacion:
+  
+  descripcion: |
+    Greybark Research se diferencia por procesar MÚLTIPLES FUENTES GLOBALES,
+    no solo la narrativa occidental tradicional.
+  
+  tradicionales:
+    - "Wall Street Journal (Markets, AI & Business)"
+    - "Financial Times"
+    - "Bloomberg"
+    - "Reuters"
+    - "Diario Financiero"
+  
+  globales_diferenciadas:
+    importancia: "⭐⭐⭐ DIFERENCIADOR ÚNICO"
+    descripcion: "Objetividad a través de múltiples perspectivas"
+    fuentes:
+      rusia: ["TASS", "RT Business"]
+      china: ["Xinhua", "SCMP", "Caixin"]
+      medio_oriente: ["Al Jazeera Business"]
+      latam: ["Valor Econômico (Brasil)", "El Economista (México)"]
+  
+  alternativas:
+    telegram:
+      descripcion: "Canales de análisis y breaking news"
+      valor: "Información en tiempo real, early signals"
+    polymarket:
+      descripcion: "Mercados de predicción"
+      valor: "Probabilidades implícitas de eventos"
+  
+  datos_mercado:
+    - "Yahoo Finance (precios, ETFs, indices)"
+    - "FRED (macro US, spreads)"
+    - "Banco Central Chile REST API"
+    - "AlphaVantage Premium (fundamentals, earnings, sentiment, news)"
+    - "CommLoan (SOFR forwards)"
+    - "BEA (investment data)"
+    - "GPR Index (geopolitical risk)"
+  
+  flujo_procesamiento:
+    1: "Curación automática (eliminar ruido)"
+    2: "Categorización por tema/relevancia"
+    3: "Distribución a IAS especialista"
+    4: "Análisis y debate AI Council"
+    5: "Síntesis en recomendaciones"
+
+# =============================================================================
+# 🆕 v4.0: REPORTE DIARIO - BASE DEL SISTEMA
+# =============================================================================
+
+reporte_diario:
+  nombre: "Daily Intelligence Report"
+  frecuencia: "2x día (AM pre-apertura, PM cierre)"
+  
+  versiones:
+    finanzas_am:
+      audiencia: "Buy Side, Gestores Pro"
+      tono: "Técnico, conciso"
+      prompt: "prompt_finanzas_AM.txt"
+    finanzas_pm:
+      audiencia: "Buy Side, Gestores Pro"
+      tono: "Técnico, conciso"
+      prompt: "prompt_finanzas_PM.txt"
+    no_finanzas_am:
+      audiencia: "Wealth, Semi-pro, Corporate"
+      tono: "Accesible, sin jerga"
+      prompt: "prompt_no_finanzas_AM.txt"
+    no_finanzas_pm:
+      audiencia: "Wealth, Semi-pro, Corporate"
+      tono: "Accesible, sin jerga"
+      prompt: "prompt_no_finanzas_PM.txt"
+  
+  estructura:
+    0_tabla_mercados:
+      nombre: "Dashboard de Mercados"
+      contenido: "IPSA, S&P 500, Petróleo, Cobre, USD/CLP, Bitcoin"
+      formato: "Monospace, 3 filas (nombre, variación %, precio)"
+    
+    1_resumen_ejecutivo:
+      nombre: "Resumen Ejecutivo"
+      largo: "3-5 bullets"
+      contenido: "Lo más importante del día"
+    
+    2_economia:
+      nombre: "Economía"
+      contenido: "Macro, tasas, bancos centrales, datos económicos"
+    
+    3_politica_geopolitica:
+      nombre: "Política y Geopolítica"
+      contenido: "Solo si es market-relevant"
+    
+    4_ia_tecnologia:
+      nombre: "Inteligencia Artificial y Tecnología"
+      contenido: "Desarrollos que mueven mercados"
+      importancia: "⭐⭐⭐ Tema crítico"
+    
+    5_chile_latam:
+      nombre: "Chile y LatAm"
+      contenido: "IPSA, TPM, dólar observado, noticias locales"
+    
+    6_mercados_activo:
+      nombre: "Mercados por Activo"
+      subsecciones:
+        - "Renta Variable (indices globales)"
+        - "Renta Fija (treasuries, spreads)"
+        - "Monedas (DXY, USD/CLP, EM)"
+        - "Commodities (oil, copper, gold)"
+        - "Criptomonedas (BTC, ETH)"
+    
+    7_sentimiento:
+      nombre: "Sentimiento y Volatilidad"
+      contenido: "VIX, sentiment score, fear & greed"
+    
+    8_agenda:
+      nombre: "Agenda"
+      contenido: "Eventos próximos market-moving"
+    
+    9_idea_tactica:
+      nombre: "Idea Táctica"
+      contenido: "1 idea condicionada a datos del JSON"
+      nota: "No recomendación personalizada"
+    
+    10_glosario:
+      nombre: "Glosario"
+      contenido: "Siempre presente en versión no_finanzas"
+  
+  flujo_hacia_mensuales:
+    descripcion: "El research diario alimenta los reportes mensuales"
+    macro:
+      - "30 días de evolución narrativa Fed/BCCh"
+      - "Cambios en sentiment sectorial"
+      - "Eventos geopolíticos acumulados"
+    renta_variable:
+      - "Earnings sorpresas y revisiones"
+      - "Cambios en recomendaciones"
+      - "Temas de inversión emergentes"
+    renta_fija:
+      - "Evolución de expectativas de tasas"
+      - "Movimientos de spreads"
+      - "Eventos de crédito"
+    asset_allocation:
+      - "Performance acumulado por asset class"
+      - "Cambios en correlaciones"
+      - "Oportunidades tácticas identificadas"
+  
+  scripts:
+    - "daily_market_snapshot.py"
+    - "generate_daily_report.py"
+    - "newsletter_curator.py"
+    - "alphavantage_integration.py"
+
+# =============================================================================
+# REPORTES MENSUALES
+# =============================================================================
+
+reportes:
+  
+  # ===========================================================================
+  # REPORTE 1: MACRO MENSUAL
+  # ===========================================================================
+  macro:
+    nombre: "Reporte Macro Mensual"
+    frecuencia: "Mensual"
+    paginas: "22-28"  # Actualizado por nuevas secciones v4.0
+    dia_publicacion: 15
+    ias_principal: "IAS Macro"
+    mejoras_v4: [2, 3, 8, 10]  # Risk Dashboard, Inflation, China, Breadth
+    
+    secciones:
+      1_resumen_ejecutivo:
+        nombre: "Resumen Ejecutivo"
+        largo: "300-400 palabras"
+        contenido: "Síntesis macro global + Chile, principales conclusiones"
+      
+      1_5_regimen_macro:
+        nombre: "Régimen Macro & Leading Indicators Dashboard"
+        largo: "2-3 páginas"
+        charts: ["#20 (Regime Timeline)", "#21 (Indicators Heatmap)", "#22 (Sector Sentiment)", "#23 (Score Breakdown)"]
+        subsecciones:
+          clasificacion:
+            nombre: "Clasificación de Régimen"
+            contenido:
+              - "Régimen actual (RECESSION/SLOWDOWN/MODERATE/EXPANSION/LATE_CYCLE)"
+              - "Score agregado (-3 a +3) con gauge visual"
+              - "Probabilidades por régimen"
+              - "Cambio vs mes anterior"
+          dashboard:
+            nombre: "Dashboard de Indicadores Líderes"
+            contenido:
+              - "Tabla: 11 indicadores con score, valor, percentil"
+              - "Top 3 concerns + Top 3 supports"
+          sentiment:
+            nombre: "Sentiment Sectorial"
+            contenido:
+              - "Sentiment por sector (AlphaVantage)"
+              - "Divergencias sentiment vs fundamentals"
+          implicaciones:
+            nombre: "Implicaciones para Inversión"
+            contenido:
+              - "Asset allocation recomendada"
+              - "Sectores Tier 1 a profundizar"
+              - "Catalizadores próximos 30 días"
+        importancia: "⭐⭐⭐ DIFERENCIADOR - Ningún competidor tiene esto"
+      
+      # 🆕 v4.0 MEJORA #2: Risk Dashboard
+      1_6_risk_dashboard:
+        nombre: "Risk Dashboard"
+        mejora_v4: "#2 - Risk Dashboard Integrado"
+        largo: "1-2 páginas"
+        charts: ["#24 (VaR Histórico)", "#25 (Stress Test)", "#26 (LSTM Predictions)"]
+        contenido:
+          - "VaR 95% y 99% por asset class"
+          - "Expected Shortfall"
+          - "Stress testing (6 escenarios: 2008, COVID, Inflation, Rate Shock, EM Crisis, Geopolitical)"
+          - "LSTM price predictions (20 días)"
+          - "Correlaciones dinámicas"
+        modulo: "greybark.analytics.risk"
+        importancia: "⭐⭐⭐ Quant differentiator"
+      
+      2_economia_us:
+        nombre: "Economía US"
+        charts: ["#10 (Disinflación)", "#11 (Fed Policy)"]
+        datos:
+          - "CPI (FRED: CPILFESL)"
+          - "Unemployment (FRED: UNRATE)"
+          - "GDP (FRED: GDPC1)"
+          - "Fed Funds (FRED: DFF)"
+        
+        # 🆕 v4.0 MEJORA #3: Inflation Analytics
+        subseccion_inflacion:
+          nombre: "Análisis de Inflación Profundo"
+          mejora_v4: "#3 - Inflation Analytics"
+          charts: ["#27 (Breakeven USA)", "#28 (Real Rates)"]
+          contenido:
+            - "Breakeven inflation (5Y, 10Y)"
+            - "Real rates vs nominal"
+            - "TIPS spreads"
+            - "Core vs headline divergence"
+          datos:
+            - "FRED: T5YIE, T10YIE (breakeven)"
+            - "FRED: DFII5, DFII10 (real rates)"
+          modulo: "greybark.analytics.macro"
+      
+      3_economia_chile:
+        nombre: "Economía Chile"
+        charts: ["#10 Chile", "#11 BCCh"]
+        datos:
+          - "Imacec (BCCh: F032.IMC.IND.0.N.CLP.EP18.Z.Z)"
+          - "IPC (BCCh: F073.IPC.1.0.0.Z.Z)"
+          - "TPM (BCCh: F074.TPM.PLG.N.D)"
+        
+        # 🆕 v4.0 MEJORA #6: Chile Profundo (parte 1)
+        subseccion_chile_profundo:
+          nombre: "Chile Macro Profundo"
+          mejora_v4: "#6 - Chile Analytics"
+          charts: ["#35 (TPM Real)"]
+          contenido:
+            - "TPM real (TPM - IPC esperado)"
+            - "Policy stance (restrictive/neutral/accommodative)"
+            - "Diferencial TPM vs Fed Funds"
+          modulo: "greybark.analytics.chile"
+      
+      # 🆕 v4.0 MEJORA #8: China Credit Impulse
+      3_5_china_credit:
+        nombre: "China Credit Impulse"
+        mejora_v4: "#8 - China Credit Analytics"
+        largo: "1 página"
+        charts: ["#29 (China Credit)", "#30 (Commodities Link)"]
+        contenido:
+          - "Credit impulse (% GDP)"
+          - "EPU China Index"
+          - "Correlación con commodities"
+          - "Implicaciones para Chile (cobre)"
+        datos:
+          - "FRED: CLVMNACSCAB1GQCN (China GDP)"
+          - "PolicyUncertainty.com (EPU China)"
+        modulo: "greybark.analytics.china"
+        importancia: "⭐⭐⭐ ÚNICO EN CHILE"
+      
+      # 🆕 v4.0 MEJORA #10: Market Breadth
+      3_6_market_breadth:
+        nombre: "Market Breadth"
+        mejora_v4: "#10 - Market Breadth Analytics"
+        charts: ["#31 (Advance-Decline)", "#32 (New Highs/Lows)"]
+        contenido:
+          - "Advance-Decline line"
+          - "% stocks above 200 DMA"
+          - "New highs vs new lows"
+          - "Risk appetite indicator"
+        modulo: "greybark.analytics.breadth"
+      
+      4_inversion_ai:
+        nombre: "Ciclo de Inversión AI"
+        charts: ["#15 (AI Cycle)", "#16 (Tech Concentration)"]
+        datos:
+          - "BEA Investment by Type (FAAt201)"
+        importancia: "⭐⭐⭐ Análisis diferenciador vs competencia"
+      
+      5_riesgo_geopolitico:
+        nombre: "Riesgo Geopolítico"
+        charts: ["#13 (GPR Index)"]
+        datos:
+          - "GPR Index (CSV download)"
+      
+      6_tasas:
+        nombre: "Tasas de Interés"
+        charts: ["Yield Curve"]
+        datos:
+          - "2Y, 10Y, 30Y Treasuries (FRED)"
+          - "TPM Chile (BCCh)"
+          - "SOFR Forwards (CommLoan)"
+      
+      7_outlook:
+        nombre: "Outlook y Recomendaciones"
+        contenido: "Base/bull/bear cases, recomendaciones asset allocation"
+        usa_regime: "Outlook informado por clasificación de régimen"
+        input_ai_council: "IAS Macro + IAS Riesgo + IAS Asset Allocation debaten"
+    
+    charts_requeridos:
+      tier_1_obligatorios:
+        existentes:
+          - "Chart #10: Disinflación (US + Chile)"
+          - "Chart #11: Política Monetaria (Fed + BCCh)"
+          - "Chart #13: Riesgo Geopolítico"
+          - "Chart #15: AI Investment Cycle"
+          - "Chart #16: Tech Concentration"
+          - "Chart #20: Regime Score Timeline"
+          - "Chart #21: Leading Indicators Heatmap"
+          - "Chart #22: Sector Sentiment"
+          - "Chart #23: Score Breakdown"
+        nuevos_v4:
+          - "Chart #24: VaR Histórico (Mejora #2)"
+          - "Chart #25: Stress Test Results (Mejora #2)"
+          - "Chart #27: Breakeven Inflation (Mejora #3)"
+          - "Chart #28: Real Rates (Mejora #3)"
+          - "Chart #29: China Credit Impulse (Mejora #8)"
+          - "Chart #31: Advance-Decline (Mejora #10)"
+          - "Chart #35: TPM Real Chile (Mejora #6)"
+      
+      tier_2_opcionales:
+        - "Yield Curve"
+        - "Employment Trends"
+        - "Chart #26: LSTM Predictions"
+        - "Chart #30: Commodities-China Link"
+        - "Chart #32: New Highs/Lows"
+  
+  # ===========================================================================
+  # REPORTE 2: RENTA VARIABLE MENSUAL
+  # ===========================================================================
+  renta_variable:
+    nombre: "Reporte Renta Variable Mensual"
+    frecuencia: "Mensual"
+    paginas: "22-28"  # Actualizado
+    dia_publicacion: 10
+    ias_principal: "IAS Renta Variable"
+    mejoras_v4: [4, 7, 10]  # Earnings, Factors, Breadth
+    
+    secciones:
+      1_resumen_ejecutivo:
+        nombre: "Resumen Ejecutivo"
+        largo: "300-400 palabras"
+        incluye: "Referencia al régimen macro actual"
+      
+      2_performance_regional:
+        nombre: "Performance Regional"
+        charts: ["#2 (Regional Attribution)"]
+        subsecciones:
+          - "US (S&P 500, Nasdaq, Russell 2000)"
+          - "Europa (MSCI EAFE)"
+          - "Emerging Markets (MSCI EM)"
+          - "Chile (IPSA)"
+        datos:
+          - "Yahoo: ^GSPC, ^IXIC, ^RUT, EFA, EEM, ^IPSA"
+      
+      3_valuaciones:
+        nombre: "Valuaciones"
+        charts: ["#3 (P/E Ratios)", "#7 (Top 5 Premium)"]
+        datos:
+          - "AlphaVantage OVERVIEW: P/E ratios"
+          - "Mag 7: AAPL, MSFT, NVDA, GOOGL, AMZN"
+      
+      4_analisis_sectorial:
+        nombre: "Análisis Sectorial"
+        charts: ["#5 (Sector Performance)"]
+        datos:
+          - "Yahoo: 11 Sector ETFs (XLK, XLF, XLV, etc.)"
+        logica_dinamica: |
+          El régimen determina qué sectores analizar en detalle:
+          
+          SLOWDOWN → Tier 1: Healthcare, Utilities, Staples, Financials, Tech
+          EXPANSION → Tier 1: Tech, Industrials, Financials, Discretionary
+          RECESSION → Tier 1: Utilities, Healthcare, Staples
+          
+          Sectores Tier 1: Análisis completo con sub-industrias
+          Sectores Tier 2: Solo performance agregado
+        intro_sugerido: |
+          "Basado en el régimen [RÉGIMEN] identificado en el Reporte Macro,
+           este mes profundizamos en [SECTORES TIER 1] mientras mantenemos
+           cobertura agregada en [SECTORES TIER 2]."
+        
+        # 🆕 v4.0 MEJORA #10: Sector Breadth
+        subseccion_breadth:
+          nombre: "Sector Breadth Analysis"
+          mejora_v4: "#10 - Market Breadth Analytics"
+          charts: ["#33 (Sector Breadth)", "#34 (Cyclical vs Defensive)"]
+          contenido:
+            - "Breadth por sector (% stocks positivas)"
+            - "Cyclical vs Defensive ratio"
+            - "Leadership changes"
+          modulo: "greybark.analytics.breadth"
+      
+      # 🆕 v4.0 MEJORA #4: Earnings Analytics Enhanced
+      # ✅ IMPLEMENTADO 2026-02-11: 4 tablas con datos reales AV Premium
+      5_earnings:
+        nombre: "Earnings Analysis"
+        mejora_v4: "#4 - Earnings Analytics Enhanced"
+        charts: ["#6 (Tech Earnings)", "#14 (Mag 7 vs Rest)", "#40 (Beat Rate)", "#41 (Insider Activity)"]
+        contenido:
+          - "Beat rate (% companies beating estimates) — AV EARNINGS"
+          - "Revision trends (upgrade/downgrade 30d) — AV EARNINGS_ESTIMATES"
+          - "Márgenes y ROE por región — AV OVERVIEW"
+          - "Earnings calendar real — AV EARNINGS_CALENDAR (CSV)"
+          - "EPS growth YoY + forward EPS — AV EARNINGS + ESTIMATES"
+          - "Insider activity (buys vs sells ratio)"
+        datos:
+          - "AlphaVantage EARNINGS: Beat rate, surprise %, EPS history"
+          - "AlphaVantage EARNINGS_ESTIMATES: Consensus EPS, revision up/down 7/30d"
+          - "AlphaVantage OVERVIEW: Margins, ROE, PE, analyst target/ratings"
+          - "AlphaVantage INCOME_STATEMENT: Quarterly margins, revenue growth"
+          - "AlphaVantage EARNINGS_CALENDAR: CSV upcoming earnings"
+          - "Tickers: AAPL, MSFT, AMZN, NVDA, GOOGL, META, JPM, UNH, ASML, SAP, NVO, SQM, BSAC"
+        modulo: "greybark.analytics.earnings"
+        api_calls: "~45 por ejecución (13 EARNINGS + 13 ESTIMATES + 13 OVERVIEW + 5 INCOME + 1 CALENDAR)"
+      
+      # 🆕 v4.0 MEJORA #7: Factor Analysis
+      5_5_factor_analysis:
+        nombre: "Factor Analysis"
+        mejora_v4: "#7 - Factor Analytics"
+        largo: "1-2 páginas"
+        charts: ["#42 (Factor Performance)", "#43 (Factor Regime)"]
+        contenido:
+          - "Factor returns (Value, Growth, Momentum, Quality, Size)"
+          - "Factor by regime (qué factores funcionan en cada régimen)"
+          - "Factor crowding indicators"
+          - "Recomendación de factor tilts"
+        datos:
+          - "Yahoo: Factor ETFs (MTUM, QUAL, VLUE, SIZE)"
+        modulo: "greybark.analytics.factors"
+        importancia: "⭐⭐⭐ Quant differentiator"
+      
+      6_themes:
+        nombre: "Temas de Inversión"
+        contenido:
+          - "AI Investment Cycle (usa Charts #15, #16 del Macro Report)"
+          - "Tech Concentration Risk"
+          - "Earnings Catch-up (Mag 7 vs Rest)"
+      
+      7_focus_chile:
+        nombre: "Focus Chile"
+        datos:
+          - "IPSA (Yahoo: ^IPSA)"
+          - "Copper (Yahoo: HG=F)"
+          - "Imacec (BCCh)"
+        contenido: "Performance IPSA, drivers, outlook, recomendaciones"
+      
+      8_outlook:
+        nombre: "Outlook y Recomendaciones"
+        contenido: "Base/bull/bear, asset allocation, sector recommendations"
+        usa_regime: "Recomendaciones alineadas con régimen macro"
+        input_ai_council: "IAS Renta Variable + IAS Macro debaten"
+    
+    charts_requeridos:
+      tier_1_obligatorios:
+        existentes:
+          - "Chart #2: Regional Performance"
+          - "Chart #3: Valuations (P/E)"
+          - "Chart #5: Sector Attribution"
+          - "Chart #6: Tech Earnings"
+          - "Chart #7: Top 5 Premium"
+          - "Chart #14: Earnings Catch-up"
+        nuevos_v4:
+          - "Chart #33: Sector Breadth (Mejora #10)"
+          - "Chart #40: Beat Rate (Mejora #4)"
+          - "Chart #41: Insider Activity (Mejora #4)"
+          - "Chart #42: Factor Performance (Mejora #7)"
+          - "Chart #43: Factor by Regime (Mejora #7)"
+  
+  # ===========================================================================
+  # REPORTE 3: RENTA FIJA MENSUAL
+  # ===========================================================================
+  renta_fija:
+    nombre: "Reporte Renta Fija Mensual"
+    frecuencia: "Mensual"
+    paginas: "15-20"  # Actualizado
+    dia_publicacion: 12
+    ias_principal: "IAS Renta Fija"
+    mejoras_v4: [3, 5, 6, 9]  # Inflation, Duration, Chile, Credit
+    
+    secciones:
+      1_resumen_ejecutivo:
+        nombre: "Resumen Ejecutivo"
+        largo: "200-300 palabras"
+      
+      2_tasas_us:
+        nombre: "Tasas US"
+        charts: ["Yield Curve", "Fed Funds Path"]
+        datos:
+          - "Fed Funds (FRED: DFF)"
+          - "2Y, 10Y, 30Y Treasuries (FRED: DGS2, DGS10, DGS30)"
+          - "SOFR Forwards (CommLoan) - Fed expectations"
+        
+        # 🆕 v4.0 MEJORA #3: Breakeven
+        subseccion_breakeven:
+          nombre: "Breakeven & Real Rates"
+          mejora_v4: "#3 - Inflation Analytics"
+          charts: ["#27 (Breakeven USA)", "#28 (Real Rates)"]
+          contenido:
+            - "Breakeven inflation term structure"
+            - "Real rates analysis"
+            - "TIPS valuation"
+          modulo: "greybark.analytics.macro"
+      
+      # 🆕 v4.0 MEJORA #5: Duration Recommendations
+      2_5_duration:
+        nombre: "Duration Recommendations"
+        mejora_v4: "#5 - Duration Analytics"
+        largo: "1 página"
+        charts: ["#44 (Duration Target)", "#45 (Curve Positioning)"]
+        contenido:
+          - "Duration target by regime"
+          - "Curve positioning (steepener/flattener)"
+          - "Roll-down analysis"
+          - "Carry calculations"
+        logica: |
+          Duration recomendada por régimen:
+          RECESSION → Overweight duration (rates falling)
+          SLOWDOWN → Neutral to slight OW
+          MODERATE → Neutral
+          EXPANSION → Underweight (rates rising)
+          LATE_CYCLE → Overweight (anticipating pivot)
+        modulo: "greybark.analytics.fixed_income"
+        importancia: "⭐⭐ Actionable recommendation"
+      
+      3_tasas_chile:
+        nombre: "Tasas Chile"
+        datos:
+          - "TPM (BCCh: F074.TPM.PLG.N.D)"
+          - "BCU/BCP curves (BCCh)"
+        
+        # 🆕 v4.0 MEJORA #6: Chile Profundo
+        subseccion_chile_profundo:
+          nombre: "Chile Renta Fija Profundo"
+          mejora_v4: "#6 - Chile Analytics"
+          largo: "1-2 páginas"
+          charts: ["#36 (Swap CÁMARA)", "#37 (Breakeven Chile)", "#38 (Carry Trade)"]
+          contenido:
+            - "Curva Swap CÁMARA completa"
+            - "Breakeven inflation Chile"
+            - "Carry trade analysis (CLP vs USD)"
+            - "BCCh forward guidance analysis"
+          datos:
+            - "BCCh: Swap CÁMARA"
+            - "BCCh: BCU-BCP spread (breakeven)"
+          modulo: "greybark.analytics.chile"
+          importancia: "⭐⭐⭐ ÚNICO EN EL MERCADO CHILENO"
+      
+      # 🆕 v4.0 MEJORA #9: Credit Spreads Breakdown
+      4_spreads:
+        nombre: "Credit Spreads"
+        mejora_v4: "#9 - Credit Spread Analytics"
+        largo: "1-2 páginas"
+        charts: ["#46 (IG Spreads)", "#47 (HY Spreads)", "#48 (Quality Rotation)"]
+        contenido:
+          - "IG spreads by rating (AAA, AA, A, BBB)"
+          - "HY spreads by rating (BB, B, CCC)"
+          - "Sector spreads (Financials, Industrials, Utilities)"
+          - "Quality rotation indicator"
+          - "Crossover opportunities"
+        datos:
+          - "HY Spreads (FRED: BAMLH0A0HYM2)"
+          - "IG Spreads (FRED: BAMLC0A0CM)"
+        modulo: "greybark.analytics.credit"
+        usa_regime: "Spreads contextualizados con régimen macro"
+      
+      5_outlook:
+        nombre: "Outlook y Recomendaciones"
+        contenido: "Duration positioning, credit allocation"
+        usa_regime: "Duration y credit positioning basado en régimen"
+        input_ai_council: "IAS Renta Fija + IAS Macro + IAS Riesgo debaten"
+    
+    charts_requeridos:
+      tier_1_obligatorios:
+        existentes:
+          - "Yield Curve (US)"
+          - "TPM Chile vs Fed Funds"
+        nuevos_v4:
+          - "Chart #27: Breakeven USA (Mejora #3)"
+          - "Chart #28: Real Rates (Mejora #3)"
+          - "Chart #36: Swap CÁMARA (Mejora #6)"
+          - "Chart #37: Breakeven Chile (Mejora #6)"
+          - "Chart #44: Duration Target (Mejora #5)"
+          - "Chart #46: IG Spreads (Mejora #9)"
+          - "Chart #47: HY Spreads (Mejora #9)"
+  
+  # ===========================================================================
+  # REPORTE 4: ASSET ALLOCATION TRIMESTRAL
+  # ===========================================================================
+  asset_allocation:
+    nombre: "Asset Allocation Trimestral"
+    frecuencia: "Trimestral"
+    paginas: "28-35"  # Actualizado
+    dia_publicacion: 15
+    meses: [1, 4, 7, 10]
+    ias_principal: "IAS Asset Allocation"
+    mejoras_v4: [1, 2, 5, 7, 11]  # AA Framework, Risk, Duration, Factors, Track Record
+    
+    secciones:
+      1_resumen_ejecutivo:
+        nombre: "Resumen Ejecutivo"
+        largo: "400-500 palabras"
+      
+      2_macro_regime:
+        nombre: "Régimen Macro Framework"
+        contenido: "Growth/inflation framework, cycle positioning"
+        charts: ["#20", "#21", "#22", "#23"]
+        usa_datos_de: "regime_classification.json"
+        subsecciones:
+          clasificacion:
+            nombre: "Clasificación de Régimen"
+            contenido: "Mismo que sección 1.5 del Reporte Macro"
+          leading_indicators:
+            nombre: "Leading Indicators Dashboard"
+            contenido: "Dashboard completo de 11 indicadores"
+          historical_context:
+            nombre: "Contexto Histórico"
+            contenido: "Cómo se compara con ciclos anteriores"
+        importancia: "⭐⭐⭐ Base para todas las recomendaciones"
+      
+      # 🆕 v4.0 MEJORA #1: Asset Allocation Framework
+      3_strategic_allocation:
+        nombre: "Strategic Asset Allocation"
+        mejora_v4: "#1 - Asset Allocation Framework"
+        largo: "2-3 páginas"
+        charts: ["#50 (Efficient Frontier)", "#51 (Risk Profiles)"]
+        contenido:
+          perfiles:
+            ultra_conservador:
+              descripcion: "Capital preservation"
+              equity: "10-20%"
+              fixed_income: "60-70%"
+              alternatives: "5-10%"
+              cash: "10-15%"
+            conservador:
+              descripcion: "Income with stability"
+              equity: "25-35%"
+              fixed_income: "50-60%"
+              alternatives: "5-10%"
+              cash: "5-10%"
+            moderado:
+              descripcion: "Balanced growth"
+              equity: "40-50%"
+              fixed_income: "35-45%"
+              alternatives: "10-15%"
+              cash: "5%"
+            agresivo:
+              descripcion: "Growth oriented"
+              equity: "55-65%"
+              fixed_income: "20-30%"
+              alternatives: "10-15%"
+              cash: "5%"
+            ultra_agresivo:
+              descripcion: "Maximum growth"
+              equity: "70-80%"
+              fixed_income: "10-15%"
+              alternatives: "10-15%"
+              cash: "0-5%"
+        importancia: "⭐⭐ Framework consistente"
+      
+      # 🆕 v4.0 MEJORA #1 (cont): Tactical Views
+      3_5_tactical_views:
+        nombre: "Tactical Views"
+        mejora_v4: "#1 - Asset Allocation Framework"
+        largo: "1-2 páginas"
+        charts: ["#52 (OW/UW Matrix)", "#53 (Changes)"]
+        contenido:
+          matriz_13_clases:
+            equity:
+              - "US Large Cap"
+              - "US Small Cap"
+              - "Europe"
+              - "Japan"
+              - "EM"
+              - "Chile"
+            fixed_income:
+              - "US Treasuries"
+              - "US IG"
+              - "US HY"
+              - "EM Debt"
+              - "Chile Soberanos"
+            alternatives:
+              - "Gold"
+              - "Commodities"
+          escala: "Strong OW (+2) | OW (+1) | Neutral (0) | UW (-1) | Strong UW (-2)"
+        logica: "Views determinados por régimen + valuaciones + momentum"
+      
+      4_portfolio_construction:
+        nombre: "Construcción de Portafolio"
+        contenido: "Strategic vs tactical allocation, weights, rationale"
+        usa_regime: |
+          Régimen informa:
+          - Peso equities vs bonds
+          - Duration positioning
+          - Sector tilts
+          - Geographic allocation
+        
+        # 🆕 v4.0 MEJORA #5: Duration
+        subseccion_duration:
+          nombre: "Fixed Income Duration"
+          mejora_v4: "#5 - Duration Analytics"
+          charts: ["#44 (Duration Target)"]
+          contenido:
+            - "Duration target actual"
+            - "Cambio vs trimestre anterior"
+            - "Justificación basada en régimen"
+        
+        # 🆕 v4.0 MEJORA #7: Factor Tilts
+        subseccion_factors:
+          nombre: "Factor Tilts"
+          mejora_v4: "#7 - Factor Analytics"
+          charts: ["#42 (Factor Performance)"]
+          contenido:
+            - "Factor weights by regime"
+            - "Current tilts vs benchmark"
+      
+      5_risk_management:
+        nombre: "Risk Management"
+        charts: ["#13 (Geopolitical Risk)"]
+        contenido: "Tail risks, hedging strategies, scenario analysis"
+        
+        # 🆕 v4.0 MEJORA #2: Risk Dashboard
+        subseccion_risk:
+          mejora_v4: "#2 - Risk Dashboard"
+          charts: ["#24 (VaR)", "#25 (Stress Test)"]
+          contenido:
+            - "VaR por perfil de riesgo"
+            - "Stress testing resultados"
+            - "Hedging recomendaciones"
+      
+      6_recommendations:
+        nombre: "Recomendaciones"
+        contenido: "Model portfolios (5 perfiles)"
+        calibrado_por_regime: true
+        input_ai_council: "Todos los IAS debaten para consenso final"
+      
+      # 🆕 v4.0 MEJORA #11: Track Record
+      7_track_record:
+        nombre: "Track Record"
+        mejora_v4: "#11 - Track Record System"
+        largo: "1-2 páginas"
+        charts: ["#54 (Hit Rate)", "#55 (Attribution)"]
+        contenido:
+          - "Hit rate de recomendaciones (target >60%)"
+          - "Performance attribution"
+          - "Mejores y peores calls"
+          - "Lessons learned"
+        modulo: "greybark.tracking"
+        importancia: "⭐⭐⭐ ACCOUNTABILITY - Único en el mercado"
+    
+    charts_requeridos:
+      usa_todos_de: "Reportes Macro + Renta Variable + Renta Fija"
+      obligatorios_regime:
+        - "Chart #20: Regime Timeline"
+        - "Chart #21: Leading Indicators Heatmap"
+        - "Chart #23: Score Breakdown"
+      obligatorios_v4:
+        - "Chart #24: VaR (Mejora #2)"
+        - "Chart #42: Factor Performance (Mejora #7)"
+        - "Chart #44: Duration Target (Mejora #5)"
+        - "Chart #50: Efficient Frontier (Mejora #1)"
+        - "Chart #52: OW/UW Matrix (Mejora #1)"
+        - "Chart #54: Hit Rate (Mejora #11)"
+
+# =============================================================================
+# CALENDARIO DE PUBLICACIÓN
+# =============================================================================
+
+calendario:
+  diario:
+    am: "Pre-apertura Chile (~7:00)"
+    pm: "Post-cierre US (~18:00 Chile)"
+  
+  mensual:
+    dia_10: "Renta Variable"
+    dia_12: "Renta Fija"
+    dia_15: "Macro"
+  
+  trimestral:
+    dia_15: "Asset Allocation (Ene, Abr, Jul, Oct)"
+  
+  regime_update:
+    frecuencia: "Mensual (con Reporte Macro)"
+    output: "regime_classification.json para AI Council"
+
+# =============================================================================
+# CHARTS CATALOG
+# =============================================================================
+
+charts_tier_1:
+  
+  # ---------------------------------------------------------------------------
+  # EXISTENTES (v2.0)
+  # ---------------------------------------------------------------------------
+  chart_2:
+    nombre: "Regional Performance Attribution"
+    tipo: "Bar chart"
+    datos: "Yahoo indices"
+    reportes: ["Renta Variable"]
+  
+  chart_3:
+    nombre: "Valuations (P/E Ratios)"
+    tipo: "Line + bar"
+    datos: "AlphaVantage OVERVIEW"
+    reportes: ["Renta Variable"]
+  
+  chart_5:
+    nombre: "Sector Attribution"
+    tipo: "Heatmap"
+    datos: "Yahoo sector ETFs"
+    reportes: ["Renta Variable"]
+  
+  chart_6:
+    nombre: "Tech Earnings Long-term"
+    tipo: "Line chart"
+    datos: "AlphaVantage EARNINGS"
+    reportes: ["Renta Variable"]
+  
+  chart_7:
+    nombre: "Top 5 Valuation Premium"
+    tipo: "Bar chart"
+    datos: "AlphaVantage OVERVIEW (Mag 7)"
+    reportes: ["Renta Variable"]
+  
+  chart_10:
+    nombre: "Disinflation (US + Chile)"
+    tipo: "Dual axis line"
+    datos: "FRED CPI + BCCh IPC"
+    reportes: ["Macro"]
+  
+  chart_11:
+    nombre: "Central Bank Policy (Fed + BCCh)"
+    tipo: "Line chart"
+    datos: "FRED Fed Funds + BCCh TPM"
+    reportes: ["Macro", "Renta Fija"]
+  
+  chart_13:
+    nombre: "Geopolitical Risk Index"
+    tipo: "Area chart"
+    datos: "GPR CSV"
+    reportes: ["Macro", "Asset Allocation"]
+  
+  chart_14:
+    nombre: "Earnings Catch-up (Mag 7 vs Rest)"
+    tipo: "Dual line"
+    datos: "AlphaVantage EARNINGS"
+    reportes: ["Renta Variable"]
+  
+  chart_15:
+    nombre: "AI Investment Cycle"
+    tipo: "Stacked area"
+    datos: "BEA FAAt201"
+    reportes: ["Macro"]
+    importancia: "⭐⭐⭐ DIFERENCIADOR #1"
+  
+  chart_16:
+    nombre: "Tech Concentration (% of GDP)"
+    tipo: "Line chart"
+    datos: "BEA FAAt201"
+    reportes: ["Macro"]
+    importancia: "⭐⭐⭐ DIFERENCIADOR #2"
+  
+  chart_20:
+    nombre: "Regime Score Timeline"
+    tipo: "Line chart con áreas coloreadas por régimen"
+    datos: "Score mensual calculado (11 indicadores)"
+    periodo: "24 meses"
+    reportes: ["Macro", "Asset Allocation"]
+    importancia: "⭐⭐⭐ DIFERENCIADOR #3"
+  
+  chart_21:
+    nombre: "Leading Indicators Heatmap"
+    tipo: "Heatmap 11 indicadores × 12 meses"
+    datos: "FRED + BCCh REST + CommLoan + AlphaVantage"
+    colores: "Rojo (-3) → Blanco (0) → Verde (+3)"
+    reportes: ["Macro", "Asset Allocation"]
+    importancia: "⭐⭐⭐ DIFERENCIADOR #4"
+  
+  chart_22:
+    nombre: "Sector Sentiment Bar Chart"
+    tipo: "Horizontal bar chart"
+    datos: "AlphaVantage NEWS_SENTIMENT por sector"
+    reportes: ["Macro"]
+  
+  chart_23:
+    nombre: "Macro Score Breakdown"
+    tipo: "Waterfall chart"
+    datos: "Contribución por categoría al score total"
+    categorias: ["Financial (40%)", "Expectations (25%)", "Monetary (20%)", "Real (15%)"]
+    reportes: ["Macro", "Asset Allocation"]
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #2: RISK DASHBOARD
+  # ---------------------------------------------------------------------------
+  chart_24:
+    nombre: "VaR Histórico"
+    tipo: "Line + confidence bands"
+    datos: "Returns calculados"
+    contenido: "VaR 95%, 99%, Expected Shortfall"
+    reportes: ["Macro", "Asset Allocation"]
+    mejora: "#2"
+  
+  chart_25:
+    nombre: "Stress Test Results"
+    tipo: "Bar chart horizontal"
+    datos: "Escenarios predefinidos"
+    escenarios: ["2008 Crisis", "COVID", "Inflation Spike", "Rate Shock", "EM Crisis", "Geopolitical"]
+    reportes: ["Macro", "Asset Allocation"]
+    mejora: "#2"
+  
+  chart_26:
+    nombre: "LSTM Price Predictions"
+    tipo: "Line + forecast cone"
+    datos: "Modelo LSTM entrenado"
+    horizonte: "20 días"
+    reportes: ["Macro"]
+    mejora: "#2"
+    opcional: true
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #3: INFLATION ANALYTICS
+  # ---------------------------------------------------------------------------
+  chart_27:
+    nombre: "Breakeven Inflation USA"
+    tipo: "Multi-line"
+    datos: "FRED: T5YIE, T10YIE"
+    contenido: "5Y, 10Y breakeven + histórico"
+    reportes: ["Macro", "Renta Fija"]
+    mejora: "#3"
+  
+  chart_28:
+    nombre: "Real Rates"
+    tipo: "Line chart"
+    datos: "FRED: DFII5, DFII10"
+    contenido: "Real rates vs nominal"
+    reportes: ["Macro", "Renta Fija"]
+    mejora: "#3"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #8: CHINA CREDIT
+  # ---------------------------------------------------------------------------
+  chart_29:
+    nombre: "China Credit Impulse"
+    tipo: "Line + area"
+    datos: "FRED, PolicyUncertainty"
+    contenido: "Credit impulse % GDP + EPU"
+    reportes: ["Macro"]
+    mejora: "#8"
+    importancia: "⭐⭐⭐ ÚNICO EN CHILE"
+  
+  chart_30:
+    nombre: "China-Commodities Link"
+    tipo: "Scatter + correlation"
+    datos: "China credit vs Copper"
+    reportes: ["Macro"]
+    mejora: "#8"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #10: MARKET BREADTH
+  # ---------------------------------------------------------------------------
+  chart_31:
+    nombre: "Advance-Decline Line"
+    tipo: "Line chart"
+    datos: "NYSE data"
+    reportes: ["Macro"]
+    mejora: "#10"
+  
+  chart_32:
+    nombre: "New Highs vs New Lows"
+    tipo: "Bar chart"
+    datos: "NYSE data"
+    reportes: ["Macro"]
+    mejora: "#10"
+  
+  chart_33:
+    nombre: "Sector Breadth"
+    tipo: "Heatmap"
+    datos: "Sector ETF constituents"
+    reportes: ["Renta Variable"]
+    mejora: "#10"
+  
+  chart_34:
+    nombre: "Cyclical vs Defensive"
+    tipo: "Ratio line"
+    datos: "Cyclical vs Defensive ETFs"
+    reportes: ["Renta Variable"]
+    mejora: "#10"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #6: CHILE PROFUNDO
+  # ---------------------------------------------------------------------------
+  chart_35:
+    nombre: "TPM Real Chile"
+    tipo: "Line chart"
+    datos: "BCCh: TPM, IPC"
+    reportes: ["Macro"]
+    mejora: "#6"
+  
+  chart_36:
+    nombre: "Curva Swap CÁMARA"
+    tipo: "Yield curve"
+    datos: "BCCh: Swap rates"
+    reportes: ["Renta Fija"]
+    mejora: "#6"
+    importancia: "⭐⭐⭐ ÚNICO EN CHILE"
+  
+  chart_37:
+    nombre: "Breakeven Chile"
+    tipo: "Line chart"
+    datos: "BCCh: BCU-BCP spread"
+    reportes: ["Renta Fija"]
+    mejora: "#6"
+  
+  chart_38:
+    nombre: "Carry Trade Analysis"
+    tipo: "Bar + line"
+    datos: "BCCh + FRED"
+    reportes: ["Renta Fija"]
+    mejora: "#6"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #4: EARNINGS ANALYTICS
+  # ---------------------------------------------------------------------------
+  # Endpoints AV Premium activos (2026-02-11):
+  #   EARNINGS         → beat rate, surprise %, EPS history (13 tickers)
+  #   EARNINGS_ESTIMATES → consensus EPS, revision up/down 7d/30d, forward EPS (13 tickers)
+  #   OVERVIEW         → margins, ROE, PE, analyst target/ratings (13 tickers)
+  #   INCOME_STATEMENT → quarterly margins, revenue growth YoY (5 tickers)
+  #   EARNINGS_CALENDAR → CSV 9,872 entries, filtered to monitored tickers
+  # Total: ~45 API calls por ejecución (dentro de 75/min Premium)
+  # ---------------------------------------------------------------------------
+  chart_40:
+    nombre: "Earnings Beat Rate"
+    tipo: "Bar + line"
+    datos: "AlphaVantage EARNINGS + EARNINGS_ESTIMATES"
+    estado: "Datos ✅ (tablas en RV report), Chart PNG ❌"
+    reportes: ["Renta Variable"]
+    mejora: "#4"
+
+  chart_41:
+    nombre: "Insider Activity"
+    tipo: "Net buy/sell bar"
+    datos: "AlphaVantage INSIDER"
+    estado: "Datos ✅ (endpoint existe), Chart PNG ❌"
+    reportes: ["Renta Variable"]
+    mejora: "#4"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #7: FACTOR ANALYTICS
+  # ---------------------------------------------------------------------------
+  chart_42:
+    nombre: "Factor Performance"
+    tipo: "Multi-line"
+    datos: "Yahoo: Factor ETFs"
+    reportes: ["Renta Variable", "Asset Allocation"]
+    mejora: "#7"
+  
+  chart_43:
+    nombre: "Factor by Regime"
+    tipo: "Heatmap"
+    datos: "Historical analysis"
+    reportes: ["Renta Variable"]
+    mejora: "#7"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #5: DURATION ANALYTICS
+  # ---------------------------------------------------------------------------
+  chart_44:
+    nombre: "Duration Target by Regime"
+    tipo: "Gauge + table"
+    datos: "Regime classification"
+    reportes: ["Renta Fija", "Asset Allocation"]
+    mejora: "#5"
+  
+  chart_45:
+    nombre: "Curve Positioning"
+    tipo: "Yield curve + annotations"
+    datos: "FRED DGS*"
+    reportes: ["Renta Fija"]
+    mejora: "#5"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #9: CREDIT SPREADS
+  # ---------------------------------------------------------------------------
+  chart_46:
+    nombre: "IG Spreads by Rating"
+    tipo: "Multi-line"
+    datos: "FRED: BAML IG indices"
+    reportes: ["Renta Fija"]
+    mejora: "#9"
+  
+  chart_47:
+    nombre: "HY Spreads by Rating"
+    tipo: "Multi-line"
+    datos: "FRED: BAML HY indices"
+    reportes: ["Renta Fija"]
+    mejora: "#9"
+  
+  chart_48:
+    nombre: "Quality Rotation"
+    tipo: "Line ratio"
+    datos: "IG vs HY spread ratio"
+    reportes: ["Renta Fija"]
+    mejora: "#9"
+  
+  # ---------------------------------------------------------------------------
+  # 🆕 NUEVOS v4.0 - MEJORA #1 & #11: ASSET ALLOCATION
+  # ---------------------------------------------------------------------------
+  chart_50:
+    nombre: "Efficient Frontier"
+    tipo: "Scatter plot"
+    datos: "Historical returns"
+    reportes: ["Asset Allocation"]
+    mejora: "#1"
+  
+  chart_51:
+    nombre: "Risk Profiles"
+    tipo: "Stacked bar"
+    datos: "Model portfolios"
+    reportes: ["Asset Allocation"]
+    mejora: "#1"
+  
+  chart_52:
+    nombre: "Tactical Views Matrix"
+    tipo: "Heatmap"
+    datos: "13 asset classes"
+    reportes: ["Asset Allocation"]
+    mejora: "#1"
+  
+  chart_53:
+    nombre: "Tactical Changes"
+    tipo: "Arrow chart"
+    datos: "Changes vs prior quarter"
+    reportes: ["Asset Allocation"]
+    mejora: "#1"
+  
+  chart_54:
+    nombre: "Hit Rate"
+    tipo: "Bar + target line"
+    datos: "Track record database"
+    reportes: ["Asset Allocation"]
+    mejora: "#11"
+    importancia: "⭐⭐⭐ ACCOUNTABILITY"
+  
+  chart_55:
+    nombre: "Performance Attribution"
+    tipo: "Waterfall"
+    datos: "Track record database"
+    reportes: ["Asset Allocation"]
+    mejora: "#11"
+
+# =============================================================================
+# ESTADO DE IMPLEMENTACIÓN (Actualizado 2026-02-11)
+# =============================================================================
+#
+# Leyenda: ✅ = Implementado con datos reales | ⚠️ = Hardcoded/stub | ❌ = No implementado
+#
+# --- REPORTE MACRO (chart_generator.py + chart_data_provider.py) ---
+# 28 charts implementados, la mayoría con datos reales BCCh/FRED:
+#
+#   ✅ inflation_evolution        (FRED: CPI, Core CPI, PCE Core)
+#   ✅ inflation_heatmap          (BCCh: IPC 10 países + Core 7 países)
+#   ✅ labor_unemployment         (FRED: UNRATE, U6RATE)
+#   ✅ labor_nfp                  (FRED: PAYEMS)
+#   ✅ labor_jolts                (FRED: JTSJOL, JTSQUR)
+#   ✅ labor_wages                (FRED: CES0500000003, ECIWAG, CIVPART)
+#   ✅ usa_leading_indicators     (FRED: NEWORDER, HOUST, CSCICP03, UMCSENT)
+#   ✅ yield_curve                (FRED: DGS1MO..DGS30)
+#   ✅ yield_spreads              (FRED: DGS2, DGS10, DGS3MO)
+#   ✅ fed_vs_ecb_bcch            (BCCh: tasas de política 10 bancos centrales)
+#   ✅ commodity_prices           (BCCh: tabla HTML, valor + 1m/3m/1y changes)
+#   ✅ energy_food                (BCCh: Brent, WTI, gas, alimentos)
+#   ✅ chile_dashboard            (BCCh: IMACEC, IPC, desempleo, USD/CLP)
+#   ✅ chile_external             (BCCh: exportaciones, importaciones, balanza, cobre)
+#   ✅ latam_rates                (BCCh: tasas LatAm)
+#   ✅ china_dashboard            (BCCh: GDP, CPI, PPI, desempleo China)
+#   ⚠️ europe_pmi                (PMI propietario S&P Global — hardcoded)
+#   ⚠️ china_trade               (sin datos comercio total China en BCCh)
+#   ⚠️ pmi_global                (PMI propietario — hardcoded)
+#   ✅ chile_inflation_components (BCCh: IPC componentes)
+#   ✅ europe_dashboard           (BCCh: GDP, CPI, desempleo Eurozona)
+#   ✅ global_equities            (BCCh: índices bursátiles)
+#   ⚠️ inflation_components_ts   (CPI subcomponents Shelter/Services — sin FRED simple)
+#
+# --- REPORTE RV (rv_content_generator.py + equity_data_collector.py) ---
+# Tablas generadas en código, no charts PNG:
+#
+#   ✅ Tabla resumen regional      (yfinance: SPY/EFA/EEM/EWJ/ECH + BCCh IPSA)
+#   ✅ Matriz sectorial            (yfinance: 11 sector ETFs + BCCh commodities)
+#   ✅ Earnings growth             (AV: EARNINGS beat rate/surprise + EARNINGS_ESTIMATES growth/revisions)
+#   ✅ Revision trends             (AV: EARNINGS_ESTIMATES revision_up/down_trailing_30_days)
+#   ✅ Márgenes y ROE              (AV: OVERVIEW ProfitMargin/OperatingMarginTTM/ReturnOnEquityTTM)
+#   ✅ Earnings calendar           (AV: EARNINGS_CALENDAR CSV — 9,872 entries filtradas)
+#   ✅ Correlaciones               (yfinance: 10 activos, 6M rolling)
+#   ✅ VaR/CVaR/Drawdown           (greybark.risk.metrics)
+#   ✅ Style Growth/Value/Size     (yfinance: IWF/IWD/IWB/IWM)
+#   ✅ Credit spreads              (FRED: IG/HY OAS)
+#   ✅ Tasas reales / ERP          (FRED: TIPS + yfinance SPY PE)
+#   ✅ BCCh indices                (BCCh: IPSA/IGPA/intl/USD-CLP/commodities)
+#   ⚠️ Factor analysis            (AV: solo momentum funciona para ETFs)
+#   ⚠️ Breadth                    (yfinance: bug timezone, returns error)
+#
+# --- REPORTE RF (rf_content_generator.py + rf_data_collector.py) ---
+# 12 módulos de datos, tablas en código:
+#
+#   ✅ UST yields + slopes         (FRED: DGS2/5/10/30)
+#   ✅ Chile BCP full curve         (BCCh: F022.BCLP.TIS.AN*)
+#   ✅ Chile BCU full curve         (BCCh: F022.BUF.TIS.AN* — sin 2Y)
+#   ✅ Chile swap curve SPC         (BCCh: SPC CLP 2Y/5Y/10Y + UF 5Y/10Y)
+#   ✅ International yields 8 países (BCCh: F019.TBG.TAS.*.D)
+#   ✅ IG/HY spreads breakdown      (FRED: BAML indices)
+#   ✅ Breakeven + TIPS              (FRED: T5YIE/T10YIE/DFII5/DFII10)
+#   ✅ TPM + DAP + interbancaria     (BCCh: TPM, DAP 90d/1y, préstamos)
+#   ✅ Policy rates 7 bancos centrales (BCCh: Fed/ECB/BOJ/BOE/PBOC/BCB/Banxico)
+#   ✅ VIX + MOVE                    (yfinance/BCCh)
+#   ⚠️ CDS soberanos               (propietario — hardcoded)
+#   ⚠️ Carry/rolldown calc          (requiere cálculo manual — hardcoded)
+#
+# --- REPORTE AA (asset_allocation_content_generator.py) ---
+# 9 secciones, tablas HTML:
+#
+#   ✅ Dashboard OW/N/UW            (council output + market_data)
+#   ✅ Portafolios modelo 5×9       (council output)
+#   ✅ Focus list ETFs              (council output)
+#   ✅ Escenarios base/bull/bear    (council output)
+#   ⚠️ Track record / hit rate     (no implementado — sin DB histórica)
+#   ⚠️ Efficient frontier          (no implementado)
+#
+# --- CHARTS v4.0 NO IMPLEMENTADOS (del catálogo original) ---
+#   ❌ #24 VaR Histórico chart      (datos existen en risk.metrics, falta chart PNG)
+#   ❌ #25 Stress Test chart         (datos existen, falta chart)
+#   ❌ #26 LSTM Predictions          (no implementado)
+#   ❌ #29 China Credit Impulse      (sin datos BCCh de credit impulse)
+#   ❌ #30 China-Commodities Link    (sin datos)
+#   ❌ #31-32 Advance-Decline/Highs  (sin datos NYSE)
+#   ❌ #33-34 Sector Breadth charts  (datos parciales, sin chart)
+#   ❌ #35 TPM Real Chile chart      (datos existen, sin chart dedicado)
+#   ❌ #36-38 Swap/Breakeven/Carry   (datos en rf_data_collector, sin chart)
+#   ❌ #40-41 Beat Rate/Insider chart (datos existen, sin chart PNG)
+#   ❌ #42-43 Factor charts          (datos parciales, sin chart)
+#   ❌ #44-45 Duration/Curve chart   (datos existen, sin chart)
+#   ❌ #46-48 Credit Spread charts   (datos existen, sin chart)
+#   ❌ #50-53 AA Framework charts    (no implementado)
+#   ❌ #54-55 Track Record charts    (no implementado)
+#
+# =============================================================================
+
+# =============================================================================
+# REGIME CLASSIFICATION INTEGRATION
+# =============================================================================
+
+regime_classification:
+  
+  descripcion: "Sistema de clasificación de régimen macro"
+  
+  output_files:
+    json: "regime_classification.json"
+    uso: "Input para AI Council y reportes"
+  
+  indicadores_count: 11
+  
+  fuentes:
+    - "FRED (8 series)"
+    - "BCCh REST (5 series)"
+    - "CommLoan (SOFR forwards)"
+    - "AlphaVantage (Sentiment)"
+  
+  integracion:
+    reporte_macro: "Nueva sección 1.5 con dashboard completo"
+    reporte_asset_allocation: "Sección 2 actualizada con framework"
+    reporte_renta_variable: "Lógica dinámica Tier 1/Tier 2 sectores"
+    ai_council: "JSON input para decisiones de los 5 IAS"
+
+# =============================================================================
+# 🆕 v4.0: WHITE-LABEL MODEL
+# =============================================================================
+
+white_label:
+  
+  descripcion: |
+    Empresas pueden ofrecer el research de Greybark Research bajo su propia marca,
+    personalizado para su audiencia.
+  
+  personalizaciones:
+    branding:
+      - "Logo del cliente en todos los reportes"
+      - "Colores corporativos"
+      - "Dominio propio (research.empresa.com)"
+    
+    sesgo_industria:
+      descripcion: "AI Council ajusta foco según industria"
+      ejemplos:
+        agricultura:
+          foco: "Commodities agrícolas, clima, FX, China demand"
+          ias_macro: "Prioriza commodities, weather patterns"
+        mineria:
+          foco: "Cobre, litio, energía, China, permisos"
+          ias_macro: "Deep-dive China + commodities"
+        retail:
+          foco: "Consumo, tasas, FX, confianza consumidor"
+          ias_macro: "Consumo, IAS RF en tasas financiamiento"
+        exportadores:
+          foco: "FX, demanda global, aranceles, logística"
+          todos_ias: "Lente de comercio exterior"
+    
+    tono:
+      opciones: ["Técnico", "Ejecutivo", "Accesible"]
+    
+    dashboard:
+      - "Portal personalizado"
+      - "Widgets configurables"
+      - "Alertas custom"
+
+# =============================================================================
+# WORKFLOW DE GENERACIÓN
+# =============================================================================
+
+workflow:
+  
+  paso_0:
+    nombre: "Reporte Diario"
+    accion: "Ejecutar daily_market_snapshot.py + generate_daily_report.py"
+    output: "4 reportes diarios"
+    frecuencia: "2x día"
+  
+  paso_1:
+    nombre: "Regime Classification"
+    accion: "Ejecutar regime_classification.py"
+    output: "regime_classification.json"
+    frecuencia: "Mensual, antes de generar reportes"
+  
+  paso_2:
+    nombre: "Fetch Data"
+    accion: "Ejecutar scripts de data fetching usando DATA_DICTIONARY"
+    output: "DataFrames con series necesarias"
+  
+  paso_3:
+    nombre: "Generate Charts"
+    accion: "Crear gráficos usando datos fetched"
+    output: "PNG/SVG files"
+    incluye: "Charts #2-#55 según reporte"
+  
+  paso_4:
+    nombre: "AI Council Debate"
+    accion: "IAS procesan datos y debaten"
+    output: "Recomendaciones consensuadas + disensos"
+  
+  paso_5:
+    nombre: "Generate Content"
+    accion: "AI escribe secciones usando templates + datos + regime + debate"
+    output: "Markdown sections"
+  
+  paso_6:
+    nombre: "Assemble Report"
+    accion: "Combinar secciones + charts en documento final"
+    output: "PDF + HTML"
+  
+  paso_7:
+    nombre: "Quality Check"
+    accion: "Verificar completitud, data freshness, charts presentes"
+  
+  paso_8:
+    nombre: "Distribute"
+    accion: "Email a clientes + upload a web"
+
+# =============================================================================
+# QUALITY CHECKS
+# =============================================================================
+
+quality_checks:
+  data_freshness:
+    - "CPI/Employment del mes actual"
+    - "Imacec publicado (30 días después del mes)"
+    - "Earnings del último quarter"
+    - "Regime classification actualizado"
+  
+  completeness:
+    - "Todas las secciones escritas"
+    - "Todos los Tier 1 charts presentes"
+    - "Word count dentro del rango"
+    - "Sección 1.5 Régimen presente en Macro"
+    - "Charts #20-#23 presentes"
+    - "Charts de mejoras presentes según reporte"
+  
+  diferenciacion:
+    - "Charts #15, #16 presentes (AI analysis)"
+    - "Chile integrado en cada reporte"
+    - "Regime Classification Dashboard (ÚNICO)"
+    - "Leading Indicators Heatmap (ÚNICO)"
+    - "Chile Profundo (ÚNICO)"
+    - "Track Record con accountability (ÚNICO)"
+    - "AI Council debate documentado"
+
+# =============================================================================
+# RESUMEN DE MEJORAS v4.0
+# =============================================================================
+
+mejoras_v4:
+  
+  mejora_1:
+    nombre: "Asset Allocation Framework"
+    descripcion: "5 perfiles de riesgo + 13 asset classes + matriz táctica"
+    charts: [50, 51, 52, 53]
+    reportes: ["Asset Allocation"]
+  
+  mejora_2:
+    nombre: "Risk Dashboard"
+    descripcion: "VaR, stress testing, LSTM predictions"
+    charts: [24, 25, 26]
+    reportes: ["Macro", "Asset Allocation"]
+  
+  mejora_3:
+    nombre: "Inflation Analytics"
+    descripcion: "Breakeven, real rates, TIPS"
+    charts: [27, 28]
+    reportes: ["Macro", "Renta Fija"]
+  
+  mejora_4:
+    nombre: "Earnings Analytics"
+    descripcion: "Beat rate, revision trends, márgenes/ROE, earnings calendar — datos reales AV Premium"
+    estado: "✅ Implementado 2026-02-11 (tablas con datos reales, charts PNG pendientes)"
+    endpoints: ["EARNINGS", "EARNINGS_ESTIMATES", "OVERVIEW", "INCOME_STATEMENT", "EARNINGS_CALENDAR"]
+    api_calls: "~45 por ejecución"
+    charts: [40, 41]
+    reportes: ["Renta Variable"]
+  
+  mejora_5:
+    nombre: "Duration Analytics"
+    descripcion: "Duration target by regime, curve positioning"
+    charts: [44, 45]
+    reportes: ["Renta Fija", "Asset Allocation"]
+  
+  mejora_6:
+    nombre: "Chile Profundo"
+    descripcion: "Swap CÁMARA, breakeven Chile, carry trade"
+    charts: [35, 36, 37, 38]
+    reportes: ["Macro", "Renta Fija"]
+    importancia: "⭐⭐⭐ ÚNICO"
+  
+  mejora_7:
+    nombre: "Factor Analytics"
+    descripcion: "Factor performance, factor by regime"
+    charts: [42, 43]
+    reportes: ["Renta Variable", "Asset Allocation"]
+  
+  mejora_8:
+    nombre: "China Credit"
+    descripcion: "Credit impulse, commodities link"
+    charts: [29, 30]
+    reportes: ["Macro"]
+    importancia: "⭐⭐⭐ ÚNICO EN CHILE"
+  
+  mejora_9:
+    nombre: "Credit Spreads"
+    descripcion: "IG/HY by rating, quality rotation"
+    charts: [46, 47, 48]
+    reportes: ["Renta Fija"]
+  
+  mejora_10:
+    nombre: "Market Breadth"
+    descripcion: "A-D line, sector breadth, cyclical vs defensive"
+    charts: [31, 32, 33, 34]
+    reportes: ["Macro", "Renta Variable"]
+  
+  mejora_11:
+    nombre: "Track Record"
+    descripcion: "Hit rate, performance attribution, accountability"
+    charts: [54, 55]
+    reportes: ["Asset Allocation"]
+    importancia: "⭐⭐⭐ ACCOUNTABILITY"

@@ -39,3 +39,17 @@ greybark-intelligence/data/
 # Large binaries
 *.pdf
 *.mp3
+
+# Database
+*.db
+
+# Credentials
+*CREDENTIALS*
+
+# Runtime data
+.env.example
+estructuras/consejo_ia/output/
+estructuras/consejo_ia/input/
+estructuras/consejo_ia/content/
+estructuras/sessions/
+estructuras/reports/

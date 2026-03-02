@@ -1,0 +1,174 @@
+# ============================================================================
+# GREY BARK ADVISORS - GUÍA TÉCNICA
+# ============================================================================
+# Fecha: 22 Enero 2026
+# ============================================================================
+
+# ============================================================================
+# INSTALACIÓN
+# ============================================================================
+
+instalacion:
+  pasos:
+    1: "unzip 03_greybark_library.zip"
+    2: "cd greybark"
+    3: "pip install -r requirements.txt"
+    4: "pip install -e ."
+    
+  verificacion: |
+    python -c "from greybark.analytics import classify_regime; print('OK')"
+    
+  dependencias_criticas:
+    - QuantLib: "pip install QuantLib"
+    - fredapi: "pip install fredapi"
+    - yfinance: "pip install yfinance"
+    - torch: "pip install torch  # Solo para LSTM, opcional"
+
+# ============================================================================
+# ESTRUCTURA DE LA LIBRERÍA
+# ============================================================================
+
+estructura:
+  greybark:
+    config.py: "Credenciales (ya configuradas)"
+    
+    data_sources:
+      fred_client.py: "FRED API (macro USA)"
+      bcch_client.py: "BCCh REST API (Chile)"
+      alphavantage_client.py: "AlphaVantage (fundamentals)"
+      commloan_scraper.py: "SOFR forwards"
+      
+    analytics:
+      rate_expectations: "Fed/TPM expectations"
+      regime_classification: "11 indicadores → régimen"
+      risk: "VaR, Stress, LSTM (Mejora #2)"
+      macro: "Inflation analytics (Mejora #3)"
+      earnings: "EPS analytics (Mejora #4)"
+      fixed_income: "Duration (Mejora #5)"
+      chile: "Chile Profundo (Mejora #6)"
+      factors: "Factor analysis (Mejora #7)"
+      china: "China credit (Mejora #8)"
+      credit: "IG spreads (Mejora #9)"
+      breadth: "Market breadth (Mejora #10)"
+      
+    tracking:
+      track_record.py: "Track record system (Mejora #11)"
+
+# ============================================================================
+# APIs Y CREDENCIALES
+# ============================================================================
+
+apis:
+  FRED:
+    costo: Gratis
+    uso: "Macro USA, yields, spreads"
+    key: "Ver 04_CREDENTIALS.yaml"
+    
+  BCCh:
+    costo: Gratis
+    uso: "Chile: TPM, IPC, swaps, BCP/BCU"
+    nota: "⚠️ SIEMPRE usar REST API, NUNCA SOAP"
+    url: "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx"
+    
+  AlphaVantage:
+    costo: "$49.99/mes (Premium)"
+    uso: "Fundamentals, technicals, earnings"
+    
+  Yahoo_Finance:
+    costo: Gratis
+    uso: "Precios, ETFs sectoriales"
+    nota: "No requiere API key"
+
+# ============================================================================
+# SERIES MÁS USADAS
+# ============================================================================
+
+series_fred:
+  macro:
+    FED_FUNDS: DFF
+    TREASURY_2Y: DGS2
+    TREASURY_10Y: DGS10
+    CORE_CPI: CPILFESL
+    
+  credit:
+    IG_TOTAL: BAMLC0A0CM
+    IG_BBB: BAMLC0A4CBBB
+    HY_TOTAL: BAMLH0A0HYM2
+    
+  breakeven:
+    TIPS_5Y: DFII5
+    TIPS_10Y: DFII10
+
+series_bcch:
+  macro:
+    TPM: F074.TPM.PLG.N.D
+    IPC: F073.IPC.1.0.0.Z.Z
+    USD_CLP: F073.TCO.PRE.Z.D
+    UF: F073.UFF.PRE.Z.D
+    
+  swaps:
+    SPC_90D: F022.SPC.TPR.D090.NO.Z.D
+    SPC_360D: F022.SPC.TPR.D360.NO.Z.D
+    SPC_5Y: F022.SPC.TIN.AN05.NO.Z.D
+    
+  bonos:
+    BCP_5Y: F022.TMP.TIN.AN05.NO.P.D
+    BCU_5Y: F022.TMP.TIN.AN05.NO.U.D
+
+# ============================================================================
+# EJEMPLOS RÁPIDOS
+# ============================================================================
+
+ejemplos:
+
+  regimen: |
+    from greybark.analytics import classify_regime
+    result = classify_regime()
+    print(result['regime'])  # EXPANSION, SLOWDOWN, CONTRACTION, RECOVERY
+    
+  chile_completo: |
+    from greybark.analytics.chile import ChileAnalytics
+    chile = ChileAnalytics()
+    dashboard = chile.get_chile_dashboard()
+    
+  credit_spreads: |
+    from greybark.analytics.credit import CreditSpreadAnalytics
+    cs = CreditSpreadAnalytics()
+    ig = cs.get_ig_breakdown()
+    print(f"IG: {ig['total']['current_bps']}bps")
+    
+  factor_analysis: |
+    from greybark.analytics.factors import FactorAnalytics
+    fa = FactorAnalytics()
+    profile = fa.get_factor_profile('AAPL')
+    print(profile['factor_tilt'])  # VALUE, GROWTH, MOMENTUM, QUALITY
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+
+problemas_comunes:
+
+  quantlib_error:
+    error: "Please install QuantLib"
+    solucion: "pip install QuantLib"
+    nota: "Puede tardar en compilar"
+    
+  bcch_error:
+    error: "Connection refused / SOAP error"
+    solucion: "Verificar que usa REST API, no SOAP"
+    codigo_correcto: "BCChClient()  # Ya usa REST internamente"
+    
+  fred_error:
+    error: "Invalid API key"
+    solucion: "Verificar key en config.py"
+    
+  yfinance_error:
+    error: "No data found"
+    solucion: "Verificar ticker, Yahoo puede tener rate limits"
+
+# ============================================================================
+# CONTACTO
+# ============================================================================
+
+soporte: "Cualquier duda → Pablo"

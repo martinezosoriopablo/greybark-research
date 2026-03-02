@@ -1,0 +1,81 @@
+============================================================
+VALIDACIÓN DATOS GREY BARK - AI COUNCIL
+Fecha: 2026-02-04 18:10:36
+============================================================
+
+[1/9] Regime Classification
+--------------------------------------------------
+✅ OK
+   - Régimen: N/A
+   - Score: 0.8
+   - Indicadores: 6 disponibles
+
+[2/9] US Macro Dashboard (FRED)
+--------------------------------------------------
+✅ OK
+   - GDP: 4.4% (Q3 2025)
+   - Unemployment: 4.4%
+   - Payrolls: 50.0K
+   - Retail Sales: 0.6% MoM
+   - Industrial Prod: 0.4% MoM
+
+[3/9] Inflation Analytics
+--------------------------------------------------
+✅ OK
+   - Breakeven 5Y: 2.53%
+   - Breakeven 10Y: 2.36%
+   - Real Rate 10Y: 1.94%
+   - Status: WELL_ANCHORED
+
+[4/9] Macro Dashboard Consolidated
+--------------------------------------------------
+✅ OK
+   - US GDP: 4.4%
+   - US Unemployment: 4.4%
+   - Chile TPM: 4.5%
+   - China Credit: contraction
+
+[5/9] Chile Analytics
+--------------------------------------------------
+✅ OK
+   - TPM: 4.5%
+   - IPC YoY: 3.4%
+   - USD/CLP: 859.53
+   - Policy Stance: NEUTRAL
+
+[6/9] China Credit Analytics
+--------------------------------------------------
+✅ OK
+   - Credit Impulse: contraction
+   - Confidence: MODERATE
+   - EPU Signal: VERY_HIGH
+   - Commodity Signal: NEUTRAL
+
+[7/9] Market Breadth
+--------------------------------------------------
+✅ OK
+   - Sectores analizados: N/A
+   - Signal: Error: 'MarketBreadthAnalytics' objec
+   - Clase: MarketBreadthAnalytics OK
+
+[8/9] Risk Metrics
+--------------------------------------------------
+✅ OK
+   - VaR 95%: 0.78%
+   - ES 95%: 1.51%
+   - Assets: SPY, AGG, GLD
+
+[9/9] Rate Expectations (Fed)
+--------------------------------------------------
+✅ OK
+   - Fed Funds Current: None%
+   - Escenario Base: N/A
+   - Probabilidad Cortes: N/A%
+
+============================================================
+RESUMEN
+============================================================
+✅ Módulos OK: 9/9
+❌ Módulos con error: 0/9
+
+============================================================
