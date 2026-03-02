@@ -1,0 +1,68 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ title }}</title>
+  <style type="text/css">
+    body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; font-family: {{ font_family|default("'Segoe UI', 'Helvetica Neue', Arial, sans-serif") }}; font-size: 10pt; color: #4a4a4a; }
+    table { border-collapse: collapse; }
+    @media print {
+        div, table, tr, td, th {
+            page-break-inside: avoid !important;
+        }
+        body { background-color: #ffffff !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#ffffff;">
+  <div style="width:100%; max-width:1000px; margin:0 auto; background-color:#ffffff;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ffffff;">
+      <tr>
+        <td style="padding:20px 40px;">
+
+          <!-- HEADER -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom:3px solid {{ primary_color|default('#1a1a1a') }}; padding-bottom:15px; margin-bottom:25px;">
+            <tr>
+              <td valign="bottom">
+                {% if logo_path %}<img src="{{ logo_path }}" alt="{{ company_name|default('GREYBARK RESEARCH') }}" style="max-height:40px; margin-bottom:5px; display:block;" />{% endif %}
+                <div style="font-family:{{ header_font_family|default("'Arial Black','Segoe UI',sans-serif") }}; font-size:20pt; font-weight:900; color:{{ primary_color|default('#1a1a1a') }}; text-transform:uppercase; letter-spacing:1px; line-height:1.1;">
+                  {{ company_name|default('GREYBARK RESEARCH') }}
+                </div>
+                <div style="font-size:12pt; color:{{ accent_color|default('#dd6b20') }}; font-weight:500; margin-top:2px;">
+                  {{ subtitle_daily|default('Reporte Diario de Mercados') }}
+                  <span style="display:inline-block; padding:3px 10px; border-radius:4px; font-size:10px; font-weight:900; text-transform:uppercase; margin-left:8px; {{ badge_style }}">
+                    {{ report_type }}
+                  </span>
+                </div>
+              </td>
+              <td valign="bottom" style="text-align:right;">
+                <div style="font-size:11pt; font-weight:600; color:{{ primary_color|default('#1a1a1a') }};">{{ date_str }}</div>
+                <div style="font-size:9pt; color:#717171;">{{ subtitle_perspective|default('Perspectivas de Mercado') }}</div>
+              </td>
+            </tr>
+          </table>
+
+          <!-- CONTENT -->
+          <div style="font-size:10pt; line-height:1.6; color:#4a4a4a;">
+            {{ content_html }}
+          </div>
+
+          <!-- FOOTER -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:40px; border-top:2px solid {{ primary_color|default('#1a1a1a') }}; padding-top:15px;">
+            <tr>
+              <td style="text-align:center; font-size:8pt; color:#717171;">
+                <div>{{ footer_text|default(company_name|default('GREYBARK RESEARCH') ~ ' | Reporte Diario | ' ~ date_str) }}</div>
+                <div style="margin-top:10px; padding:10px; background:#f7f7f7; border-radius:5px; font-size:7pt; line-height:1.4;">
+                  {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion. Las proyecciones y estimaciones contenidas en este reporte estan basadas en supuestos que pueden no materializarse. El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
+                </div>
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

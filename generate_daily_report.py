@@ -907,7 +907,7 @@ def load_external_prompt(mode: str, audience: str) -> str:
     return get_default_prompt(mode, audience)
 
 
-def generate_report_with_anthropic(context: str, prompt: str, mode: str) -> str:
+def generate_report_with_anthropic(context: str, prompt: str, mode: str, system_prompt: str = None) -> str:
     """Genera reporte usando Anthropic Claude"""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
@@ -917,10 +917,12 @@ def generate_report_with_anthropic(context: str, prompt: str, mode: str) -> str:
 
     print(f"[INFO] Generando reporte con Anthropic Claude (modo: {mode})...")
 
+    sys_prompt = system_prompt or SYSTEM_PROMPT
+
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=16000,
-        system=SYSTEM_PROMPT,
+        system=sys_prompt,
         messages=[
             {
                 "role": "user",
@@ -1086,16 +1088,38 @@ def _extract_validation_data(dataset: Dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
+def generate_for_client(json_path: str, mode: str, system_prompt: str = None, output_dir=None) -> str:
+    """Genera reporte para un cliente. Retorna path al .md."""
+    dataset = load_dataset(json_path)
+    context = build_curated_context(dataset, mode)
+    detailed_tables = build_detailed_tables(dataset)
+
+    prompt = load_external_prompt(mode, "finanzas")
+    report_text = generate_report_with_anthropic(context, prompt, mode, system_prompt=system_prompt)
+    report_text = review_report(report_text, dataset, detailed_tables)
+    full_report = report_text + "\n\n" + detailed_tables
+
+    today = date.today()
+    filename = f"daily_report_{mode}_{today.strftime('%Y-%m-%d')}.md"
+    out_path = Path(output_dir) / filename if output_dir else Path(filename)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(full_report)
+    print(f"[OK] Guardado: {out_path}")
+    return str(out_path)
+
+
 def main():
     """Función principal"""
     import sys
-    
+
     # Argumentos
     if len(sys.argv) < 2:
         json_path = INPUT_JSON
     else:
         json_path = sys.argv[1]
-    
+
     # Detectar modo (AM/PM)
     if len(sys.argv) >= 3:
         mode = sys.argv[2].upper()

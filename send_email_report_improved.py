@@ -221,6 +221,56 @@ def send_all_pending_reports():
 
 
 # ============================================================================
+# CLIENT PIPELINE ENTRY POINT
+# ============================================================================
+
+def send_email_for_client(html_path, recipients, from_name, subject, podcast_path=None):
+    """Envía reporte a destinatarios de un cliente.
+    recipients: [{'name': '...', 'email': '...'}]
+    Returns: True si al menos 1 envío exitoso."""
+    if not recipients:
+        return False
+
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_SENDER_USERNAME, EMAIL_SENDER_PASSWORD)
+    except Exception as e:
+        print(f"[ERROR] SMTP: {e}")
+        return False
+
+    sent = 0
+    for r in recipients:
+        try:
+            msg = MIMEMultipart('mixed')
+            msg['From'] = f"{from_name} <{EMAIL_SENDER_USERNAME}>"
+            msg['To'] = r['email']
+            msg['Subject'] = subject
+            msg.attach(MIMEText(html_content, 'html', 'utf-8'))
+
+            if podcast_path and os.path.exists(podcast_path):
+                with open(podcast_path, 'rb') as f:
+                    att = MIMEBase('audio', 'mpeg')
+                    att.set_payload(f.read())
+                    encoders.encode_base64(att)
+                    att.add_header('Content-Disposition', 'attachment',
+                                   filename=os.path.basename(podcast_path))
+                    msg.attach(att)
+
+            server.send_message(msg)
+            sent += 1
+            print(f"[OK] -> {r.get('name', '')} <{r['email']}>")
+        except Exception as e:
+            print(f"[ERROR] {r['email']}: {e}")
+
+    server.quit()
+    return sent > 0
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 

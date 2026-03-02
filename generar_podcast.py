@@ -129,7 +129,7 @@ def extraer_texto_html(html_path):
     return fecha_text, dashboard, content
 
 
-def generar_guion_claude(fecha, dashboard, contenido, turno="AM"):
+def generar_guion_claude(fecha, dashboard, contenido, turno="AM", intro=None, outro=None):
     """Llama a Claude para convertir el reporte en guión de podcast."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -138,12 +138,19 @@ def generar_guion_claude(fecha, dashboard, contenido, turno="AM"):
 
     client = anthropic.Anthropic(api_key=api_key)
 
-    # Adaptar saludo y despedida según turno AM/PM
-    if turno == "PM":
+    # Adaptar saludo y despedida: custom (intro/outro) o defaults Greybark
+    if intro:
+        saludo = intro.replace("{fecha}", fecha) if "{fecha}" in intro else intro
+    elif turno == "PM":
         saludo = f"Buenas tardes, soy Camila, tu analista de Greybark Research y esto es tu Reporte de Cierre de Mercados del {fecha}"
-        despedida = "Esto ha sido tu Reporte de Cierre de Mercados de Greybark Research. Que tengas una excelente tarde."
     else:
         saludo = f"Buenos días, soy Camila, tu analista de Greybark Research y esto es tu Reporte de Mercados del {fecha}"
+
+    if outro:
+        despedida = outro
+    elif turno == "PM":
+        despedida = "Esto ha sido tu Reporte de Cierre de Mercados de Greybark Research. Que tengas una excelente tarde."
+    else:
         despedida = "Esto ha sido tu Reporte de Mercados de Greybark Research. Que tengas un excelente día."
 
     prompt = f"""Convierte este reporte de mercados en un guión de podcast hablado en español chileno.
@@ -217,10 +224,7 @@ Escribe SOLO el guión, sin explicaciones ni comentarios."""
             cut_point = guion[:MAX_GUION_CHARS].rfind(".")
             if cut_point > MAX_GUION_CHARS * 0.7:
                 guion = guion[:cut_point + 1]
-                if turno == "PM":
-                    guion += "\n\nEsto ha sido tu Reporte de Cierre de Mercados de Greybark Research. Que tengas una excelente tarde."
-                else:
-                    guion += "\n\nEsto ha sido tu Reporte de Mercados de Greybark Research. Que tengas un excelente día."
+                guion += "\n\n" + despedida
             else:
                 guion = guion[:MAX_GUION_CHARS]
             log("INFO", f"Guión recortado a {len(guion):,} caracteres")
@@ -270,6 +274,34 @@ def inferir_fecha_de_archivo(filepath):
     if match:
         return match.group(1)
     return datetime.now().strftime("%Y-%m-%d")
+
+
+# ============================================================================
+# CLIENT PIPELINE ENTRY POINT
+# ============================================================================
+
+def generate_podcast_for_client(html_path, turno, intro=None, outro=None, output_dir=None):
+    """Genera podcast para un cliente. Retorna path al .mp3 o None."""
+    fecha_texto, dashboard, contenido = extraer_texto_html(html_path)
+    fecha = inferir_fecha_de_archivo(html_path)
+    if not fecha_texto:
+        fecha_texto = fecha
+
+    guion, costo = generar_guion_claude(fecha_texto, dashboard, contenido, turno, intro=intro, outro=outro)
+    if not guion:
+        return None
+
+    out_dir = output_dir or PODCAST_OUT_DIR
+    os.makedirs(out_dir, exist_ok=True)
+
+    txt_path = os.path.join(out_dir, f"podcast_{fecha}_{turno}.txt")
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write(guion)
+
+    mp3_path = os.path.join(out_dir, f"podcast_{fecha}_{turno}.mp3")
+    asyncio.run(generar_audio_tts(guion, mp3_path))
+    log("OK", f"Podcast cliente: {mp3_path}")
+    return mp3_path
 
 
 # ============================================================================

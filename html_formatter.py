@@ -12,6 +12,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 from pathlib import Path
 from datetime import datetime
 import re
+from jinja2 import Environment, FileSystemLoader, Undefined
 
 # INTENTAMOS IMPORTAR PDFKIT
 try:
@@ -54,77 +55,35 @@ BG_EVEN = "#f7f7f7"
 BORDER_COLOR = "#e0e0e0"
 WHITE = "#ffffff"
 
-# Plantilla Greybark Research (unificada con reportes mensuales)
-HTML_TEMPLATE = """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{title}</title>
-  <style type="text/css">
-    body {{ margin: 0; padding: 0; -webkit-text-size-adjust: 100%; font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 10pt; color: #4a4a4a; }}
-    table {{ border-collapse: collapse; }}
-    @media print {{
-        div, table, tr, td, th {{
-            page-break-inside: avoid !important;
-        }}
-        body {{ background-color: #ffffff !important; }}
-    }}
-  </style>
-</head>
-<body style="margin:0; padding:0; background-color:#ffffff;">
-  <div style="width:100%; max-width:1000px; margin:0 auto; background-color:#ffffff;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ffffff;">
-      <tr>
-        <td style="padding:20px 40px;">
+DEFAULT_DISCLAIMER = (
+    "Este documento es solo para fines informativos y no constituye una recomendacion de inversion. "
+    "Las proyecciones y estimaciones contenidas en este reporte estan basadas en supuestos que pueden no materializarse. "
+    "El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion."
+)
 
-          <!-- HEADER -->
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom:3px solid #1a1a1a; padding-bottom:15px; margin-bottom:25px;">
-            <tr>
-              <td valign="bottom">
-                <div style="font-family:'Arial Black','Segoe UI',sans-serif; font-size:20pt; font-weight:900; color:#1a1a1a; text-transform:uppercase; letter-spacing:1px; line-height:1.1;">
-                  GREYBARK RESEARCH
-                </div>
-                <div style="font-size:12pt; color:#dd6b20; font-weight:500; margin-top:2px;">
-                  Reporte Diario de Mercados
-                  <span style="display:inline-block; padding:3px 10px; border-radius:4px; font-size:10px; font-weight:900; text-transform:uppercase; margin-left:8px; {badge_style}">
-                    {report_type}
-                  </span>
-                </div>
-              </td>
-              <td valign="bottom" style="text-align:right;">
-                <div style="font-size:11pt; font-weight:600; color:#1a1a1a;">{date_str}</div>
-                <div style="font-size:9pt; color:#717171;">Perspectivas de Mercado</div>
-              </td>
-            </tr>
-          </table>
+# Jinja2 environment
+TEMPLATE_DIR = Path(__file__).parent / "templates"
+_jinja_env = Environment(
+    loader=FileSystemLoader(str(TEMPLATE_DIR)),
+    undefined=Undefined,
+    autoescape=False,
+)
 
-          <!-- CONTENT -->
-          <div style="font-size:10pt; line-height:1.6; color:#4a4a4a;">
-            {content_html}
-          </div>
-
-          <!-- FOOTER -->
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:40px; border-top:2px solid #1a1a1a; padding-top:15px;">
-            <tr>
-              <td style="text-align:center; font-size:8pt; color:#717171;">
-                <div>GREYBARK RESEARCH | Reporte Diario | {date_str}</div>
-                <div style="margin-top:10px; padding:10px; background:#f7f7f7; border-radius:5px; font-size:7pt; line-height:1.4;">
-                  Este documento es solo para fines informativos y no constituye una recomendacion de inversion.
-                  Las proyecciones y estimaciones contenidas en este reporte estan basadas en supuestos que pueden no materializarse.
-                  El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.
-                </div>
-              </td>
-            </tr>
-          </table>
-
-        </td>
-      </tr>
-    </table>
-  </div>
-</body>
-</html>
-"""
+# Branding defaults (Greybark Research — visualmente identico al diseño actual)
+GREYBARK_DEFAULTS = {
+    'company_name': 'GREYBARK RESEARCH',
+    'primary_color': PRIMARY_BLACK,
+    'accent_color': ACCENT_ORANGE,
+    'green_color': GREEN_TEXT,
+    'red_color': RED_TEXT,
+    'font_family': "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    'header_font_family': "'Arial Black','Segoe UI',sans-serif",
+    'subtitle_daily': 'Reporte Diario de Mercados',
+    'subtitle_perspective': 'Perspectivas de Mercado',
+    'footer_text': '',
+    'disclaimer_text': DEFAULT_DISCLAIMER,
+    'logo_path': '',
+}
 
 def detect_report_type_from_name(name: str) -> str:
     lower = name.lower()
@@ -152,10 +111,15 @@ def format_date_from_stem(stem: str) -> str:
 # ==========================================
 # (Se mantienen iguales para asegurar el estilo inline)
 
-def convert_dashboard_to_html(lines):
+def convert_dashboard_to_html(lines, colors=None):
+    c = colors or {}
+    _primary = c.get('primary_color', PRIMARY_BLACK)
+    _green = c.get('green_color', GREEN_TEXT)
+    _red = c.get('red_color', RED_TEXT)
+
     s_table = f"width:100%; margin:14px 0; background:{WHITE}; border:1px solid {BORDER_COLOR}; border-radius:8px; border-collapse:separate; border-spacing:0; overflow:hidden; page-break-inside:avoid;"
     s_td_base = f"padding:9px 8px; text-align:center; font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif; line-height:1.15; border-bottom:1px solid {BORDER_COLOR};"
-    s_header = f"background:{PRIMARY_BLACK}; color:{WHITE}; font-size:9pt; font-weight:700; text-transform:uppercase;"
+    s_header = f"background:{_primary}; color:{WHITE}; font-size:9pt; font-weight:700; text-transform:uppercase;"
     s_val = f"background:{WHITE}; color:{TEXT_MEDIUM}; font-size:9pt; font-weight:600;"
 
     html_parts = [f'<table style="{s_table}" cellpadding="0" cellspacing="0" border="0">']
@@ -169,13 +133,13 @@ def convert_dashboard_to_html(lines):
         html_parts.append('<tr>' + ''.join(f'<td style="{s_td_base} {s_header}">{h}</td>' for h in headers[:6]) + '</tr>')
 
         row_cells = []
-        for c in changes[:6]:
-            color = PRIMARY_BLACK
-            if '%' in c:
-                if '+' in c: color = GREEN_TEXT
-                elif '-' in c: color = RED_TEXT
+        for ch in changes[:6]:
+            color = _primary
+            if '%' in ch:
+                if '+' in ch: color = _green
+                elif '-' in ch: color = _red
             s_change = f"background:{WHITE}; color:{color}; font-size:12pt; font-weight:900;"
-            row_cells.append(f'<td style="{s_td_base} {s_change}">{c}</td>')
+            row_cells.append(f'<td style="{s_td_base} {s_change}">{ch}</td>')
         html_parts.append('<tr>' + ''.join(row_cells) + '</tr>')
         html_parts.append('<tr>' + ''.join(f'<td style="{s_td_base} {s_val}">{v}</td>' for v in values[:6]) + '</tr>')
 
@@ -210,12 +174,17 @@ def infer_block_cols(lines, default_cols=5) -> int:
             if parts: return len(parts)
     return default_cols
 
-def convert_market_table_to_html(lines):
+def convert_market_table_to_html(lines, colors=None):
+    c = colors or {}
+    _primary = c.get('primary_color', PRIMARY_BLACK)
+    _green = c.get('green_color', GREEN_TEXT)
+    _red = c.get('red_color', RED_TEXT)
+
     s_table = f"width:100%; margin:14px 0; font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif; font-size:9pt; border:1px solid {BORDER_COLOR}; border-radius:8px; border-collapse:separate; border-spacing:0; overflow:hidden; page-break-inside:avoid;"
-    s_th = f"background:{PRIMARY_BLACK}; color:{WHITE}; padding:10px 8px; font-weight:700; font-size:9pt; border-bottom:1px solid {PRIMARY_BLACK}; white-space:nowrap;"
-    s_td = f"padding:8px 8px; border-bottom:1px solid {BORDER_COLOR}; font-size:9pt; color:{PRIMARY_BLACK}; white-space:nowrap;"
-    s_section = f"background:{PRIMARY_BLACK}; color:{WHITE}; text-align:center; font-weight:700; padding:10px; text-transform:uppercase; letter-spacing:0.45px; font-size:9pt; border-bottom:0;"
-    s_sub = f"background:{PRIMARY_BLACK}; color:{WHITE}; font-weight:700; font-size:9pt; padding:9px 10px;"
+    s_th = f"background:{_primary}; color:{WHITE}; padding:10px 8px; font-weight:700; font-size:9pt; border-bottom:1px solid {_primary}; white-space:nowrap;"
+    s_td = f"padding:8px 8px; border-bottom:1px solid {BORDER_COLOR}; font-size:9pt; color:{_primary}; white-space:nowrap;"
+    s_section = f"background:{_primary}; color:{WHITE}; text-align:center; font-weight:700; padding:10px; text-transform:uppercase; letter-spacing:0.45px; font-size:9pt; border-bottom:0;"
+    s_sub = f"background:{_primary}; color:{WHITE}; font-weight:700; font-size:9pt; padding:9px 10px;"
 
     html_parts = [f'<table style="{s_table}" cellpadding="0" cellspacing="0">']
 
@@ -264,7 +233,7 @@ def convert_market_table_to_html(lines):
         for i, p in enumerate(parts):
             color_style = ""
             if ('%' in p or 'bp' in p) and ('+' in p or '-' in p):
-                color_style = f"color: {GREEN_TEXT}; font-weight: 900;" if '+' in p else f"color: {RED_TEXT}; font-weight: 900;"
+                color_style = f"color: {_green}; font-weight: 900;" if '+' in p else f"color: {_red}; font-weight: 900;"
             align = "right" if i > 0 else "left"
             weight = "font-weight: 800;" if (i == 0 or vix_parts) else ""
             tds.append(f'<td style="{s_td} background-color: {bg_color}; text-align: {align}; {color_style} {weight}">{p}</td>')
@@ -274,11 +243,11 @@ def convert_market_table_to_html(lines):
     html_parts.append('</table>')
     return "\n".join(html_parts)
 
-def process_markdown_content(text):
+def process_markdown_content(text, colors=None):
     lines = text.split("\n"); result = []
-    
+
     def is_eq_line(s): return len(s.strip()) >= 10 and all(ch == '=' for ch in s.strip())
-    def classify_block(bl): 
+    def classify_block(bl):
         up = "\n".join(bl).upper()
         if "DASHBOARD DIARIO" in up: return "dashboard"
         if any(k in up for k in ["ÍNDICES", "RENTA FIJA", "COMMODITIES", "DIVISAS", "SENTIMENT"]): return "market"
@@ -291,8 +260,8 @@ def process_markdown_content(text):
             i += 1; block = []
             while i < len(lines) and not lines[i].strip().startswith("```"): block.append(lines[i]); i += 1
             kind = classify_block(block)
-            if kind == "dashboard": result.append(convert_dashboard_to_html(block))
-            elif kind == "market": result.append(convert_market_table_to_html(block))
+            if kind == "dashboard": result.append(convert_dashboard_to_html(block, colors=colors))
+            elif kind == "market": result.append(convert_market_table_to_html(block, colors=colors))
             else: result.append("```\n" + "\n".join(block) + "\n```")
             if i < len(lines) and lines[i].strip().startswith("```"): i += 1
             continue
@@ -310,8 +279,8 @@ def process_markdown_content(text):
                     else: i += 1; break
                 i += 1
             kind = classify_block(block)
-            if kind == "dashboard": result.append(convert_dashboard_to_html(block))
-            elif kind == "market": result.append(convert_market_table_to_html(block))
+            if kind == "dashboard": result.append(convert_dashboard_to_html(block, colors=colors))
+            elif kind == "market": result.append(convert_market_table_to_html(block, colors=colors))
             else: result.extend(block)
             continue
 
@@ -319,24 +288,28 @@ def process_markdown_content(text):
         result.append(line); i += 1
     return "\n".join(result)
 
-def apply_inline_styles(html):
-    """Inyecta estilos Greybark en tags generados por markdown.markdown()."""
-    # h2 — section title: 14pt, orange bottom border
+def apply_inline_styles(html, branding=None):
+    """Inyecta estilos en tags generados por markdown.markdown()."""
+    b = branding or {}
+    _primary = b.get('primary_color', PRIMARY_BLACK)
+    _accent = b.get('accent_color', ACCENT_ORANGE)
+
+    # h2 — section title: 14pt, accent bottom border
     html = re.sub(
         r'<h2>(.*?)</h2>',
-        r'<h2 style="font-size:14pt; font-weight:700; color:#1a1a1a; border-bottom:2px solid #dd6b20; padding-bottom:8px; margin:25px 0 15px 0;">\1</h2>',
+        rf'<h2 style="font-size:14pt; font-weight:700; color:{_primary}; border-bottom:2px solid {_accent}; padding-bottom:8px; margin:25px 0 15px 0;">\1</h2>',
         html
     )
-    # h3 — subsection: 11pt, orange left border
+    # h3 — subsection: 11pt, accent left border
     html = re.sub(
         r'<h3>(.*?)</h3>',
-        r'<h3 style="font-size:11pt; font-weight:600; color:#3a3a3a; margin:15px 0 10px 0; padding-left:10px; border-left:3px solid #dd6b20;">\1</h3>',
+        rf'<h3 style="font-size:11pt; font-weight:600; color:#3a3a3a; margin:15px 0 10px 0; padding-left:10px; border-left:3px solid {_accent};">\1</h3>',
         html
     )
     # h1 — keep large for report title
     html = re.sub(
         r'<h1>(.*?)</h1>',
-        r'<h1 style="font-size:16pt; font-weight:700; color:#1a1a1a; margin:20px 0 10px 0;">\1</h1>',
+        rf'<h1 style="font-size:16pt; font-weight:700; color:{_primary}; margin:20px 0 10px 0;">\1</h1>',
         html
     )
     # p — body text
@@ -351,58 +324,83 @@ def apply_inline_styles(html):
         '<li style="font-size:10pt; color:#4a4a4a; margin-bottom:5px;">',
         html
     )
-    # strong — bold in primary black
+    # strong — bold in primary
     html = re.sub(
         r'<strong>',
-        '<strong style="color:#1a1a1a;">',
+        f'<strong style="color:{_primary};">',
         html
     )
-    # Resumen Ejecutivo — wrap in orange-bordered box
+    # Resumen Ejecutivo — wrap in accent-bordered box
     html = re.sub(
         r'(<h2[^>]*>.*?Resumen Ejecutivo.*?</h2>)(.*?)(?=<h2|$)',
-        lambda m: m.group(1) + '<div style="background:#f7f7f7; border-left:4px solid #dd6b20; padding:15px; border-radius:5px; margin-bottom:20px;">' + m.group(2) + '</div>',
+        lambda m: m.group(1) + f'<div style="background:#f7f7f7; border-left:4px solid {_accent}; padding:15px; border-radius:5px; margin-bottom:20px;">' + m.group(2) + '</div>',
         html,
         flags=re.DOTALL | re.IGNORECASE
     )
     return html
 
 
-def build_files(md_path: Path):
+def build_files(md_path: Path, branding: dict = None, output_dir: Path = None):
+    # Merge branding with defaults
+    effective_branding = dict(GREYBARK_DEFAULTS)
+    if branding:
+        effective_branding.update({k: v for k, v in branding.items() if v})
+
     text = md_path.read_text(encoding="utf-8", errors="replace")
     title = "Reporte de Mercados"
     for line in text.splitlines():
         if line.startswith("# "): title = line.replace("#", "").strip(); break
 
     report_type = detect_report_type_from_name(md_path.stem)
+    _accent = effective_branding['accent_color']
+    _primary = effective_branding['primary_color']
+    _green = effective_branding['green_color']
     if report_type == "AM":
-        badge_style = f"background-color:{ACCENT_ORANGE}; color:{WHITE};"
+        badge_style = f"background-color:{_accent}; color:{WHITE};"
     elif report_type == "PM":
-        badge_style = f"background-color:{PRIMARY_BLACK}; color:{WHITE};"
+        badge_style = f"background-color:{_primary}; color:{WHITE};"
     elif report_type == "SEMANAL":
-        badge_style = f"background-color:{GREEN_TEXT}; color:{WHITE};"
+        badge_style = f"background-color:{_green}; color:{WHITE};"
     else:
         badge_style = f"background-color:{TEXT_LIGHT}; color:{WHITE};"
 
-    processed = process_markdown_content(text)
+    # Colors dict for table converters
+    colors = {
+        'primary_color': _primary,
+        'accent_color': _accent,
+        'green_color': _green,
+        'red_color': effective_branding['red_color'],
+    }
+
+    processed = process_markdown_content(text, colors=colors)
     if markdown:
         content_html = markdown.markdown(processed, extensions=["extra", "nl2br", "sane_lists"])
     else:
         content_html = processed.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
 
-    content_html = apply_inline_styles(content_html)
+    content_html = apply_inline_styles(content_html, branding=effective_branding)
 
-    final_html = HTML_TEMPLATE.format(
-        title=title, date_str=format_date_from_stem(md_path.stem),
-        report_type=report_type, badge_style=badge_style, content_html=content_html
-    )
+    # Render with Jinja2
+    template = _jinja_env.get_template("daily_report.html")
+    context = dict(effective_branding)
+    context.update({
+        'title': title,
+        'date_str': format_date_from_stem(md_path.stem),
+        'report_type': report_type,
+        'badge_style': badge_style,
+        'content_html': content_html,
+    })
+    final_html = template.render(**context)
 
     # 1. Guardar HTML
-    out_html = OUTPUT_DIR / (md_path.stem + ".html")
+    out_dir = Path(output_dir) if output_dir else OUTPUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_html = out_dir / (md_path.stem + ".html")
     out_html.write_text(final_html, encoding="utf-8", errors="replace")
-    print(f"[OK] HTML generado: {out_html.name}")
+    print(f"[OK] HTML generado: {out_html}")
 
-    # 2. Generar PDF (Si está configurado)
-    if HAS_PDFKIT:
+    # 2. Generar PDF (solo para output default, no para cada cliente)
+    if HAS_PDFKIT and output_dir is None:
         out_pdf = OUTPUT_DIR / (md_path.stem + ".pdf")
         options = {
             'page-size': 'A4',
@@ -418,6 +416,8 @@ def build_files(md_path: Path):
             print(f"[OK] PDF generado:  {out_pdf.name}")
         except Exception as e:
             print(f"[ERROR] Falló PDF: {e}")
+
+    return str(out_html)
 
 def main():
     # Buscar reportes diarios Y semanales
