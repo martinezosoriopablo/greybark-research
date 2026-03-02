@@ -17,6 +17,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
+from jinja2 import Environment, FileSystemLoader, Undefined
+
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 
@@ -28,14 +30,21 @@ class AssetAllocationRenderer:
     """Renderizador del Reporte de Asset Allocation profesional."""
 
     def __init__(self, council_result: Dict = None, market_data: Dict = None,
-                 forecast_data: Dict = None, verbose: bool = True):
+                 forecast_data: Dict = None, verbose: bool = True, branding: dict = None):
         self.council_result = council_result or {}
         self.market_data = market_data or {}
         self.forecast_data = forecast_data
         self.verbose = verbose
+        self.branding = branding or {}
         self.template_path = Path(__file__).parent / "templates" / "asset_allocation_professional.html"
+        self.template_name = "asset_allocation_professional.html"
         self.output_dir = Path(__file__).parent / "output" / "reports"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._jinja_env = Environment(
+            loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
+            undefined=Undefined,
+            autoescape=False,
+        )
 
         # Inicializar generador de contenido con datos cuantitativos
         self.content_generator = AssetAllocationContentGenerator(
@@ -65,10 +74,9 @@ class AssetAllocationRenderer:
         self._print("[1/3] Generando contenido narrativo...")
         content = self.content_generator.generate_all_content()
 
-        # 2. Leer template
+        # 2. Cargar template Jinja2
         self._print("[2/3] Cargando template profesional...")
-        with open(self.template_path, 'r', encoding='utf-8') as f:
-            template = f.read()
+        template = self._jinja_env.get_template(self.template_name)
 
         # 3. Renderizar
         self._print("[3/3] Renderizando reporte...")
@@ -85,7 +93,7 @@ class AssetAllocationRenderer:
         self._print(f"\n[OK] Reporte generado: {output_path}")
         return str(output_path)
 
-    def _render_template(self, template: str, content: Dict) -> str:
+    def _render_template(self, template, content: Dict) -> str:
         """Renderiza el template con el contenido."""
 
         # Metadata
@@ -421,11 +429,17 @@ class AssetAllocationRenderer:
             </div>'''
         replacements['{{focus_list_html}}'] = focus_html
 
-        # Apply all replacements
+        # Convert {{key}} → key for Jinja2 context
+        context = {}
         for key, value in replacements.items():
-            template = template.replace(key, str(value))
+            clean = key.replace('{{', '').replace('}}', '')
+            context[clean] = str(value)
 
-        return template
+        # Inject branding (templates use |default() for fallback)
+        if self.branding:
+            context.update(self.branding)
+
+        return template.render(**context)
 
 
 def main():

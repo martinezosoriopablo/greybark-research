@@ -17,6 +17,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
+from jinja2 import Environment, FileSystemLoader, Undefined
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from rf_content_generator import RFContentGenerator
@@ -26,14 +28,21 @@ class RFReportRenderer:
     """Renderizador del Reporte de Renta Fija profesional."""
 
     def __init__(self, council_result: Dict = None, market_data: Dict = None,
-                 forecast_data: Dict = None, verbose: bool = True):
+                 forecast_data: Dict = None, verbose: bool = True, branding: dict = None):
         self.council_result = council_result or {}
         self.market_data = market_data or {}
         self.forecast_data = forecast_data
         self.verbose = verbose
+        self.branding = branding or {}
         self.template_path = Path(__file__).parent / "templates" / "rf_report_professional.html"
+        self.template_name = "rf_report_professional.html"
         self.output_dir = Path(__file__).parent / "output" / "reports"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._jinja_env = Environment(
+            loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
+            undefined=Undefined,
+            autoescape=False,
+        )
 
         self.content_generator = RFContentGenerator(
             self.council_result, self.market_data, forecast_data=self.forecast_data)
@@ -60,31 +69,21 @@ class RFReportRenderer:
         content = self.content_generator.generate_all_content()
 
         self._print("[2/4] Cargando template profesional...")
-        with open(self.template_path, 'r', encoding='utf-8') as f:
-            template = f.read()
+        template = self._jinja_env.get_template(self.template_name)
 
-        self._print("[3/4] Renderizando reporte...")
-        html = self._render_template(template, content)
-
-        self._print("[4/4] Generando e inyectando charts...")
+        self._print("[3/4] Generando charts...")
+        charts = {}
         try:
             from rf_chart_generator import RFChartsGenerator
             charts_gen = RFChartsGenerator(self.market_data)
             charts = charts_gen.generate_all_charts()
-            for chart_id, img_data in charts.items():
-                if img_data.startswith('data:image'):
-                    img_tag = f'<img src="{img_data}" style="max-width: 100%; height: auto;" alt="{chart_id}">'
-                else:
-                    img_tag = img_data  # placeholder HTML
-                html = html.replace(f'{{{{{chart_id}}}}}', img_tag)
             real_count = len([v for v in charts.values() if 'base64' in v])
             self._print(f"  Charts: {real_count}/{len(charts)} generados con datos reales")
         except Exception as e:
             self._print(f"  [WARN] Charts: {e}")
 
-        # Clean unresolved chart placeholders
-        import re
-        html = re.sub(r'\{\{rf_[a-z_]+\}\}', '', html)
+        self._print("[4/4] Renderizando reporte...")
+        html = self._render_template(template, content, charts)
 
         if output_filename is None:
             output_filename = f"rf_report_{datetime.now().strftime('%Y-%m-%d')}.html"
@@ -96,8 +95,8 @@ class RFReportRenderer:
         self._print(f"\n[OK] Reporte RF generado: {output_path}")
         return str(output_path)
 
-    def _render_template(self, template: str, content: Dict) -> str:
-        """Renderiza el template con el contenido."""
+    def _render_template(self, template, content: Dict, charts: Dict = None) -> str:
+        """Renderiza el template con el contenido usando Jinja2."""
 
         now = datetime.now()
         replacements = {
@@ -375,11 +374,25 @@ class RFReportRenderer:
         replacements['{{summary_rows}}'] = sum_rows
         replacements['{{mensaje_clave}}'] = summary['mensaje_clave']
 
-        # Apply all replacements
+        # Convert {{key}} → key for Jinja2 context
+        context = {}
         for key, value in replacements.items():
-            template = template.replace(key, str(value))
+            clean = key.replace('{{', '').replace('}}', '')
+            context[clean] = str(value)
 
-        return template
+        # Charts
+        if charts:
+            for chart_id, img_data in charts.items():
+                if img_data and img_data.startswith('data:image'):
+                    context[chart_id] = f'<img src="{img_data}" style="max-width: 100%; height: auto;" alt="{chart_id}">'
+                else:
+                    context[chart_id] = img_data or ''
+
+        # Inject branding (templates use |default() for fallback)
+        if self.branding:
+            context.update(self.branding)
+
+        return template.render(**context)
 
     def _get_view_class(self, view: str) -> str:
         """Retorna clase CSS segun view."""

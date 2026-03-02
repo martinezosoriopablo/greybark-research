@@ -6,16 +6,16 @@
     <title>Greybark Research - Reporte Macro</title>
     <style>
         :root {
-            --primary-blue: #1a1a1a;
+            --primary-blue: {{ primary_color|default('#1a1a1a') }};
             --secondary-blue: #3a3a3a;
-            --accent-orange: #dd6b20;
-            --text-dark: #1a1a1a;
+            --accent-orange: {{ accent_color|default('#dd6b20') }};
+            --text-dark: {{ primary_color|default('#1a1a1a') }};
             --text-medium: #4a4a4a;
             --text-light: #717171;
             --bg-light: #f7f7f7;
             --border-color: #e0e0e0;
-            --positive: #276749;
-            --negative: #c53030;
+            --positive: {{ green_color|default('#276749') }};
+            --negative: {{ red_color|default('#c53030') }};
             --neutral: #744210;
         }
 
@@ -26,7 +26,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-family: {{ font_family|default("'Segoe UI', 'Helvetica Neue', Arial, sans-serif") }};
             font-size: 10pt;
             line-height: 1.5;
             color: var(--text-dark);
@@ -50,7 +50,7 @@
         }
 
         .logo-section h1 {
-            font-family: 'Archio Black', 'Archio', 'Arial Black', 'Segoe UI', sans-serif;
+            font-family: {{ header_font_family|default("'Archio Black', 'Archio', 'Arial Black', 'Segoe UI', sans-serif") }};
             font-size: 24pt;
             color: var(--primary-blue);
             font-weight: 900;
@@ -489,7 +489,8 @@
         <!-- Header -->
         <header class="header">
             <div class="logo-section">
-                <h1>GREYBARK RESEARCH</h1>
+                {% if logo_path %}<img src="{{ logo_path }}" alt="{{ company_name|default('GREYBARK RESEARCH') }}" style="max-height:40px;margin-bottom:5px;">{% endif %}
+                <h1>{{ company_name|default('GREYBARK RESEARCH') }}</h1>
                 <div class="subtitle">Reporte Macro Mensual</div>
             </div>
             <div class="report-info">
@@ -1158,11 +1159,9 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <div>GREYBARK RESEARCH | Reporte Macro | {{fecha_reporte}}</div>
+            <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Macro | {{fecha_reporte}}</div>
             <div class="disclaimer">
-                Este documento es solo para fines informativos y no constituye una recomendacion de inversion.
-                Las proyecciónes y estimaciónes contenidas en este reporte estan basadas en supuestos que pueden no materializarse.
-                El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.
+                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion. Las proyecciónes y estimaciónes contenidas en este reporte estan basadas en supuestos que pueden no materializarse. El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
             </div>
         </footer>
     </div>

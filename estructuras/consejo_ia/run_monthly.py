@@ -74,6 +74,9 @@ class MonthlyPipeline:
         no_confirm: bool = False,
         reports: List[str] = None,
         open_browser: bool = False,
+        branding: dict = None,
+        output_dir: str = None,
+        client_prompts: dict = None,
     ):
         self.dry_run = dry_run
         self.skip_collect = skip_collect
@@ -82,6 +85,11 @@ class MonthlyPipeline:
         self.open_browser = open_browser
         self.date_str = datetime.now().strftime('%Y-%m-%d')
         self.timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # Client customization (None = Greybark defaults)
+        self.branding = branding
+        self.custom_output_dir = Path(output_dir) if output_dir else None
+        self.client_prompts = client_prompts
 
         # State
         self.data = {}
@@ -93,6 +101,8 @@ class MonthlyPipeline:
         # Ensure output dirs exist
         for d in [COUNCIL_DIR, REPORTS_DIR, EQUITY_DIR, RF_DIR, FORECAST_DIR]:
             d.mkdir(parents=True, exist_ok=True)
+        if self.custom_output_dir:
+            self.custom_output_dir.mkdir(parents=True, exist_ok=True)
 
     def _print(self, msg: str):
         print(msg)
@@ -544,7 +554,7 @@ class MonthlyPipeline:
             # Por ahora, delegamos al runner que re-recopile (es rápido para macro)
             # pero le pasamos equity_data por separado.
 
-            runner = AICouncilRunner(verbose=True)
+            runner = AICouncilRunner(verbose=True, client_prompts=self.client_prompts)
 
             # Inyectar equity_data al collector del runner para que lo incluya
             equity_data = data.get('equity', {})
@@ -650,8 +660,9 @@ class MonthlyPipeline:
                 council_result=council_result,
                 forecast_data=forecast_data,
                 verbose=True,
+                branding=self.branding,
             )
-            return renderer.render()
+            path = renderer.render()
 
         elif report_name == 'rv':
             from rv_report_renderer import RVReportRenderer
@@ -660,8 +671,9 @@ class MonthlyPipeline:
                 market_data=equity_data,
                 forecast_data=forecast_data,
                 verbose=True,
+                branding=self.branding,
             )
-            return renderer.render()
+            path = renderer.render()
 
         elif report_name == 'rf':
             from rf_report_renderer import RFReportRenderer
@@ -674,8 +686,9 @@ class MonthlyPipeline:
                 market_data=rf_data,
                 forecast_data=forecast_data,
                 verbose=True,
+                branding=self.branding,
             )
-            return renderer.render()
+            path = renderer.render()
 
         elif report_name == 'aa':
             from asset_allocation_renderer import AssetAllocationRenderer
@@ -691,11 +704,20 @@ class MonthlyPipeline:
                 market_data=aa_data if aa_data else None,
                 forecast_data=forecast_data,
                 verbose=True,
+                branding=self.branding,
             )
-            return renderer.render()
+            path = renderer.render()
 
         else:
             raise ValueError(f"Reporte desconocido: {report_name}")
+
+        # Copy to custom output dir if specified
+        if self.custom_output_dir and path and os.path.exists(path):
+            import shutil
+            dest = self.custom_output_dir / os.path.basename(path)
+            shutil.copy2(path, dest)
+            return str(dest)
+        return path
 
     # =====================================================================
     # FASE 5: RESUMEN Y ENTREGA

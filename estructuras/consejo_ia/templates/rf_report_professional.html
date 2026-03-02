@@ -6,12 +6,12 @@
     <title>Greybark Research - Reporte Renta Fija</title>
     <style>
         :root {
-            --primary-blue: #1a1a1a;
+            --primary-blue: {{ primary_color|default('#1a1a1a') }};
             --secondary-blue: #333333;
-            --accent-teal: #dd6b20;
-            --accent-green: #276749;
-            --accent-red: #c53030;
-            --accent-orange: #dd6b20;
+            --accent-teal: {{ accent_color|default('#dd6b20') }};
+            --accent-green: {{ green_color|default('#276749') }};
+            --accent-red: {{ red_color|default('#c53030') }};
+            --accent-orange: {{ accent_color|default('#dd6b20') }};
             --text-dark: #1a202c;
             --text-medium: #4a5568;
             --text-light: #718096;
@@ -25,7 +25,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-family: {{ font_family|default("'Segoe UI', 'Helvetica Neue', Arial, sans-serif") }};
             font-size: 10pt;
             line-height: 1.5;
             color: var(--text-dark);
@@ -428,7 +428,8 @@
         <!-- Header -->
         <header class="header">
             <div class="logo-section">
-                <h1>GREYBARK RESEARCH</h1>
+                {% if logo_path %}<img src="{{ logo_path }}" alt="{{ company_name|default('GREYBARK RESEARCH') }}" style="max-height:40px;margin-bottom:5px;">{% endif %}
+                <h1>{{ company_name|default('GREYBARK RESEARCH') }}</h1>
                 <div class="subtitle">Reporte Renta Fija Mensual</div>
             </div>
             <div class="report-info">
@@ -840,11 +841,9 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <div>GREYBARK RESEARCH | Reporte Renta Fija | {{fecha_reporte}}</div>
+            <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Renta Fija | {{fecha_reporte}}</div>
             <div class="disclaimer">
-                Este documento es solo para fines informativos y no constituye una recomendacion de inversion personalizada.
-                Los rendimientos pasados no garantizan resultados futuros. Los precios de los bonos pueden fluctuar.
-                Consulte a su asesor financiero antes de tomar decisiones de inversion.
+                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion personalizada. Los rendimientos pasados no garantizan resultados futuros. Los precios de los bonos pueden fluctuar. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
             </div>
         </footer>
     </div>

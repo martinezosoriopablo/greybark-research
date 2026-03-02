@@ -17,6 +17,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
+from jinja2 import Environment, FileSystemLoader, Undefined
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from rv_content_generator import RVContentGenerator
@@ -28,14 +30,21 @@ class RVReportRenderer:
     """Renderizador del Reporte de Renta Variable profesional."""
 
     def __init__(self, council_result: Dict = None, market_data: Dict = None,
-                 forecast_data: Dict = None, verbose: bool = True):
+                 forecast_data: Dict = None, verbose: bool = True, branding: dict = None):
         self.council_result = council_result or {}
         self.market_data = market_data or {}
         self.forecast_data = forecast_data
         self.verbose = verbose
+        self.branding = branding or {}
         self.template_path = Path(__file__).parent / "templates" / "rv_report_professional.html"
+        self.template_name = "rv_report_professional.html"
         self.output_dir = Path(__file__).parent / "output" / "reports"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._jinja_env = Environment(
+            loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
+            undefined=Undefined,
+            autoescape=False,
+        )
 
         self.content_generator = RVContentGenerator(
             self.council_result, self.market_data, forecast_data=self.forecast_data)
@@ -69,10 +78,9 @@ class RVReportRenderer:
         chart_count = sum(1 for v in charts.values() if v and v.startswith('data:image'))
         self._print(f"  {chart_count}/{len(charts)} charts generados con datos reales")
 
-        # 3. Leer template
+        # 3. Cargar template Jinja2
         self._print("[3/4] Cargando template profesional...")
-        with open(self.template_path, 'r', encoding='utf-8') as f:
-            template = f.read()
+        template = self._jinja_env.get_template(self.template_name)
 
         # 4. Renderizar
         self._print("[4/4] Renderizando reporte...")
@@ -89,8 +97,8 @@ class RVReportRenderer:
         self._print(f"\n[OK] Reporte RV generado: {output_path}")
         return str(output_path)
 
-    def _render_template(self, template: str, content: Dict, charts: Dict = None) -> str:
-        """Renderiza el template con el contenido y charts."""
+    def _render_template(self, template, content: Dict, charts: Dict = None) -> str:
+        """Renderiza el template con el contenido y charts usando Jinja2."""
 
         now = datetime.now()
         replacements = {
@@ -408,21 +416,25 @@ class RVReportRenderer:
         replacements['{{summary_positioning_rows}}'] = sum_rows
         replacements['{{mensaje_clave}}'] = summary['mensaje_clave']
 
-        # Apply all replacements
+        # Convert {{key}} → key for Jinja2 context
+        context = {}
         for key, value in replacements.items():
-            template = template.replace(key, str(value))
+            clean = key.replace('{{', '').replace('}}', '')
+            context[clean] = str(value)
 
         # Charts
         if charts:
             for chart_id, chart_data in charts.items():
-                placeholder = '{{' + chart_id + '}}'
                 if chart_data and chart_data.startswith('data:image'):
-                    img_html = f'<div class="chart-container"><img src="{chart_data}" alt="{chart_id}"></div>'
-                    template = template.replace(placeholder, img_html)
+                    context[chart_id] = f'<div class="chart-container"><img src="{chart_data}" alt="{chart_id}"></div>'
                 else:
-                    template = template.replace(placeholder, chart_data or '')
+                    context[chart_id] = chart_data or ''
 
-        return template
+        # Inject branding (templates use |default() for fallback)
+        if self.branding:
+            context.update(self.branding)
+
+        return template.render(**context)
 
     def _get_view_class(self, view: str) -> str:
         """Retorna clase CSS segun view."""

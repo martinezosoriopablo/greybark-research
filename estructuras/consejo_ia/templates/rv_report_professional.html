@@ -6,11 +6,11 @@
     <title>Greybark Research - Reporte Renta Variable</title>
     <style>
         :root {
-            --primary: #1a1a1a;
+            --primary: {{ primary_color|default('#1a1a1a') }};
             --secondary: #333333;
-            --accent: #dd6b20;
-            --danger: #c53030;
-            --success: #276749;
+            --accent: {{ accent_color|default('#dd6b20') }};
+            --danger: {{ red_color|default('#c53030') }};
+            --success: {{ green_color|default('#276749') }};
             --text-dark: #1a202c;
             --text-medium: #4a5568;
             --text-light: #718096;
@@ -22,7 +22,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-family: {{ font_family|default("'Segoe UI', 'Helvetica Neue', Arial, sans-serif") }};
             font-size: 10pt;
             line-height: 1.5;
             color: var(--text-dark);
@@ -49,7 +49,7 @@
             font-size: 24pt;
             color: var(--primary);
             font-weight: 700;
-            font-family: 'Archio', 'Arial Black', 'Helvetica Neue', sans-serif;
+            font-family: {{ header_font_family|default("'Archio', 'Arial Black', 'Helvetica Neue', sans-serif") }};
         }
 
         .logo-section .subtitle {
@@ -540,7 +540,8 @@
         <!-- Header -->
         <header class="header">
             <div class="logo-section">
-                <h1>GREYBARK RESEARCH</h1>
+                {% if logo_path %}<img src="{{ logo_path }}" alt="{{ company_name|default('GREYBARK RESEARCH') }}" style="max-height:40px;margin-bottom:5px;">{% endif %}
+                <h1>{{ company_name|default('GREYBARK RESEARCH') }}</h1>
                 <div class="subtitle">Reporte Renta Variable Mensual</div>
             </div>
             <div class="report-info">
@@ -943,11 +944,9 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <div>GREYBARK RESEARCH | Reporte Renta Variable | {{fecha_reporte}}</div>
+            <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Renta Variable | {{fecha_reporte}}</div>
             <div class="disclaimer">
-                Este documento es solo para fines informativos y no constituye una recomendacion de inversion personalizada.
-                Las opiniones expresadas pueden cambiar sin previo aviso. El desempeno pasado no garantiza resultados futuros.
-                Consulte a su asesor financiero antes de tomar decisiones de inversion.
+                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion personalizada. Las opiniones expresadas pueden cambiar sin previo aviso. El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
             </div>
         </footer>
     </div>

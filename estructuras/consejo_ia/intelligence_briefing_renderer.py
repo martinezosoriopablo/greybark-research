@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
+from jinja2 import Environment, FileSystemLoader, Undefined
+
 
 MESES_ES = {
     1: 'enero', 2: 'febrero', 3: 'marzo', 4: 'abril',
@@ -32,12 +34,19 @@ MESES_ES = {
 class IntelligenceBriefingRenderer:
     """Renderiza el briefing de inteligencia como HTML profesional."""
 
-    def __init__(self, briefing_data: Dict[str, Any], verbose: bool = True):
+    def __init__(self, briefing_data: Dict[str, Any], verbose: bool = True, branding: dict = None):
         self.briefing = briefing_data
         self.verbose = verbose
+        self.branding = branding or {}
         self.template_path = Path(__file__).parent / "templates" / "intelligence_briefing_professional.html"
+        self.template_name = "intelligence_briefing_professional.html"
         self.output_dir = Path(__file__).parent / "output" / "reports"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._jinja_env = Environment(
+            loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
+            undefined=Undefined,
+            autoescape=False,
+        )
 
     def _print(self, msg: str):
         if self.verbose:
@@ -50,17 +59,21 @@ class IntelligenceBriefingRenderer:
         """
         self._print("[Renderer] Cargando template...")
 
-        # Load template
-        with open(self.template_path, 'r', encoding='utf-8') as f:
-            template = f.read()
+        # Load template via Jinja2
+        template = self._jinja_env.get_template(self.template_name)
 
-        # Build replacements
+        # Build replacements and convert keys for Jinja2
         replacements = self._build_replacements()
-
-        # Apply replacements
-        html = template
+        context = {}
         for key, value in replacements.items():
-            html = html.replace(key, str(value))
+            clean = key.replace('{{', '').replace('}}', '')
+            context[clean] = str(value)
+
+        # Inject branding (templates use |default() for fallback)
+        if self.branding:
+            context.update(self.branding)
+
+        html = template.render(**context)
 
         # Output filename
         if not output_filename:

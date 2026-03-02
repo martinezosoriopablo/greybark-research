@@ -79,7 +79,8 @@ class AICouncilRunner:
         self,
         api_key: Optional[str] = None,
         model: str = DEFAULT_MODEL,
-        verbose: bool = True
+        verbose: bool = True,
+        client_prompts: Optional[Dict[str, str]] = None,
     ):
         """
         Inicializa el runner.
@@ -88,6 +89,8 @@ class AICouncilRunner:
             api_key: API key de Anthropic. Si None, busca en env.
             model: Modelo de Claude a usar
             verbose: Si True, imprime progreso
+            client_prompts: Dict con tone, audience, focus, custom_instructions
+                para inyectar en los system prompts de los agentes.
         """
         if not HAS_ANTHROPIC:
             raise ImportError("anthropic package required. Install: pip install anthropic")
@@ -117,6 +120,11 @@ class AICouncilRunner:
         # Cargar prompts
         self.prompts = self._load_prompts()
 
+        # Inyectar personalizaciones del cliente en system prompts
+        self.client_prompts = client_prompts or {}
+        if self.client_prompts:
+            self._inject_client_prompts()
+
     def _print(self, msg: str):
         if self.verbose:
             print(msg)
@@ -145,6 +153,26 @@ class AICouncilRunner:
                 prompts[agent] = f"Eres el agente {agent} del AI Council."
 
         return prompts
+
+    def _inject_client_prompts(self):
+        """Append client-specific instructions to all agent system prompts."""
+        additions = []
+        if self.client_prompts.get('tone'):
+            additions.append(f"Tono de escritura: {self.client_prompts['tone']}")
+        if self.client_prompts.get('audience'):
+            additions.append(f"Audiencia objetivo: {self.client_prompts['audience']}")
+        if self.client_prompts.get('focus'):
+            additions.append(f"Foco tematico: {self.client_prompts['focus']}")
+        if self.client_prompts.get('custom_instructions'):
+            additions.append(f"Instrucciones adicionales: {self.client_prompts['custom_instructions']}")
+
+        if not additions:
+            return
+
+        suffix = "\n\n--- Configuracion del cliente ---\n" + "\n".join(additions)
+        for agent in list(self.prompts.keys()):
+            self.prompts[agent] += suffix
+        self._print(f"[OK] Client prompts inyectados en {len(self.prompts)} agentes")
 
     # =========================================================================
     # LLAMADAS A LLM

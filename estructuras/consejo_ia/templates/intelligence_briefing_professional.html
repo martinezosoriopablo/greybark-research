@@ -6,16 +6,16 @@
     <title>Greybark Research - Intelligence Briefing</title>
     <style>
         :root {
-            --primary-blue: #1a1a1a;
+            --primary-blue: {{ primary_color|default('#1a1a1a') }};
             --secondary-blue: #3a3a3a;
-            --accent-orange: #dd6b20;
-            --text-dark: #1a1a1a;
+            --accent-orange: {{ accent_color|default('#dd6b20') }};
+            --text-dark: {{ primary_color|default('#1a1a1a') }};
             --text-medium: #4a4a4a;
             --text-light: #717171;
             --bg-light: #f7f7f7;
             --border-color: #e0e0e0;
-            --positive: #276749;
-            --negative: #c53030;
+            --positive: {{ green_color|default('#276749') }};
+            --negative: {{ red_color|default('#c53030') }};
             --neutral: #744210;
         }
 
@@ -26,7 +26,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-family: {{ font_family|default("'Segoe UI', 'Helvetica Neue', Arial, sans-serif") }};
             font-size: 10pt;
             line-height: 1.5;
             color: var(--text-dark);
@@ -454,7 +454,8 @@
         <!-- HEADER -->
         <div class="header">
             <div class="logo-section">
-                <h1>Greybark Research</h1>
+                {% if logo_path %}<img src="{{ logo_path }}" alt="{{ company_name|default('Greybark Research') }}" style="max-height:40px;margin-bottom:5px;">{% endif %}
+                <h1>{{ company_name|default('Greybark Research') }}</h1>
                 <div class="subtitle">Intelligence Briefing &mdash; Pre-Comit&eacute;</div>
             </div>
             <div class="date-section">
@@ -522,7 +523,7 @@
         <!-- FOOTER -->
         <div class="footer">
             <div>Generado: {{generated_at}} | {{reports_count}} reportes | Per&iacute;odo: {{period}}</div>
-            <div class="disclaimer">Este briefing alimenta al AI Council &mdash; Greybark Research</div>
+            <div class="disclaimer">{{ disclaimer_text|default('Este briefing alimenta al AI Council &mdash; ' ~ company_name|default('Greybark Research')) }}</div>
         </div>
 
     </div>

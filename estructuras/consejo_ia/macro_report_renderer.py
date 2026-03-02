@@ -18,6 +18,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
+from jinja2 import Environment, FileSystemLoader, Undefined
+
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 
@@ -29,13 +31,21 @@ from chart_data_provider import ChartDataProvider
 class MacroReportRenderer:
     """Renderizador del Reporte Macro profesional."""
 
-    def __init__(self, council_result: Dict = None, forecast_data: Dict = None, verbose: bool = True):
+    def __init__(self, council_result: Dict = None, forecast_data: Dict = None,
+                 verbose: bool = True, branding: dict = None):
         self.council_result = council_result or {}
         self.forecast_data = forecast_data
         self.verbose = verbose
+        self.branding = branding or {}
         self.template_path = Path(__file__).parent / "templates" / "macro_report_professional.html"
+        self.template_name = "macro_report_professional.html"
         self.output_dir = Path(__file__).parent / "output" / "reports"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._jinja_env = Environment(
+            loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
+            undefined=Undefined,
+            autoescape=False,
+        )
 
         # Initialize ChartDataProvider for real data
         try:
@@ -70,10 +80,9 @@ class MacroReportRenderer:
         self._print("[1/3] Generando contenido macro...")
         content = self.content_generator.generate_all_content()
 
-        # 2. Leer template
+        # 2. Renderizar con Jinja2
         self._print("[2/3] Cargando template profesional...")
-        with open(self.template_path, 'r', encoding='utf-8') as f:
-            template = f.read()
+        template = self._jinja_env.get_template(self.template_name)
 
         # 3. Renderizar
         self._print("[3/3] Renderizando reporte...")
@@ -90,8 +99,8 @@ class MacroReportRenderer:
         self._print(f"\n[OK] Reporte Macro generado: {output_path}")
         return str(output_path)
 
-    def _render_template(self, template: str, content: Dict) -> str:
-        """Renderiza el template con el contenido."""
+    def _render_template(self, template, content: Dict) -> str:
+        """Renderiza el template con el contenido usando Jinja2."""
 
         now = datetime.now()
         replacements = {
@@ -615,11 +624,17 @@ class MacroReportRenderer:
             for placeholder in chart_map:
                 replacements[placeholder] = ''
 
-        # Apply all replacements
+        # Convert {{key}} → key for Jinja2 context
+        context = {}
         for key, value in replacements.items():
-            template = template.replace(key, str(value))
+            clean = key.replace('{{', '').replace('}}', '')
+            context[clean] = str(value)
 
-        return template
+        # Inject branding (templates use |default() for fallback)
+        if self.branding:
+            context.update(self.branding)
+
+        return template.render(**context)
 
     def _get_vs_class(self, vs: str) -> str:
         """Retorna clase CSS segun cambio vs anterior."""
