@@ -1,0 +1,207 @@
+{
+  "metadata": {
+    "generated_at": "2025-12-16T12:17:53.804599",
+    "report_week_ending": "2025-12-16",
+    "api_calls_used": 25
+  },
+  "macro": {
+    "equity_indices": {
+      "SPY": {
+        "symbol": "SPY",
+        "price": 680.73,
+        "change": -1.03,
+        "change_pct": -0.1511,
+        "volume": 90810952,
+        "latest_trading_day": "2025-12-15"
+      },
+      "QQQ": {
+        "symbol": "QQQ",
+        "price": 610.54,
+        "change": -3.08,
+        "change_pct": -0.5019,
+        "volume": 49538197,
+        "latest_trading_day": "2025-12-15"
+      },
+      "IWM": {
+        "symbol": "IWM",
+        "price": 251.93,
+        "change": -1.92,
+        "change_pct": -0.7564,
+        "volume": 43120086,
+        "latest_trading_day": "2025-12-15"
+      },
+      "DIA": {
+        "symbol": "DIA",
+        "price": 485.17,
+        "change": -0.23,
+        "change_pct": -0.0474,
+        "volume": 4891296,
+        "latest_trading_day": "2025-12-15"
+      },
+      "EFA": {
+        "symbol": "EFA",
+        "price": 97.09,
+        "change": 0.59,
+        "change_pct": 0.6114,
+        "volume": 22751908,
+        "latest_trading_day": "2025-12-15"
+      },
+      "EEM": {
+        "symbol": "EEM",
+        "price": 54.08,
+        "change": -0.16,
+        "change_pct": -0.295,
+        "volume": 29137022,
+        "latest_trading_day": "2025-12-15"
+      }
+    },
+    "volatility": {
+      "VXX": {
+        "symbol": "VXX",
+        "price": 29.56,
+        "change": 0.03,
+        "change_pct": 0.1016,
+        "volume": 8595220,
+        "latest_trading_day": "2025-12-15"
+      }
+    },
+    "fixed_income": {
+      "SHY": {
+        "symbol": "SHY",
+        "price": 82.92,
+        "change": 0.05,
+        "change_pct": 0.0603,
+        "volume": 5252379,
+        "latest_trading_day": "2025-12-15"
+      },
+      "IEF": {
+        "symbol": "IEF",
+        "price": 96.27,
+        "change": 0.08,
+        "change_pct": 0.0832,
+        "volume": 6117094,
+        "latest_trading_day": "2025-12-15"
+      },
+      "TLT": {
+        "symbol": "TLT",
+        "price": 87.4,
+        "change": 0.06,
+        "change_pct": 0.0687,
+        "volume": 28611787,
+        "latest_trading_day": "2025-12-15"
+      },
+      "LQD": {
+        "symbol": "LQD",
+        "price": 110.3,
+        "change": 0.13,
+        "change_pct": 0.118,
+        "volume": 22151514,
+        "latest_trading_day": "2025-12-15"
+      },
+      "HYG": {
+        "symbol": "HYG",
+        "price": 80.61,
+        "change": 0.04,
+        "change_pct": 0.0496,
+        "volume": 28983574,
+        "latest_trading_day": "2025-12-15"
+      }
+    },
+    "commodities": {
+      "USO": {
+        "symbol": "USO",
+        "price": 67.89,
+        "change": -0.92,
+        "change_pct": -1.337,
+        "volume": 6298849,
+        "latest_trading_day": "2025-12-15"
+      },
+      "GLD": {
+        "symbol": "GLD",
+        "price": 395.8,
+        "change": 0.36,
+        "change_pct": 0.091,
+        "volume": 11345031,
+        "latest_trading_day": "2025-12-15"
+      },
+      "SLV": {
+        "symbol": "SLV",
+        "price": 58.11,
+        "change": 2.01,
+        "change_pct": 3.5829,
+        "volume": 43227804,
+        "latest_trading_day": "2025-12-15"
+      },
+      "CPER": {
+        "symbol": "CPER",
+        "price": 33.15,
+        "change": 0.32,
+        "change_pct": 0.9747,
+        "volume": 543207,
+        "latest_trading_day": "2025-12-15"
+      }
+    },
+    "forex": {
+      "UUP": {
+        "symbol": "UUP",
+        "price": 27.93,
+        "change": -0.02,
+        "change_pct": -0.0716,
+        "volume": 568375,
+        "latest_trading_day": "2025-12-15"
+      },
+      "FXE": {
+        "symbol": "FXE",
+        "price": 108.44,
+        "change": 0.14,
+        "change_pct": 0.1293,
+        "volume": 48510,
+        "latest_trading_day": "2025-12-15"
+      },
+      "FXY": {
+        "symbol": "FXY",
+        "price": 59.25,
+        "change": 0.27,
+        "change_pct": 0.4578,
+        "volume": 302084,
+        "latest_trading_day": "2025-12-15"
+      }
+    }
+  },
+  "sectors": {
+    "XLK": {
+      "name": "Technology",
+      "weight": 29.0,
+      "type": "growth",
+      "price": 142.3,
+      "change_pct": -0.9674,
+      "rsi": 44.3591
+    },
+    "XLF": {
+      "name": "Financials",
+      "weight": 13.0,
+      "type": "cyclical",
+      "price": 54.99,
+      "change_pct": 0.0728,
+      "rsi": 68.3361
+    },
+    "XLV": {
+      "name": "Health Care",
+      "weight": 12.0,
+      "type": "defensive",
+      "price": 156.1,
+      "change_pct": 1.3242,
+      "rsi": null
+    }
+  },
+  "analysis": {
+    "sector_rotation": {
+      "avg_cyclical": 0.07,
+      "avg_defensive": 1.32,
+      "avg_growth": -0.97,
+      "cyclical_defensive_ratio": 0.05,
+      "market_regime": "RISK OFF"
+    },
+    "volatility_metrics": {}
+  }
+}

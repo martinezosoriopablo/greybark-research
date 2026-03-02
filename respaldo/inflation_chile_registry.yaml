@@ -1,0 +1,194 @@
+meta:
+  owner: GreyBark
+  module: macro_chile_inflation
+  source: BCCh Siete API
+  notes: "Series oficiales BCCh (IPC base 2023 + expectativas EEE). Drivers: FX, petróleo, IPP."
+  stepwise_ffill:
+    - EEE_INF_1Y
+    - EEE_INF_2Y
+    - EEE_INF_3Y
+
+series:
+
+  # =========
+  # IPC (CORE)
+  # =========
+  - name: IPC_HEADLINE_MOM
+    code: F074.IPC.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: core
+    family: inflation_observed
+    transforms: [to_float]
+
+  - name: IPC_HEADLINE_INDEX
+    code: F074.IPC.IND.Z.2023.C.M
+    freq: M
+    unit: index
+    tier: core
+    family: inflation_observed
+    transforms: [to_float]
+
+  - name: IPC_SAE_MOM
+    code: F074.IPCSAE.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: core
+    family: inflation_core
+    transforms: [to_float]
+
+  - name: IPC_SAE_INDEX
+    code: F074.IPCSAE.IND.Z.2023.C.M
+    freq: M
+    unit: index
+    tier: core
+    family: inflation_core
+    transforms: [to_float]
+
+  # Transables / No transables (muy útil macro)
+  - name: IPC_TRADABLES_MOM
+    code: F074.IPCT.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: core
+    family: inflation_decomp
+    transforms: [to_float]
+
+  - name: IPC_NONTRADABLES_MOM
+    code: F074.IPCN.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: core
+    family: inflation_decomp
+    transforms: [to_float]
+
+  # Bienes / Servicios (señal de persistencia)
+  - name: IPC_GOODS_MOM
+    code: F074.IPCB.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: core
+    family: inflation_decomp
+    transforms: [to_float]
+
+  - name: IPC_SERVICES_MOM
+    code: F074.IPCS.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: core
+    family: inflation_decomp
+    transforms: [to_float]
+
+  # Componentes relevantes (drivers)
+  - name: IPC_FOOD_MOM
+    code: F074.IPCA.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: optional
+    family: inflation_components
+    transforms: [to_float]
+
+  - name: IPC_ENERGY_MOM
+    code: F074.IPCE.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: optional
+    family: inflation_components
+    transforms: [to_float]
+
+  - name: IPC_HOUSING_MOM
+    code: F074.IPCVIV.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: optional
+    family: inflation_components
+    transforms: [to_float]
+
+  - name: IPC_SERVICES_EX_HOUSING_MOM
+    code: F074.IPCSVIV.VAR.Z.2023.C.M
+    freq: M
+    unit: pct
+    tier: optional
+    family: inflation_components
+    transforms: [to_float]
+
+  # ==================
+  # Expectativas (EEE)
+  # ==================
+  - name: EEE_INF_1Y
+    code: F089.IPC.V12.14.M
+    freq: M
+    unit: pct
+    tier: core
+    family: expectations
+    transforms: [to_float, stepwise_daily_ffill]
+
+  - name: EEE_INF_2Y
+    code: F089.IPC.V12.15.M
+    freq: M
+    unit: pct
+    tier: core
+    family: expectations
+    transforms: [to_float, stepwise_daily_ffill]
+
+  - name: EEE_INF_3Y
+    code: F089.IPC.V12.35.M
+    freq: M
+    unit: pct
+    tier: optional
+    family: expectations
+    transforms: [to_float, stepwise_daily_ffill]
+
+  # ==========================
+  # Drivers externos (BCCh)
+  # ==========================
+  - name: USDCLP_D
+    code: F073.TCO.PRE.Z.D
+    freq: D
+    unit: clp_per_usd
+    tier: core
+    family: drivers_fx
+    transforms: [to_float]
+
+  - name: WTI_D
+    code: F019.PPB.PRE.41B.D
+    freq: D
+    unit: usd_per_bbl
+    tier: core
+    family: drivers_energy
+    transforms: [to_float]
+
+  - name: BRENT_M
+    code: F019.PPB.PRE.41AB.M
+    freq: M
+    unit: usd_per_bbl
+    tier: optional
+    family: drivers_energy
+    transforms: [to_float]
+
+  # ==========================
+  # Precios mayoristas (IPP)
+  # ==========================
+  - name: IPP_INDUSTRY_INDEX
+    code: F075.IPP.IND.P0551.2019.Z.M
+    freq: M
+    unit: index
+    tier: core
+    family: drivers_costs
+    transforms: [to_float]
+
+  - name: IPP_MANUF_INDEX
+    code: F075.IPP.IND.P0552.2019.Z.M
+    freq: M
+    unit: index
+    tier: optional
+    family: drivers_costs
+    transforms: [to_float]
+
+  - name: IPP_MINING_INDEX
+    code: F075.IPP.IND.P0949.2019.Z.M
+    freq: M
+    unit: index
+    tier: optional
+    family: drivers_costs
+    transforms: [to_float]

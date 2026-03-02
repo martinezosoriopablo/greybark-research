@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grey Bark Advisors - Gestión de Clientes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #000000 0%, #1e3a8a 100%);
+            color: white;
+            padding: 30px 40px;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f3f4f6;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            color: #6b7280;
+        }
+        
+        .tab:hover {
+            background: #e5e7eb;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #1e40af;
+            border-bottom: 3px solid #3b82f6;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .client-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .client-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        
+        .client-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+        
+        .client-card.professional {
+            border-left: 4px solid #10b981;
+        }
+        
+        .client-card.retail {
+            border-left: 4px solid #f59e0b;
+        }
+        
+        .client-card.internal {
+            border-left: 4px solid #8b5cf6;
+        }
+        
+        .client-card h3 {
+            font-size: 18px;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+        
+        .client-card .email {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .client-card .type-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        
+        .type-badge.professional {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .type-badge.retail {
+            background: #fed7aa;
+            color: #92400e;
+        }
+        
+        .type-badge.internal {
+            background: #ddd6fe;
+            color: #5b21b6;
+        }
+        
+        .reports-list {
+            list-style: none;
+            font-size: 13px;
+            color: #4b5563;
+        }
+        
+        .reports-list li {
+            padding: 4px 0;
+        }
+        
+        .reports-list li:before {
+            content: "✓ ";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+        
+        .button:active {
+            transform: translateY(0);
+        }
+        
+        .button.secondary {
+            background: #6b7280;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+        
+        .stat-card .label {
+            font-size: 14px;
+            color: #6b7280;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        .distribution-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .distribution-table th,
+        .distribution-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .distribution-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .distribution-table tr:hover {
+            background: #f9fafb;
+        }
+        
+        .recipient-list {
+            list-style: none;
+            font-size: 13px;
+            color: #6b7280;
+        }
+        
+        .recipient-list li {
+            padding: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Grey Bark Advisors</h1>
+            <p>Sistema de Gestión de Clientes y Distribución de Reportes</p>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('overview')">📊 Resumen</div>
+            <div class="tab" onclick="showTab('clients')">👥 Clientes</div>
+            <div class="tab" onclick="showTab('add')">➕ Agregar Cliente</div>
+            <div class="tab" onclick="showTab('distribution')">📧 Distribución</div>
+        </div>
+        
+        <div class="content">
+            <!-- RESUMEN TAB -->
+            <div id="overview" class="tab-content active">
+                <h2>Resumen del Sistema</h2>
+                
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="number" id="stat-total">0</div>
+                        <div class="label">Total Clientes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="stat-professional">0</div>
+                        <div class="label">Profesionales</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="stat-retail">0</div>
+                        <div class="label">Retail</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="stat-internal">0</div>
+                        <div class="label">Internos</div>
+                    </div>
+                </div>
+                
+                <p style="color: #6b7280; margin-bottom: 20px;">
+                    <strong>Nota:</strong> Este dashboard muestra los datos del archivo <code>clients_database.json</code>. 
+                    Para actualizar, usa el script <code>client_manager.py</code> o edita el JSON manualmente.
+                </p>
+                
+                <button class="button" onclick="loadData()">🔄 Recargar Datos</button>
+            </div>
+            
+            <!-- CLIENTES TAB -->
+            <div id="clients" class="tab-content">
+                <h2>Lista de Clientes Activos</h2>
+                <div class="client-grid" id="clients-grid">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+            
+            <!-- AGREGAR TAB -->
+            <div id="add" class="tab-content">
+                <h2>Agregar Nuevo Cliente</h2>
+                <p style="color: #6b7280; margin-bottom: 20px;">
+                    Para agregar un cliente, usa el script de línea de comandos:
+                </p>
+                <pre style="background: #f3f4f6; padding: 20px; border-radius: 8px; overflow-x: auto;">python client_manager.py</pre>
+                <p style="color: #6b7280; margin-top: 20px;">
+                    El script te guiará paso a paso para agregar el cliente con todos sus datos.
+                </p>
+            </div>
+            
+            <!-- DISTRIBUCIÓN TAB -->
+            <div id="distribution" class="tab-content">
+                <h2>Distribución de Reportes</h2>
+                <p style="color: #6b7280; margin-bottom: 20px;">
+                    Destinatarios por tipo de reporte:
+                </p>
+                <table class="distribution-table" id="distribution-table">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Reporte</th>
+                            <th>Destinatarios</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Se llena dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Simular datos (en producción, esto vendría de un API o del JSON)
+        let clientsData = {
+            clients: []
+        };
+        
+        function showTab(tabName) {
+            // Ocultar todos los contenidos
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(c => c.classList.remove('active'));
+            
+            // Desactivar todos los tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            // Activar el tab seleccionado
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        function loadData() {
+            // En producción, esto haría fetch al JSON
+            // Por ahora, mostrar datos de ejemplo
+            
+            alert('Para ver datos reales, este dashboard necesita correr con un servidor web (Flask/FastAPI) que lea clients_database.json');
+            
+            // Datos de ejemplo
+            clientsData = {
+                clients: [
+                    {
+                        id: 1,
+                        name: "Pablo Martínez",
+                        email: "pabloalfonsomartinezosorio@gmail.com",
+                        type: "internal",
+                        reports: ["AM_pro", "PM_pro", "weekly_quant"],
+                        active: true
+                    },
+                    {
+                        id: 2,
+                        name: "Nicolas Guinez",
+                        email: "nicolas.guinezt@gmail.com",
+                        type: "professional",
+                        reports: ["AM_pro", "PM_pro", "weekly_quant"],
+                        active: true
+                    },
+                    {
+                        id: 3,
+                        name: "Test Cliente",
+                        email: "test@example.com",
+                        type: "retail",
+                        reports: ["AM_general"],
+                        active: true
+                    }
+                ]
+            };
+            
+            updateStats();
+            renderClients();
+            renderDistribution();
+        }
+        
+        function updateStats() {
+            const active = clientsData.clients.filter(c => c.active);
+            document.getElementById('stat-total').textContent = active.length;
+            document.getElementById('stat-professional').textContent = active.filter(c => c.type === 'professional').length;
+            document.getElementById('stat-retail').textContent = active.filter(c => c.type === 'retail').length;
+            document.getElementById('stat-internal').textContent = active.filter(c => c.type === 'internal').length;
+        }
+        
+        function renderClients() {
+            const grid = document.getElementById('clients-grid');
+            grid.innerHTML = '';
+            
+            const active = clientsData.clients.filter(c => c.active);
+            
+            active.forEach(client => {
+                const card = document.createElement('div');
+                card.className = `client-card ${client.type}`;
+                
+                const reportNames = {
+                    'AM_pro': 'Matutino Pro',
+                    'AM_general': 'Matutino General',
+                    'PM_pro': 'Vespertino Pro',
+                    'PM_general': 'Vespertino General',
+                    'weekly_quant': 'Cuantitativo Semanal'
+                };
+                
+                card.innerHTML = `
+                    <h3>${client.name}</h3>
+                    <div class="email">${client.email}</div>
+                    <div class="type-badge ${client.type}">${client.type}</div>
+                    <ul class="reports-list">
+                        ${client.reports.map(r => `<li>${reportNames[r] || r}</li>`).join('')}
+                    </ul>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+        
+        function renderDistribution() {
+            const table = document.getElementById('distribution-table').querySelector('tbody');
+            table.innerHTML = '';
+            
+            const reportTypes = {
+                'AM_pro': 'Reporte Matutino (Profesionales)',
+                'AM_general': 'Reporte Matutino (General)',
+                'PM_pro': 'Reporte Vespertino (Profesionales)',
+                'PM_general': 'Reporte Vespertino (General)',
+                'weekly_quant': 'Reporte Cuantitativo Semanal'
+            };
+            
+            Object.entries(reportTypes).forEach(([key, name]) => {
+                const recipients = clientsData.clients.filter(c => c.active && c.reports.includes(key));
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${name}</strong></td>
+                    <td>
+                        <ul class="recipient-list">
+                            ${recipients.map(r => `<li>${r.name} &lt;${r.email}&gt;</li>`).join('')}
+                        </ul>
+                    </td>
+                    <td><strong>${recipients.length}</strong></td>
+                `;
+                
+                table.appendChild(row);
+            });
+        }
+        
+        // Cargar datos al iniciar
+        loadData();
+    </script>
+</body>
+</html>

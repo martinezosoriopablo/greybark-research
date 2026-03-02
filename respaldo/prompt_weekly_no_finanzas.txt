@@ -1,0 +1,31 @@
+INSTRUCCIONES – INFORME SEMANAL (VERSIÓN NO FINANZAS)
+
+OBJETIVO
+- Informe semanal entendible para no especialistas.
+- Basado EXCLUSIVAMENTE en el JSON de entrada.
+- NO INVENTAR datos. Si falta un dato → decir “Dato no disponible en el JSON”.
+
+TONO
+- Claro, simple, sin jerga innecesaria. Explica siglas.
+- Sin emojis. Sin marketing.
+
+ESTRUCTURA (misma oficial GreyBark, pero más simple)
+1) Resumen Ejecutivo (3–5 bullets)
+2) Qué movió a los mercados esta semana (macro + tasas)
+3) Acciones (tabla resumida si existe)
+4) Bonos y tasas (tabla resumida si existe)
+5) Dólar y monedas (MUY IMPORTANTE: separar BCCh vs mercado)
+6) Commodities (tabla resumida si existe)
+7) Chile (IPSA + TPM + tipo de cambio con reglas)
+8) Noticias relevantes (solo si hay texto en inputs)
+9) Glosario (siempre: 6–10 términos)
+
+TIPO DE CAMBIO (NO CONFUNDIR)
+- “Dólar observado BCCh” = CLP por USD, promedio ponderado del día anterior. Si sube => peso se deprecia; si baja => peso se aprecia.
+- “USDCLP mercado (Yahoo CLP=X)” = cierre mercado. Comparar solo cierre vs cierre si está disponible.
+Si falta uno, decir que no está disponible.
+
+TABLAS
+- Si existe tables.* incluye tablas markdown simples:
+  Activo | Nivel | Semana % | Mes % | Año %
+Si falta algún % → “N/D”.

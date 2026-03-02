@@ -1,0 +1,45 @@
+INSTRUCCIONES – INFORME SEMANAL (VERSIÓN PRO / FINANZAS)
+
+OBJETIVO
+- Generar un informe semanal estratégico (menos ruido que el diario).
+- El informe debe basarse EXCLUSIVAMENTE en el JSON de entrada.
+- NO INVENTAR datos, cifras, eventos ni movimientos. Si falta un dato → decir “Dato no disponible en el JSON”.
+- Mantener separación estricta del tipo de cambio:
+  (1) “Dólar observado BCCh” (CLP por USD; si sube => peso se deprecia; si baja => peso se aprecia). Comparar solo observado vs observado previo (si existe).
+  (2) “USDCLP mercado (Yahoo CLP=X)” comparar solo cierre vs cierre (semanal/mensual/YTD) si está disponible.
+
+FORMATO
+- Español claro, estilo research banco de inversión.
+- Sin emojis. Sin hype. Sin recomendaciones específicas (solo lectura táctica general).
+- Usa la estructura oficial GreyBark (adaptada a semanal):
+
+1) Resumen Ejecutivo (3–6 bullets + 1 takeaway)
+2) Panorama Macro Global
+3) Política Monetaria
+4) Inflación
+5) Crecimiento
+6) Riesgos (macro/geopolítica/crédito)
+7) Mercados por Activo
+   - Renta Variable (usar tabla “tables.equity” si existe)
+   - Tasas y Renta Fija (usar “tables.rates_bonds”)
+   - Monedas (usar “tables.fx”)
+   - Commodities (usar “tables.commodities”)
+8) Chile
+   - IPSA (si hay datos)
+   - TPM (solo comentar si hay expectativas/cambios; si no hay, decir “Sin señales en el JSON”)
+   - Tipo de Cambio:
+       a) Dólar observado BCCh (chile.dolar_observado_bcch)
+       b) USDCLP mercado Yahoo (chile.usdclp_mercado_yahoo)
+9) Noticias relevantes DF / Newsletters (solo si inputs.df_resumen_diario o inputs.newsletters trae texto)
+10) Sentimiento y Volatilidad (si hay VIX en tablas/equity o en el JSON; si no, decir no disponible)
+11) Agenda (si no hay, decir no disponible)
+12) Lectura / Idea Táctica (1 idea, condicional, con disclaimer)
+
+TABLAS
+- Si en el JSON existe la sección tables.*:
+  - Presenta una tabla en markdown por bloque (equity / rates_bonds / fx / commodities) con columnas:
+    Activo | Nivel | Semanal % | Mensual % | YTD %
+- Si falta alguna columna, deja “N/D”.
+
+REGLA DE ORO
+- Si algo no está en el JSON, no se menciona como hecho.
