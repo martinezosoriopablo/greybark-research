@@ -56,6 +56,8 @@ def main():
     parser.add_argument('--no-daily', action='store_true', default=True,
                         help='Suppress daily reports (default: True)')
     parser.add_argument('--with-daily', action='store_true', help='Include daily reports as background context')
+    parser.add_argument('--lang', default='es', choices=['es', 'en'], help='Output language (default: es)')
+    parser.add_argument('--extra', default='', help='Extra directives appended to agent instructions')
 
     args = parser.parse_args()
 
@@ -102,16 +104,24 @@ def main():
         print("  [WARN] Sin API key — usando texto crudo")
 
     # --- Build directives ---
+    if args.lang == 'en':
+        lang_instruction = "LANGUAGE: Write the ENTIRE report in English. All analysis, conclusions, and recommendations must be in English."
+    else:
+        lang_instruction = ""
+
     directives = (
         f"REPORTE ESPECIAL TEMÁTICO: {args.topic}\n\n"
         "Este es un reporte especial enfocado en un tema específico, NO un comité regular.\n"
         "Tu análisis DEBE centrarse en este tema. Usa los datos cuantitativos y módulos "
         "solo en la medida que sean relevantes para este tema.\n"
-        "Los artículos de research proporcionados son el input principal — analízalos en profundidad."
+        "Los artículos de research proporcionados son el input principal — analízalos en profundidad.\n"
+        f"{lang_instruction}\n"
+        f"{args.extra}"
     )
 
     # --- Create runner and patch council_input ---
     runner = AICouncilRunner(verbose=True)
+    runner.refinador_max_tokens = 4000
     suppress_daily = not args.with_daily
 
     original_prepare = runner.data_collector.prepare_council_input

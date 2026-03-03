@@ -116,6 +116,7 @@ class AICouncilRunner:
         self.session_log = []
         self.panel_outputs = {}
         self.synthesis_outputs = {}
+        self.refinador_max_tokens = MAX_TOKENS
 
         # Cargar prompts
         self.prompts = self._load_prompts()
@@ -179,9 +180,10 @@ class AICouncilRunner:
     # =========================================================================
 
     async def _call_llm_async(self, system_prompt: str, user_prompt: str,
-                              model: str = None) -> str:
+                              model: str = None, max_tokens: int = None) -> str:
         """Llama a Claude API de forma asíncrona."""
         use_model = model or self.model
+        use_tokens = max_tokens or MAX_TOKENS
         try:
             # Anthropic SDK es sincrónico, lo envolvemos
             loop = asyncio.get_event_loop()
@@ -189,7 +191,7 @@ class AICouncilRunner:
                 None,
                 lambda: self.client.messages.create(
                     model=use_model,
-                    max_tokens=MAX_TOKENS,
+                    max_tokens=use_tokens,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
                 )
@@ -378,7 +380,7 @@ Limita tu respuesta a 400-500 palabras máximo.
         # Paso 3: Refinador produce output final (Opus 4.6)
         self._print(f"\n  -> REFINADOR generando output final... [{SYNTHESIS_MODEL}]")
         refinador_prompt = self._build_refinador_prompt(cio_output, contrarian_output, council_input)
-        refinador_output = await self._call_llm_async(self.prompts['refinador'], refinador_prompt, model=SYNTHESIS_MODEL)
+        refinador_output = await self._call_llm_async(self.prompts['refinador'], refinador_prompt, model=SYNTHESIS_MODEL, max_tokens=self.refinador_max_tokens)
         synthesis_outputs['refinador'] = refinador_output
         self._print(f"  <- REFINADOR completado ({len(refinador_output)} chars)")
 
