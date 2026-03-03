@@ -300,6 +300,14 @@ Los siguientes datos provienen directamente de Bloomberg Terminal.
 {external_research[:3000]}
 """
 
+        # Inyectar analytics modules
+        module_outputs = council_input.get('module_outputs', '')
+        if module_outputs:
+            prompt += f"""
+## ANALYTICS MODULES (Señales Cuantitativas)
+{module_outputs}
+"""
+
         # Inyectar directivas del usuario — siempre prominente
         if user_directives:
             prompt += f"""
@@ -402,6 +410,14 @@ Considera estas perspectivas externas en tu síntesis:
 {external_research[:4000]}
 """
 
+        # Inyectar analytics modules
+        module_outputs = council_input.get('module_outputs', '')
+        if module_outputs:
+            prompt += f"""
+## ANALYTICS MODULES (Señales Cuantitativas)
+{module_outputs}
+"""
+
         if user_directives:
             prompt += f"""
 ## DIRECTIVAS DEL COMITÉ (IMPORTANTE)
@@ -478,6 +494,14 @@ Desafía la síntesis del CIO. Encuentra las fallas. Propón mejoras.
 - Temas de inteligencia: {meta.get('intelligence_themes', 0)}
 """
 
+        # Inyectar analytics modules
+        module_outputs = council_input.get('module_outputs', '')
+        if module_outputs:
+            prompt += f"""
+## ANALYTICS MODULES (Señales Cuantitativas)
+{module_outputs}
+"""
+
         if user_directives:
             prompt += f"""
 ## DIRECTIVAS DEL COMITÉ (IMPORTANTE)
@@ -537,6 +561,22 @@ El output debe ser profesional y listo para el cliente.
 
         # Recopilar datos
         council_input = self.data_collector.prepare_council_input(report_type)
+
+        # Run analytics modules
+        self._print("\n  Ejecutando analytics modules...")
+        try:
+            from modules import run_all_modules
+            module_results = run_all_modules(verbose=self.verbose)
+            module_texts = []
+            for name, out in module_results.items():
+                instance = out.get('_instance')
+                if instance:
+                    module_texts.append(instance.get_council_input())
+            council_input['module_outputs'] = "\n\n".join(module_texts)
+            self._print(f"  -> {len(module_results)} analytics modules OK")
+        except Exception as e:
+            self._print(f"  [WARN] Analytics modules failed: {e}")
+            council_input['module_outputs'] = ''
 
         # Preflight gate: NO-GO aborta la sesión
         preflight = council_input.get('preflight', {})
