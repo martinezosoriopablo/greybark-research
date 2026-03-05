@@ -218,13 +218,13 @@ echo Generando HTML con:
 echo   - Dashboard visual compacto
 echo   - Tablas profesionales con fuentes pequenas
 echo   - Colores para cambios positivos/negativos
-echo   - Logo Grey Bark Advisors
+echo   - Branding Greybark Research (via Platform)
 echo   - Compatible con Gmail, Outlook, Apple Mail
 echo.
 
 echo [%date% %time%] PASO 4: Convirtiendo a HTML... >> logs\report_log.txt
 
-%PYTHON% html_formatter.py >> logs\html_formatter_%MODE%.log 2>&1
+%PYTHON% html_formatter.py --client greybark >> logs\html_formatter_%MODE%.log 2>&1
 
 if %errorlevel% neq 0 (
     echo [%date% %time%] ERROR: Fallo conversion HTML >> logs\report_log.txt

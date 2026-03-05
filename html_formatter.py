@@ -9,6 +9,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     except:
         pass
 
+import os
 from pathlib import Path
 from datetime import datetime
 import re
@@ -409,7 +410,8 @@ def build_files(md_path: Path, branding: dict = None, output_dir: Path = None):
             'margin-bottom': '0.5in',
             'margin-left': '0.5in',
             'encoding': "UTF-8",
-            'no-outline': None
+            'no-outline': None,
+            'enable-local-file-access': None
         }
         try:
             pdfkit.from_string(final_html, str(out_pdf), configuration=PDF_CONFIG, options=options)
@@ -419,7 +421,64 @@ def build_files(md_path: Path, branding: dict = None, output_dir: Path = None):
 
     return str(out_html)
 
+def load_platform_branding(client_id: str) -> dict:
+    """Carga branding desde Platform DB para un cliente.
+
+    Retorna dict compatible con build_files(branding=...) o None si
+    Platform no esta disponible.
+    """
+    try:
+        layout_dir = Path(__file__).resolve().parent.parent / "Layout"
+        if str(layout_dir) not in sys.path:
+            sys.path.insert(0, str(layout_dir))
+
+        from greybark_platform import Platform
+        from dataclasses import asdict
+
+        p = Platform()
+        branding_obj = p.get_branding(client_id)
+        prompts_obj = p.get_ai_prompts(client_id)
+
+        # Solo incluir campos con valor (los vacios caen a GREYBARK_DEFAULTS)
+        result = {k: v for k, v in asdict(branding_obj).items() if v}
+
+        # Logo: ruta absoluta para compatibilidad local/PDF
+        if result.get('logo_path') and os.path.isfile(result['logo_path']):
+            result['logo_path'] = os.path.abspath(result['logo_path'])
+
+        # company_name desde el registro del cliente
+        try:
+            dashboard_data = p.get_client_for_dashboard(client_id)
+            if dashboard_data and dashboard_data.get('client'):
+                result['company_name'] = dashboard_data['client'].company_name
+        except Exception:
+            pass
+
+        # Disclaimer desde AI prompts
+        if prompts_obj.report_disclaimer:
+            result['disclaimer_text'] = prompts_obj.report_disclaimer
+
+        return result
+    except Exception as e:
+        print(f"[INFO] Platform no disponible, usando branding por defecto: {e}")
+        return None
+
+
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='Convierte reportes .md a HTML/PDF')
+    parser.add_argument('--client', default=None,
+                        help='Client ID para cargar branding desde Platform')
+    args, _ = parser.parse_known_args()
+
+    # Cargar branding del cliente si se especifica
+    branding = None
+    if args.client:
+        branding = load_platform_branding(args.client)
+        if branding:
+            print(f"[OK] Branding cargado para cliente: {args.client}")
+            print(f"     Empresa: {branding.get('company_name', '(default)')}")
+
     # Buscar reportes diarios Y semanales
     daily_files = sorted(INPUT_DIR.glob("daily_report_*.md"))
     weekly_files = sorted(INPUT_DIR.glob("weekly_report_*.md"))
@@ -435,7 +494,7 @@ def main():
 
     for md in md_files:
         try:
-            build_files(md)
+            build_files(md, branding=branding)
         except Exception as e:
             print(f"[ERROR] {md.name}: {e}")
             import traceback
