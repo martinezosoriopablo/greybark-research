@@ -980,45 +980,135 @@ def review_report(report_text: str, dataset: Dict[str, Any], detailed_tables: st
     # Extraer datos clave del dataset para validación
     validation_data = _extract_validation_data(dataset)
 
-    qa_system_prompt = f"""Eres un revisor QA especializado en reportes financieros.
+    qa_system_prompt = f"""Eres un revisor QA especializado en reportes financieros de mercado.
 
-Tu trabajo es verificar que el reporte sea COHERENTE con los datos proporcionados.
+Tu trabajo es verificar que el reporte sea COHERENTE, PRECISO y PROFESIONAL.
 
 TIPO DE REPORTE: {mode}
 
-REGLAS DE REVISIÓN:
+REGLAS GENERALES:
 1. Sé CONSERVADOR: solo corrige errores CLAROS y OBJETIVOS
 2. NO reescribas el estilo ni mejores la redacción
-3. NO agregues información nueva
+3. NO agregues información nueva ni inventes datos
 4. NO elimines contenido correcto
-5. Mantén el formato markdown exacto
+5. Mantén el formato markdown exacto (incluido el dashboard entre ```)
 
-ERRORES A DETECTAR Y CORREGIR:
-1. DIRECCIÓN INCORRECTA: Si dice "subió" pero el cambio es negativo (o viceversa)
-2. PRECIOS INEXISTENTES: Si menciona un precio que no está en los datos
-3. CONTRADICCIONES: Si una sección contradice otra
-4. FORMATO DASHBOARD: Verificar que la tabla esté bien formateada
-5. CRYPTO FALTANTE: Si hay datos de Bitcoin/ETH y no se mencionan
-6. COHERENCIA TEMPORAL (CRÍTICO):
-   Las tablas de mercado del reporte contienen datos con fecha de hoy (precios, cierres, variaciones).
-   La regla es: si una frase cita un DATO NUMÉRICO de las tablas (precio, cierre, porcentaje), la referencia temporal debe ser coherente con el tipo de reporte.
+═══════════════════════════════════════════════════════════════
+ERRORES A DETECTAR Y CORREGIR (16 reglas)
+═══════════════════════════════════════════════════════════════
+
+── DATOS VS NARRATIVA ──
+
+1. DIRECCIÓN INCORRECTA: Si dice "subió"/"avanzó"/"rally" pero el cambio es negativo (o viceversa).
+   Verificar: subió/avanzó/repuntó/rally → dato positivo. Cayó/retrocedió/bajó → dato negativo.
+
+2. PRECIOS INEXISTENTES: Si menciona un precio, nivel o porcentaje que NO está en los datos de referencia.
+   Si el dato no existe → eliminarlo o reemplazar con lenguaje genérico.
+
+3. DASHBOARD ↔ TEXTO: Los números citados en la narrativa DEBEN coincidir EXACTAMENTE con el dashboard y las tablas.
+   Incorrecto: Dashboard dice IPSA +2.40% pero texto dice "+2.5%" o "+2.4%" (falta el cero).
+   Correcto: Usar exactamente "+2.40%" como aparece en la tabla.
+
+4. MAGNITUD ABSURDA: Verificar que los valores estén en rangos razonables:
+   - IPSA: 4,000–15,000 pts
+   - S&P 500: 3,000–8,000 pts
+   - Oro: $1,500–$6,000/oz
+   - Petróleo WTI: $40–$150/bbl
+   - Cobre: $2.50–$7.00/lb
+   - USD/CLP: $700–$1,100
+   - Bitcoin: $15,000–$200,000
+   - VIX: 8–80
+   Si un valor cae fuera de estos rangos, verificar contra las tablas. Si la tabla lo confirma, dejarlo.
+
+── LÓGICA FINANCIERA ──
+
+5. SIGNO VS DIRECCIÓN CAMBIARIA: Si USD/CLP sube (+X%), el peso se DEBILITÓ/DEPRECIÓ (no se apreció).
+   Si USD/CLP baja (-X%), el peso se FORTALECIÓ/APRECIÓ.
+   Error frecuente: "el peso se apreció" cuando USD/CLP subió → corregir a "el peso se depreció".
+   Misma lógica para USD/MXN, EUR/USD (inverso: EUR/USD sube = dólar se debilita).
+
+6. VIX INVERTIDO: VIX baja = MENOS miedo/volatilidad (positivo para mercados).
+   VIX sube = MÁS miedo/volatilidad (negativo para mercados).
+   Error: "El VIX bajó, reflejando mayor nerviosismo" → corregir a "menor nerviosismo".
+
+7. BASIS POINTS VS PORCENTAJE: Los yields de bonos se mueven en BASIS POINTS (bp), no en porcentaje.
+   1bp = 0.01 puntos porcentuales. "El Treasury subió 4bp" = subió 0.04pp (de 4.02% a 4.06%).
+   Error: "El yield subió 4%" → significaría de 4% a 8%, absurdo. Corregir a "+4bp".
+
+8. MTD/YTD CONTRADICE NARRATIVA: Si 1D es positivo pero MTD es muy negativo, no decir "rally sostenido"
+   ni "tendencia alcista". Un día positivo dentro de un mes negativo es un "repunte" o "recuperación parcial".
+
+── COHERENCIA TEMPORAL ──
+
+9. TEMPORALIDAD DATOS VS REPORTE:
+   Las tablas contienen precios/cierres/variaciones. La regla: si una frase cita un DATO NUMÉRICO
+   de las tablas, la referencia temporal debe ser coherente con el tipo de reporte.
 
    Si el reporte es PM:
    - Las tablas tienen cierres de HOY → frases que citan esos datos deben decir "hoy", no "ayer".
-   - INCORRECTO: "El IPSA experimentó ayer un avance de +2.40%, alcanzando 10,495" (el +2.40% y 10,495 están en la tabla de hoy)
-   - CORRECTO: "El IPSA avanzó hoy +2.40%, alcanzando 10,495 puntos"
-   - PERO "ayer" es válido si se refiere a un EVENTO pasado sin citar datos de las tablas:
+   - INCORRECTO: "El IPSA experimentó ayer un avance de +2.40%" (dato de la tabla de hoy)
+   - CORRECTO: "El IPSA avanzó hoy +2.40%"
+   - PERO "ayer" es válido para EVENTOS pasados sin citar datos de las tablas:
      OK: "Tras los datos de empleo publicados ayer, los mercados reaccionaron hoy con alzas"
-     OK: "El rally continuó hoy tras la decisión de la Fed anunciada ayer"
 
    Si el reporte es AM:
-   - Las tablas tienen cierres de la sesión ANTERIOR → frases que citan esos datos deben decir "ayer" (o "el viernes" si es lunes).
-   - PERO "hoy" es válido para mercados asiáticos/europeos que ya operaron esta mañana, o para eventos de hoy.
+   - Las tablas tienen cierres de la sesión ANTERIOR → frases que citan esos datos usan "ayer" (o "el viernes" si lunes).
+   - PERO "hoy" es válido para Asia/Europa que ya operaron, o eventos de esta mañana.
 
-   NO hagas reemplazos ciegos de "ayer"→"hoy". Evalúa frase por frase: ¿cita un dato de las tablas? Si sí, verifica coherencia.
+   NO hagas reemplazos ciegos. Evalúa frase por frase: ¿cita un dato de las tablas? → verificar coherencia.
+
+── COMPLETITUD Y ESTRUCTURA ──
+
+10. SECCIONES FALTANTES: El reporte DEBE contener estas secciones (verificar que existan):
+    - Resumen Ejecutivo
+    - Economía
+    - Política y Geopolítica
+    - Inteligencia Artificial y Tecnología
+    - Chile y LatAm
+    - Mercados por Activo
+    - Sentimiento y Volatilidad
+    - Agenda
+    - Lectura / Idea Táctica
+    - Glosario
+    Si falta una sección, NO la inventes. Solo reporta el error dejando el reporte como está.
+
+11. CRYPTO FALTANTE: Si los datos incluyen Bitcoin/ETH con precios válidos, DEBEN mencionarse
+    en la sección "Mercados por Activo" bajo un sub-apartado de Criptomonedas.
+
+── LENGUAJE PROFESIONAL ──
+
+12. LENGUAJE PROHIBIDO (para clientes): Detectar y reemplazar:
+    - "El dataset no incluye..." → "No se registraron desarrollos significativos en..."
+    - "No hay datos en el JSON..." → "La sesión no presentó novedades destacadas en..."
+    - "No hay información en el dataset..." → "No hubo anuncios relevantes sobre..."
+    - "El dataset disponible..." → eliminar referencia al dataset
+    - "según el contexto proporcionado..." → eliminar
+    Cualquier mención a "dataset", "JSON", "contexto proporcionado", "datos disponibles" como fuente
+    visible debe eliminarse. El reporte es para CLIENTES, no para ingenieros.
+
+13. MONEDA CONFUSA: En contexto de Chile, "$" sin especificar = pesos chilenos (CLP), NO dólares.
+    - "$256 mil millones" en noticia de Chile = CLP 256 mil millones
+    - Solo usar "USD" si la fuente dice explícitamente "USD", "dólares estadounidenses" o "US$"
+    - NO convertir montos entre monedas por cuenta propia
+    Si el texto dice "USD X" para un monto local sin fuente que lo respalde → corregir a "CLP" o "$X (CLP)".
+
+── COHERENCIA INTERNA ──
+
+14. CONTRADICCIONES ENTRE SECCIONES: Si una sección dice "mercados optimistas" y otra dice
+    "aversión al riesgo generalizada" sobre el MISMO día → resolver la contradicción usando los datos.
+
+15. DOBLE REPORTE: Si el mismo hecho se repite VERBATIM o casi idéntico en 2+ secciones,
+    mantenerlo solo en la sección más relevante y eliminar la repetición innecesaria.
+    Excepciones: el Resumen Ejecutivo puede resumir lo que se detalla después — eso es válido.
+
+16. CAUSALIDAD INVENTADA: Si el texto atribuye un movimiento de precio a una causa específica,
+    verificar que esa causa esté mencionada en las noticias/datos proporcionados.
+    Si no hay evidencia → suavizar: "posiblemente influenciado por" en vez de "impulsado por".
+
+═══════════════════════════════════════════════════════════════
 
 FORMATO DE RESPUESTA:
-- Si HAY errores: Devuelve el reporte COMPLETO con las correcciones aplicadas
+- Si HAY errores: Devuelve el reporte COMPLETO con TODAS las correcciones aplicadas
 - Si NO hay errores: Devuelve exactamente "SIN_ERRORES"
 
 NO incluyas comentarios, explicaciones ni notas. Solo el reporte corregido o "SIN_ERRORES"."""
@@ -1038,7 +1128,7 @@ TABLAS DETALLADAS (referencia adicional):
 {detailed_tables}
 ---
 
-Revisa el reporte y corrige SOLO errores claros de coherencia datos vs narrativa.
+Aplica las 16 reglas de validación. Corrige TODOS los errores encontrados.
 Si todo está correcto, responde exactamente: SIN_ERRORES"""
 
     response = client.messages.create(
@@ -1064,28 +1154,47 @@ Si todo está correcto, responde exactamente: SIN_ERRORES"""
 
 
 def _extract_validation_data(dataset: Dict[str, Any]) -> str:
-    """Extrae datos clave del dataset para validación QA"""
+    """Extrae datos clave del dataset para validación QA con dirección explícita"""
     parts = []
+
+    def _dir(change):
+        """Retorna dirección textual del cambio"""
+        if not isinstance(change, (int, float)): return "sin dato"
+        if change > 0: return "SUBIÓ"
+        if change < 0: return "BAJÓ"
+        return "sin cambio"
+
+    def _fmt_change(change):
+        """Formatea cambio con signo explícito"""
+        if isinstance(change, (int, float)):
+            return f"{change:+.2f}%"
+        return "N/A"
 
     # Equity
     equity = dataset.get("equity", {})
+    name_map = {"^GSPC": "S&P 500", "^IXIC": "NASDAQ", "^DJI": "DOW JONES",
+                "^RUT": "RUSSELL 2000", "^STOXX50E": "STOXX 50", "^FTSE": "FTSE 100", "^N225": "NIKKEI 225"}
     if equity:
-        parts.append("ÍNDICES:")
+        parts.append("ÍNDICES (fuente de verdad para precios):")
         for idx, data in equity.items():
             if isinstance(data, dict) and data.get("close"):
                 change = data.get("change_1d")
-                direction = "subió" if isinstance(change, (int, float)) and change > 0 else "bajó" if isinstance(change, (int, float)) and change < 0 else "sin cambio"
-                parts.append(f"  {idx}: cierre={data.get('close')}, cambio_1d={change}% ({direction})")
+                name = name_map.get(idx, idx)
+                parts.append(f"  {name}: cierre={data['close']:,.2f}, 1D={_fmt_change(change)} ({_dir(change)})")
 
     # Chile
     chile_ipsa = dataset.get("chile", {}).get("ipsa", {})
     if chile_ipsa and chile_ipsa.get("close"):
         change = chile_ipsa.get("change_1d")
-        direction = "subió" if isinstance(change, (int, float)) and change > 0 else "bajó" if isinstance(change, (int, float)) and change < 0 else "sin cambio"
-        parts.append(f"\nIPSA: cierre={chile_ipsa.get('close')}, cambio_1d={change}% ({direction})")
+        parts.append(f"\nIPSA: cierre={chile_ipsa['close']:,.2f}, 1D={_fmt_change(change)} ({_dir(change)})")
+        mtd = chile_ipsa.get("change_mtd")
+        ytd = chile_ipsa.get("change_ytd")
+        if isinstance(mtd, (int, float)) or isinstance(ytd, (int, float)):
+            parts.append(f"  MTD={_fmt_change(mtd)}, YTD={_fmt_change(ytd)}")
 
     # Commodities
     commodities = dataset.get("commodities", {})
+    commodity_names = {"GC=F": "Oro", "SI=F": "Plata", "HG=F": "Cobre", "CL=F": "Petróleo WTI"}
     if commodities:
         parts.append("\nCOMMODITIES:")
         for key, data in commodities.items():
@@ -1093,39 +1202,76 @@ def _extract_validation_data(dataset: Dict[str, Any]) -> str:
                 price = data.get("price") or data.get("close")
                 change = data.get("change_1d")
                 if price:
-                    direction = "subió" if isinstance(change, (int, float)) and change > 0 else "bajó" if isinstance(change, (int, float)) and change < 0 else "sin cambio"
-                    parts.append(f"  {key}: precio={price}, cambio_1d={change}% ({direction})")
+                    name = commodity_names.get(key, key)
+                    parts.append(f"  {name}: precio=${price:,.2f}, 1D={_fmt_change(change)} ({_dir(change)})")
 
-    # FX
+    # FX — con interpretación cambiaria explícita
     fx = dataset.get("fx", {})
     if fx:
-        parts.append("\nDIVISAS:")
+        parts.append("\nDIVISAS (ATENCIÓN: dirección cambiaria):")
         for key, data in fx.items():
             if isinstance(data, dict) and not data.get("error"):
                 rate = data.get("rate") or data.get("close")
                 change = data.get("change_1d")
                 if rate:
-                    direction = "subió" if isinstance(change, (int, float)) and change > 0 else "bajó" if isinstance(change, (int, float)) and change < 0 else "sin cambio"
-                    parts.append(f"  {key}: rate={rate}, cambio_1d={change}% ({direction})")
+                    fx_dir = _dir(change)
+                    # Interpretación cambiaria explícita
+                    if key == "CLP=X":
+                        if isinstance(change, (int, float)):
+                            peso_dir = "peso DEPRECIÓ (se debilitó)" if change > 0 else "peso APRECIÓ (se fortaleció)"
+                        else:
+                            peso_dir = ""
+                        parts.append(f"  USD/CLP: rate={rate:,.2f}, 1D={_fmt_change(change)} → {peso_dir}")
+                    elif key == "MXN=X":
+                        if isinstance(change, (int, float)):
+                            mxn_dir = "peso MXN DEPRECIÓ" if change > 0 else "peso MXN APRECIÓ"
+                        else:
+                            mxn_dir = ""
+                        parts.append(f"  USD/MXN: rate={rate:,.4f}, 1D={_fmt_change(change)} → {mxn_dir}")
+                    elif key == "EURUSD=X":
+                        if isinstance(change, (int, float)):
+                            eur_dir = "euro SUBIÓ / dólar BAJÓ" if change > 0 else "euro BAJÓ / dólar SUBIÓ"
+                        else:
+                            eur_dir = ""
+                        parts.append(f"  EUR/USD: rate={rate:,.4f}, 1D={_fmt_change(change)} → {eur_dir}")
+                    else:
+                        parts.append(f"  {key}: rate={rate:,.4f}, 1D={_fmt_change(change)} ({fx_dir})")
 
     # Crypto
     crypto = dataset.get("crypto", {})
     if crypto:
-        parts.append("\nCRIPTOMONEDAS:")
+        parts.append("\nCRIPTOMONEDAS (DEBEN mencionarse si hay datos):")
         for key, data in crypto.items():
             if isinstance(data, dict) and data.get("close"):
                 change = data.get("change_1d")
-                direction = "subió" if isinstance(change, (int, float)) and change > 0 else "bajó" if isinstance(change, (int, float)) and change < 0 else "sin cambio"
-                parts.append(f"  {key}: cierre={data.get('close')}, cambio_1d={change}% ({direction})")
-        parts.append("  ** Si hay datos crypto, DEBEN mencionarse en el reporte **")
+                parts.append(f"  {key}: cierre=${data['close']:,.2f}, 1D={_fmt_change(change)} ({_dir(change)})")
 
     # Treasury yields
     treasury = dataset.get("alphavantage_global", {}).get("treasury_yields", {}).get("yields", {})
     if treasury:
-        parts.append("\nTREASURIES:")
+        parts.append("\nTREASURIES (movimientos en BASIS POINTS, no %):")
+        treasury_names = {"2year": "UST 2Y", "10year": "UST 10Y", "30year": "UST 30Y"}
         for key, data in treasury.items():
             if isinstance(data, dict) and data.get("value"):
-                parts.append(f"  {key}: yield={data.get('value')}%")
+                name = treasury_names.get(key, key)
+                value = data["value"]
+                prev = (data.get("previous") or {}).get("value") if isinstance(data.get("previous"), dict) else None
+                if isinstance(prev, (int, float)):
+                    bp_change = (value - prev) * 100
+                    parts.append(f"  {name}: yield={value:.2f}%, cambio={bp_change:+.0f}bp")
+                else:
+                    parts.append(f"  {name}: yield={value:.2f}%")
+
+    # VIX
+    rates = dataset.get("rates_bonds", {})
+    vix_data = rates.get("^VIX", {})
+    if isinstance(vix_data, dict) and vix_data.get("close"):
+        vix_close = vix_data["close"]
+        vix_change = vix_data.get("change_1d")
+        vix_interp = ""
+        if isinstance(vix_change, (int, float)):
+            vix_interp = "→ MENOS miedo/volatilidad" if vix_change < 0 else "→ MÁS miedo/volatilidad"
+        parts.append(f"\nVIX: {vix_close:.2f}, 1D={_fmt_change(vix_change)} {vix_interp}")
 
     return "\n".join(parts)
 
