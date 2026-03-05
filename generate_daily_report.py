@@ -180,7 +180,26 @@ SENTIMIENTO SECTORIAL (MUY IMPORTANTE):
 - "Optimista" o "Bullish" significa que las NOTICIAS del sector tienen tono positivo
 - NUNCA interpretes el sentimiento como rentabilidad, ganancia o retorno de un sector
 - Ejemplo correcto: "El sentimiento en tecnología es optimista"
-- Ejemplo INCORRECTO: "El sector tecnológico lidera ganancias con +29%" (ESTO ESTÁ MAL)"""
+- Ejemplo INCORRECTO: "El sector tecnológico lidera ganancias con +29%" (ESTO ESTÁ MAL)
+
+DIVISAS Y TIPO DE CAMBIO (CRÍTICO):
+- El CLP (peso chileno) NO es un activo de inversión. Es la MONEDA LOCAL.
+- Si USD/CLP SUBE (+X%), el peso se DEPRECIÓ = se DEBILITÓ. Esto es NEGATIVO para Chile.
+  NUNCA uses "beneficiándose", "avanzó", "ganó" para describir depreciación del peso.
+  Correcto: "El peso se depreció +1.41% frente al dólar, cerrando en $895"
+  Incorrecto: "El dólar avanzó beneficiándose del apetito por activos de riesgo"
+- Si USD/CLP BAJA (-X%), el peso se APRECIÓ = se FORTALECIÓ. Esto es POSITIVO para Chile.
+- El tipo de cambio se reporta desde la perspectiva del PESO, no del dólar.
+  El dólar no se "beneficia" — el peso se debilita o fortalece.
+- Misma lógica para USD/MXN. EUR/USD es inverso (sube = euro fuerte, dólar débil).
+
+SIGLAS EN CONTEXTO CHILENO:
+- CFA = Consejo Fiscal Autónomo (organismo fiscal chileno), NO la certificación CFA Institute.
+- BCCh = Banco Central de Chile
+- CMF = Comisión para el Mercado Financiero
+- TPM = Tasa de Política Monetaria
+- IPC = Índice de Precios al Consumidor (Chile)
+- IPSA = Índice de Precios Selectivo de Acciones"""
 
 
 def detect_report_mode() -> str:
@@ -1022,10 +1041,16 @@ ERRORES A DETECTAR Y CORREGIR (16 reglas)
 
 ── LÓGICA FINANCIERA ──
 
-5. SIGNO VS DIRECCIÓN CAMBIARIA: Si USD/CLP sube (+X%), el peso se DEBILITÓ/DEPRECIÓ (no se apreció).
-   Si USD/CLP baja (-X%), el peso se FORTALECIÓ/APRECIÓ.
+5. SIGNO VS DIRECCIÓN CAMBIARIA Y TONO:
+   Si USD/CLP sube (+X%), el peso se DEBILITÓ/DEPRECIÓ (no se apreció). Esto es NEGATIVO.
+   Si USD/CLP baja (-X%), el peso se FORTALECIÓ/APRECIÓ. Esto es POSITIVO.
    Error frecuente: "el peso se apreció" cuando USD/CLP subió → corregir a "el peso se depreció".
-   Misma lógica para USD/MXN, EUR/USD (inverso: EUR/USD sube = dólar se debilita).
+   PROHIBIDO usar lenguaje positivo para depreciación del peso:
+   - "beneficiándose", "avanzó", "ganó", "impulsado" → NO cuando el peso se deprecia.
+   - El CLP NO es un activo. Depreciación = debilitamiento = negativo para Chile.
+   - Correcto: "El peso se depreció 1.41% frente al dólar, reflejando presión sobre la moneda local"
+   - Incorrecto: "El dólar avanzó beneficiándose del apetito por riesgo"
+   Misma lógica para USD/MXN. EUR/USD es inverso (sube = euro fuerte, dólar débil).
 
 6. VIX INVERTIDO: VIX baja = MENOS miedo/volatilidad (positivo para mercados).
    VIX sube = MÁS miedo/volatilidad (negativo para mercados).
@@ -1104,6 +1129,13 @@ ERRORES A DETECTAR Y CORREGIR (16 reglas)
 16. CAUSALIDAD INVENTADA: Si el texto atribuye un movimiento de precio a una causa específica,
     verificar que esa causa esté mencionada en las noticias/datos proporcionados.
     Si no hay evidencia → suavizar: "posiblemente influenciado por" en vez de "impulsado por".
+
+17. SIGLAS CHILENAS: En contexto de Chile y LatAm, verificar uso correcto de siglas:
+    - CFA = Consejo Fiscal Autónomo (organismo fiscal chileno), NO CFA Institute/certificación.
+    - BCCh = Banco Central de Chile (no "BCC" ni "BC")
+    - CMF = Comisión para el Mercado Financiero
+    - TPM = Tasa de Política Monetaria
+    - Si el texto usa "CFA" refiriéndose a la certificación financiera en contexto chileno → corregir.
 
 ═══════════════════════════════════════════════════════════════
 
