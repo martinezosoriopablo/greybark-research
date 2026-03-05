@@ -71,22 +71,42 @@ def get_ultimo_dia_habil() -> date:
         return hoy - timedelta(days=1)
 
 
-def get_contexto_temporal() -> str:
+def get_contexto_temporal(mode: str = "AM") -> str:
     """
     Genera contexto temporal para el prompt.
-    Importante para que Claude sepa cómo referirse al cierre anterior.
+    AM: los datos son del cierre ANTERIOR (ayer o viernes).
+    PM: los datos son de la sesión de HOY.
     """
     hoy = date.today()
     weekday = hoy.weekday()
     ultimo_habil = get_ultimo_dia_habil()
     dia_ultimo = DIAS_SEMANA[ultimo_habil.weekday()]
+    dia_hoy = DIAS_SEMANA[weekday]
 
+    if mode == "PM":
+        # PM: las tablas del dashboard y cierre son de HOY
+        if weekday in (5, 6):  # Sábado/Domingo
+            return f"""**CONTEXTO TEMPORAL IMPORTANTE:**
+- Hoy es {dia_hoy.upper()}. Los mercados están cerrados.
+- El último día de trading fue el VIERNES {ultimo_habil.day} de {MESES[ultimo_habil.month]}.
+- Los datos corresponden al cierre del viernes."""
+        else:
+            return f"""**CONTEXTO TEMPORAL (REPORTE PM - CIERRE DEL DÍA):**
+- Las tablas de mercado (dashboard, índices, commodities, divisas) contienen datos de HOY {dia_hoy} {hoy.day} de {MESES[hoy.month]}.
+- Cuando describas un precio, nivel o variación que aparece en las tablas, usa "hoy" (son cierres de hoy).
+  Correcto: "El IPSA cerró hoy en 10,495 (+2.40%)"
+  Incorrecto: "El IPSA experimentó ayer una jornada con avance de +2.40%"
+- Puedes usar "ayer" para referirte a EVENTOS o NOTICIAS que ocurrieron el día anterior.
+  Correcto: "Tras los datos de empleo publicados ayer, los mercados reaccionaron hoy con alzas"
+- Regla simple: si mencionas un NÚMERO de las tablas → "hoy". Si describes un evento pasado sin citar datos de hoy → "ayer" es válido."""
+
+    # AM o default
     if weekday == 0:  # Lunes
         return f"""**CONTEXTO TEMPORAL IMPORTANTE:**
 - Hoy es LUNES. Los mercados estuvieron cerrados el fin de semana.
-- El último día de trading fue el VIERNES {ultimo_habil.day} de {MESES[ultimo_habil.month]}.
-- Cuando menciones el cierre anterior, di "el viernes" NO "ayer".
-- Los datos de cierre corresponden al viernes, no al domingo."""
+- Los datos de cierre en las tablas corresponden al VIERNES {ultimo_habil.day} de {MESES[ultimo_habil.month]}.
+- Cuando describas precios y cierres de las tablas, di "el viernes" NO "ayer".
+- Puedes usar "hoy" para mercados asiáticos/europeos si ya abrieron."""
 
     elif weekday == 5:  # Sábado
         return f"""**CONTEXTO TEMPORAL IMPORTANTE:**
@@ -100,10 +120,12 @@ def get_contexto_temporal() -> str:
 - El último día de trading fue el VIERNES {ultimo_habil.day} de {MESES[ultimo_habil.month]}.
 - Cuando menciones el cierre, di "el viernes" NO "ayer"."""
 
-    else:  # Martes a Viernes
-        return f"""**CONTEXTO TEMPORAL:**
-- El último día de trading fue AYER {dia_ultimo} {ultimo_habil.day} de {MESES[ultimo_habil.month]}.
-- Puedes usar "ayer" para referirte al cierre anterior."""
+    else:  # Martes a Viernes (AM)
+        return f"""**CONTEXTO TEMPORAL (REPORTE AM - PRE-APERTURA):**
+- Los datos de cierre en las tablas (EE.UU., Chile) corresponden a AYER {dia_ultimo} {ultimo_habil.day} de {MESES[ultimo_habil.month]}.
+- Cuando describas precios de cierre de las tablas, usa "ayer".
+- Puedes usar "hoy" para mercados asiáticos/europeos que ya operaron esta mañana.
+- Puedes usar "hoy" para eventos o noticias publicadas esta mañana."""
 
 
 from dotenv import load_dotenv
@@ -751,7 +773,7 @@ def get_default_prompt(mode: str, audience: str) -> str:
 
     # Obtener fecha actual con día de la semana
     fecha_hoy = get_fecha_completa()
-    contexto_temporal = get_contexto_temporal()
+    contexto_temporal = get_contexto_temporal(mode)
 
     if audience == "finanzas":
         return f"""Genera un reporte ejecutivo de mercados para gestores profesionales.
@@ -887,7 +909,7 @@ def load_external_prompt(mode: str, audience: str) -> str:
 
     # Obtener fecha y contexto temporal (siempre se agregan)
     fecha_hoy = get_fecha_completa()
-    contexto_temporal = get_contexto_temporal()
+    contexto_temporal = get_contexto_temporal(mode)
 
     # Header con fecha y contexto que se agrega a cualquier prompt
     header_temporal = f"""**FECHA DEL REPORTE: {fecha_hoy}** (Reporte {mode})
@@ -934,7 +956,7 @@ def generate_report_with_anthropic(context: str, prompt: str, mode: str, system_
     return response.content[0].text
 
 
-def review_report(report_text: str, dataset: Dict[str, Any], detailed_tables: str) -> str:
+def review_report(report_text: str, dataset: Dict[str, Any], detailed_tables: str, mode: str = "AM") -> str:
     """
     QA Review: Verifica coherencia entre narrativa y datos.
 
@@ -942,6 +964,7 @@ def review_report(report_text: str, dataset: Dict[str, Any], detailed_tables: st
         report_text: Reporte generado por Claude (sin tablas finales)
         dataset: Dataset original con todos los datos
         detailed_tables: Tablas detalladas que se agregarán al final
+        mode: "AM" o "PM" — para verificar coherencia temporal
 
     Returns:
         Reporte corregido (o igual si no hay errores)
@@ -957,9 +980,11 @@ def review_report(report_text: str, dataset: Dict[str, Any], detailed_tables: st
     # Extraer datos clave del dataset para validación
     validation_data = _extract_validation_data(dataset)
 
-    qa_system_prompt = """Eres un revisor QA especializado en reportes financieros.
+    qa_system_prompt = f"""Eres un revisor QA especializado en reportes financieros.
 
 Tu trabajo es verificar que el reporte sea COHERENTE con los datos proporcionados.
+
+TIPO DE REPORTE: {mode}
 
 REGLAS DE REVISIÓN:
 1. Sé CONSERVADOR: solo corrige errores CLAROS y OBJETIVOS
@@ -974,6 +999,23 @@ ERRORES A DETECTAR Y CORREGIR:
 3. CONTRADICCIONES: Si una sección contradice otra
 4. FORMATO DASHBOARD: Verificar que la tabla esté bien formateada
 5. CRYPTO FALTANTE: Si hay datos de Bitcoin/ETH y no se mencionan
+6. COHERENCIA TEMPORAL (CRÍTICO):
+   Las tablas de mercado del reporte contienen datos con fecha de hoy (precios, cierres, variaciones).
+   La regla es: si una frase cita un DATO NUMÉRICO de las tablas (precio, cierre, porcentaje), la referencia temporal debe ser coherente con el tipo de reporte.
+
+   Si el reporte es PM:
+   - Las tablas tienen cierres de HOY → frases que citan esos datos deben decir "hoy", no "ayer".
+   - INCORRECTO: "El IPSA experimentó ayer un avance de +2.40%, alcanzando 10,495" (el +2.40% y 10,495 están en la tabla de hoy)
+   - CORRECTO: "El IPSA avanzó hoy +2.40%, alcanzando 10,495 puntos"
+   - PERO "ayer" es válido si se refiere a un EVENTO pasado sin citar datos de las tablas:
+     OK: "Tras los datos de empleo publicados ayer, los mercados reaccionaron hoy con alzas"
+     OK: "El rally continuó hoy tras la decisión de la Fed anunciada ayer"
+
+   Si el reporte es AM:
+   - Las tablas tienen cierres de la sesión ANTERIOR → frases que citan esos datos deben decir "ayer" (o "el viernes" si es lunes).
+   - PERO "hoy" es válido para mercados asiáticos/europeos que ya operaron esta mañana, o para eventos de hoy.
+
+   NO hagas reemplazos ciegos de "ayer"→"hoy". Evalúa frase por frase: ¿cita un dato de las tablas? Si sí, verifica coherencia.
 
 FORMATO DE RESPUESTA:
 - Si HAY errores: Devuelve el reporte COMPLETO con las correcciones aplicadas
@@ -981,7 +1023,7 @@ FORMATO DE RESPUESTA:
 
 NO incluyas comentarios, explicaciones ni notas. Solo el reporte corregido o "SIN_ERRORES"."""
 
-    qa_prompt = f"""REPORTE A REVISAR:
+    qa_prompt = f"""REPORTE A REVISAR (tipo: {mode}):
 ---
 {report_text}
 ---
@@ -1096,7 +1138,7 @@ def generate_for_client(json_path: str, mode: str, system_prompt: str = None, ou
 
     prompt = load_external_prompt(mode, "finanzas")
     report_text = generate_report_with_anthropic(context, prompt, mode, system_prompt=system_prompt)
-    report_text = review_report(report_text, dataset, detailed_tables)
+    report_text = review_report(report_text, dataset, detailed_tables, mode)
     full_report = report_text + "\n\n" + detailed_tables
 
     today = date.today()
@@ -1144,8 +1186,8 @@ def main():
         prompt = load_external_prompt(mode, audience)
         report_text = generate_report_with_anthropic(context, prompt, mode)
 
-        # QA Review: verificar coherencia datos vs narrativa
-        report_text = review_report(report_text, dataset, detailed_tables)
+        # QA Review: verificar coherencia datos vs narrativa + temporal
+        report_text = review_report(report_text, dataset, detailed_tables, mode)
 
         # Agregar tablas detalladas al FINAL (después del QA review)
         full_report = report_text + "\n\n" + detailed_tables
