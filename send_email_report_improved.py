@@ -31,7 +31,7 @@ load_dotenv()
 
 EMAIL_SENDER_USERNAME = os.getenv("EMAIL_SENDER_USERNAME")
 EMAIL_SENDER_PASSWORD = os.getenv("EMAIL_SENDER_PASSWORD")
-EMAIL_SENDER_NAME = os.getenv("EMAIL_SENDER_NAME", "Grey Bark Advisors Research")
+EMAIL_SENDER_NAME = os.getenv("EMAIL_SENDER_NAME", "Greybark Research")
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -42,23 +42,23 @@ SMTP_PORT = 587
 
 REPORT_CONFIG = {
     "AM_pro": {
-        "subject_template": "Grey Bark - Reporte Matutino {date}",
+        "subject_template": "Greybark Research -Reporte Matutino {date}",
         "html_pattern": "html_out/daily_report_AM_finanzas_*.html"
     },
     "AM_general": {
-        "subject_template": "Grey Bark - Reporte Matutino {date}",
+        "subject_template": "Greybark Research -Reporte Matutino {date}",
         "html_pattern": "html_out/daily_report_AM_no_finanzas_*.html"
     },
     "PM_pro": {
-        "subject_template": "Grey Bark - Reporte Vespertino {date}",
+        "subject_template": "Greybark Research -Reporte Vespertino {date}",
         "html_pattern": "html_out/daily_report_PM_finanzas_*.html"
     },
     "PM_general": {
-        "subject_template": "Grey Bark - Reporte Vespertino {date}",
+        "subject_template": "Greybark Research -Reporte Vespertino {date}",
         "html_pattern": "html_out/daily_report_PM_no_finanzas_*.html"
     },
     "weekly_quant": {
-        "subject_template": "Grey Bark - Reporte Cuantitativo Semanal {date}",
+        "subject_template": "Greybark Research -Reporte Cuantitativo Semanal {date}",
         "html_pattern": "html_out/quantitative_weekly_report_*.html"
     }
 }
@@ -70,18 +70,41 @@ REPORT_CONFIG = {
 def find_latest_html(pattern: str) -> Path:
     """Encuentra el archivo HTML más reciente que coincida con el patrón"""
     import glob
-    
+
     files = glob.glob(pattern)
-    
+
     if not files:
         raise FileNotFoundError(f"No se encontró ningún archivo que coincida con: {pattern}")
-    
+
     # Ordenar por fecha de modificación (más reciente primero)
     files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-    
+
     latest = Path(files[0])
     print(f"[INFO] HTML más reciente encontrado: {latest}")
-    
+
+    return latest
+
+
+def find_latest_podcast(turno: str) -> Path:
+    """Busca el podcast más reciente para AM o PM.
+
+    Args:
+        turno: "AM" o "PM"
+
+    Returns:
+        Path al MP3 más reciente, o None si no existe
+    """
+    import glob
+
+    pattern = f"podcasts/podcast_greybark_*_{turno}.mp3"
+    files = glob.glob(pattern)
+
+    if not files:
+        return None
+
+    files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+    latest = Path(files[0])
+    print(f"[INFO] Podcast encontrado: {latest}")
     return latest
 
 
@@ -125,12 +148,21 @@ def send_report_email(report_type: str, html_file: Path = None):
     # Leer contenido HTML
     with open(html_file, 'r', encoding='utf-8') as f:
         html_content = f.read()
-    
+
     # Preparar subject
     today = datetime.now().strftime("%d-%m-%Y")
     config = REPORT_CONFIG[report_type]
     subject = config["subject_template"].format(date=today)
-    
+
+    # Buscar podcast para este turno (AM o PM)
+    turno = report_type.split("_")[0]  # "AM" o "PM"
+    podcast_path = find_latest_podcast(turno)
+    if podcast_path:
+        podcast_recipients = [r for r in recipients if r.get('podcast')]
+        print(f"[INFO] Podcast disponible — {len(podcast_recipients)}/{len(recipients)} destinatarios lo recibirán")
+    else:
+        print(f"[INFO] No se encontró podcast para turno {turno}")
+
     # Conectar a SMTP
     try:
         print(f"\n[INFO] Conectando a {SMTP_SERVER}...")
@@ -141,31 +173,47 @@ def send_report_email(report_type: str, html_file: Path = None):
     except Exception as e:
         print(f"[ERROR] No se pudo conectar a SMTP: {e}")
         return False
-    
+
+    # Leer podcast en memoria una sola vez (si existe y hay destinatarios)
+    podcast_payload = None
+    if podcast_path and podcast_path.exists():
+        with open(podcast_path, 'rb') as f:
+            podcast_payload = f.read()
+
     # Enviar email a cada destinatario
     sent_count = 0
     failed = []
-    
+
     for recipient in recipients:
         try:
-            msg = MIMEMultipart('alternative')
+            attach_podcast = podcast_payload and recipient.get('podcast')
+            msg = MIMEMultipart('mixed') if attach_podcast else MIMEMultipart('alternative')
             msg['From'] = f"{EMAIL_SENDER_NAME} <{EMAIL_SENDER_USERNAME}>"
             msg['To'] = recipient['email']
             msg['Subject'] = subject
-            
+
             # Adjuntar HTML
-            html_part = MIMEText(html_content, 'html', 'utf-8')
-            msg.attach(html_part)
-            
+            msg.attach(MIMEText(html_content, 'html', 'utf-8'))
+
+            # Adjuntar podcast si corresponde
+            if attach_podcast:
+                att = MIMEBase('audio', 'mpeg')
+                att.set_payload(podcast_payload)
+                encoders.encode_base64(att)
+                att.add_header('Content-Disposition', 'attachment',
+                               filename=podcast_path.name)
+                msg.attach(att)
+
             # Enviar
             server.send_message(msg)
             sent_count += 1
-            print(f"[OK] Enviado a: {recipient['name']} <{recipient['email']}>")
-            
+            tag = " +podcast" if attach_podcast else ""
+            print(f"[OK] Enviado a: {recipient['name']} <{recipient['email']}>{tag}")
+
         except Exception as e:
             print(f"[ERROR] Fallo al enviar a {recipient['email']}: {e}")
             failed.append(recipient['email'])
-    
+
     server.quit()
     
     # Resumen

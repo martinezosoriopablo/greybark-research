@@ -16,8 +16,8 @@ from client_manager import (
 # Opcional: habilita envío desde la UI
 # from send_email_report_improved import send_report_email
 
-st.set_page_config(page_title="Grey Bark - Clientes & Reportes", layout="wide")
-st.title("Grey Bark Advisors — Gestión de Clientes y Reportes")
+st.set_page_config(page_title="Greybark Research - Clientes & Reportes", layout="wide")
+st.title("Greybark Research — Gestión de Clientes y Reportes")
 
 db = load_database()
 clients = db.get("clients", [])
@@ -34,6 +34,7 @@ def clients_df():
             "email": c["email"],
             "type": c["type"],
             "active": bool(c["active"]),
+            "podcast": bool(c.get("podcast", False)),
             "reports": ", ".join(c.get("reports", [])),
             "notes": c.get("notes", "")
         })
@@ -65,6 +66,7 @@ with tab1:
         report_keys = list(AVAILABLE_REPORTS.keys())
         report_labels = [f"{AVAILABLE_REPORTS[k]} ({k})" for k in report_keys]
         selected = st.multiselect("Reportes", options=report_keys, format_func=lambda k: f"{AVAILABLE_REPORTS[k]} ({k})")
+        podcast = st.checkbox("Incluir Podcast", value=False, help="Adjuntar MP3 del podcast en los emails")
         notes = st.text_area("Notas (opcional)", height=80)
         submitted = st.form_submit_button("Agregar")
 
@@ -74,7 +76,7 @@ with tab1:
             elif client_type not in CLIENT_TYPES:
                 st.error("Tipo inválido.")
             else:
-                ok = add_client(name=name, email=email, client_type=client_type, reports=selected, notes=notes)
+                ok = add_client(name=name, email=email, client_type=client_type, reports=selected, notes=notes, podcast=podcast)
                 if ok:
                     st.success("Cliente agregado. Recarga automática recomendada (F5) si no aparece de inmediato.")
                 else:
@@ -125,10 +127,16 @@ with tab2:
                 default=current,
                 format_func=lambda k: f"{AVAILABLE_REPORTS[k]} ({k})"
             )
+            podcast_edit = st.checkbox(
+                "Incluir Podcast",
+                value=bool(c.get("podcast", False)),
+                help="Adjuntar MP3 del podcast en los emails",
+                key="edit_podcast"
+            )
             if st.button("Guardar cambios"):
-                ok = update_client_reports(email_edit, selected)
+                ok = update_client_reports(email_edit, selected, podcast=podcast_edit)
                 if ok:
-                    st.success("Reportes actualizados.")
+                    st.success("Reportes y preferencia de podcast actualizados.")
                 else:
                     st.error("No se pudo actualizar.")
 
@@ -145,7 +153,10 @@ with tab3:
     r = st.selectbox("Selecciona reporte", list(AVAILABLE_REPORTS.keys()), format_func=lambda k: f"{AVAILABLE_REPORTS[k]} ({k})")
     rec = get_recipients_for_report(r)
     if rec:
-        st.write(f"**Destinatarios ({len(rec)}):**")
-        st.table(pd.DataFrame(rec))
+        podcast_count = sum(1 for x in rec if x.get('podcast'))
+        st.write(f"**Destinatarios ({len(rec)})** — {podcast_count} con podcast")
+        df_rec = pd.DataFrame(rec)
+        df_rec["podcast"] = df_rec["podcast"].map({True: "Si", False: "No"})
+        st.table(df_rec)
     else:
         st.info("No hay destinatarios para este reporte.")

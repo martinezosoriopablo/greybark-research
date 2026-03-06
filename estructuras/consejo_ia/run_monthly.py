@@ -614,13 +614,14 @@ class MonthlyPipeline:
         """Genera todos los reportes solicitados."""
         self._print_header("FASE 4", "GENERACIÓN DE REPORTES")
         results = []
+        self._report_contents = {}  # Collect for auditor
 
         for report_name in self.reports:
             self._print_step(f"Generando reporte: {report_name.upper()}...")
             start = time.time()
 
             try:
-                output_path = self._generate_single_report(
+                output_path, content = self._generate_single_report(
                     report_name, council_result, equity_data, forecast_data
                 )
                 elapsed = time.time() - start
@@ -630,6 +631,8 @@ class MonthlyPipeline:
                     'path': output_path,
                     'duration': round(elapsed, 1),
                 })
+                if content:
+                    self._report_contents[report_name] = content
                 self._print_ok(f"{report_name}: {output_path} ({elapsed:.1f}s)")
 
             except Exception as e:
@@ -651,8 +654,8 @@ class MonthlyPipeline:
         council_result: Optional[Dict],
         equity_data: Optional[Dict],
         forecast_data: Optional[Dict] = None,
-    ) -> str:
-        """Genera un reporte individual. Retorna path al HTML."""
+    ) -> tuple:
+        """Genera un reporte individual. Retorna (path, content_dict)."""
 
         if report_name == 'macro':
             from macro_report_renderer import MacroReportRenderer
@@ -711,13 +714,129 @@ class MonthlyPipeline:
         else:
             raise ValueError(f"Reporte desconocido: {report_name}")
 
+        content = getattr(renderer, 'last_content', None)
+
         # Copy to custom output dir if specified
         if self.custom_output_dir and path and os.path.exists(path):
             import shutil
             dest = self.custom_output_dir / os.path.basename(path)
             shutil.copy2(path, dest)
-            return str(dest)
-        return path
+            return str(dest), content
+        return path, content
+
+    # =====================================================================
+    # FASE 4.5: AUDITORÍA DE COHERENCIA
+    # =====================================================================
+
+    def audit_coherence(self) -> Dict[str, Any]:
+        """Audita coherencia entre los 4 reportes generados.
+
+        If HIGH flags are found, escalates to refinador for resolution,
+        then regenerates affected reports with correction directives.
+        """
+        contents = getattr(self, '_report_contents', {})
+        if len(contents) < 2:
+            self._print_step("Auditoría omitida (menos de 2 reportes generados)")
+            return {}
+
+        self._print_header("FASE 4.5", "AUDITORÍA DE COHERENCIA")
+        start = time.time()
+
+        try:
+            from report_auditor import (
+                audit_reports, format_audit_report,
+                resolve_flags, format_resolution,
+            )
+
+            # --- Step 1: Audit ---
+            result = audit_reports(contents)
+            print(format_audit_report(result))
+
+            high_flags = [f for f in result.get("flags", []) if f.get("severity") == "high"]
+
+            if not high_flags:
+                elapsed = time.time() - start
+                self._print(f"\n  Auditoría completada en {elapsed:.1f}s — sin flags críticos")
+                self._save_audit(result)
+                return result
+
+            # --- Step 2: Refinador resolves ---
+            self._print(f"\n  {len(high_flags)} flags HIGH → escalando al Refinador...")
+            resolution = resolve_flags(result, self.council_result or {})
+            print(format_resolution(resolution))
+
+            corrections = resolution.get("corrections", [])
+            if not corrections or resolution.get("status") != "resolved":
+                elapsed = time.time() - start
+                self._print(f"\n  Refinador no generó correcciones. Auditoría en {elapsed:.1f}s")
+                result["resolution"] = resolution
+                self._save_audit(result)
+                return result
+
+            # --- Step 3: Regenerate affected reports ---
+            affected = set(c.get("report") for c in corrections if c.get("report"))
+            self._print(f"\n  Regenerando reportes: {', '.join(r.upper() for r in affected)}...")
+
+            # Build per-report directive strings
+            directives = {}
+            for c in corrections:
+                rpt = c.get("report", "")
+                if rpt:
+                    directives.setdefault(rpt, []).append(c.get("directive", ""))
+
+            equity_data = self.data.get('equity')
+            if isinstance(equity_data, dict) and 'error' in equity_data:
+                equity_data = None
+            forecast_data = self.data.get('forecasts')
+            if isinstance(forecast_data, dict) and 'error' in forecast_data:
+                forecast_data = None
+
+            from narrative_engine import set_correction_directive, clear_correction_directive
+
+            for report_name in affected:
+                if report_name not in self.reports:
+                    continue
+                directive_text = " ".join(directives.get(report_name, []))
+                self._print_step(f"  Regenerando {report_name.upper()} con correcciones...")
+
+                try:
+                    set_correction_directive(directive_text)
+                    path, new_content = self._generate_single_report(
+                        report_name, self.council_result, equity_data,
+                        forecast_data,
+                    )
+                    if new_content:
+                        self._report_contents[report_name] = new_content
+                    # Update report_results
+                    for r in self.report_results:
+                        if r['report'] == report_name:
+                            r['path'] = path
+                            r['corrected'] = True
+                    self._print_ok(f"  {report_name.upper()} regenerado: {path}")
+                except Exception as e:
+                    self._print_err(f"  {report_name.upper()} regeneración falló: {e}")
+                finally:
+                    clear_correction_directive()
+
+            elapsed = time.time() - start
+            self._print(f"\n  Auditoría + corrección completada en {elapsed:.1f}s")
+
+            result["resolution"] = resolution
+            self._save_audit(result)
+            return result
+
+        except Exception as e:
+            self._print_err(f"Auditoría falló: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'status': 'error', 'reason': str(e)}
+
+    def _save_audit(self, result: Dict):
+        """Save audit result to JSON."""
+        audit_path = REPORTS_DIR / f"audit_{self.date_str}.json"
+        with open(audit_path, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        self._print(f"  Resultado: {audit_path}")
 
     # =====================================================================
     # FASE 5: RESUMEN Y ENTREGA
@@ -826,6 +945,9 @@ class MonthlyPipeline:
         self.report_results = self.generate_reports(
             self.council_result, equity_data, forecast_data
         )
+
+        # ---- FASE 4.5: Auditoría de Coherencia ----
+        self.audit_result = self.audit_coherence()
 
         # ---- FASE 5: Resumen ----
         self.print_summary(self.report_results)

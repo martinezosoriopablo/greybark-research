@@ -138,13 +138,14 @@ def get_recipients_for_report(report_type: str) -> List[Dict[str, str]]:
         if client["active"] and report_type in client["reports"]:
             recipients.append({
                 "name": client["name"],
-                "email": client["email"]
+                "email": client["email"],
+                "podcast": bool(client.get("podcast", False))
             })
     
     return recipients
 
 
-def add_client(name: str, email: str, client_type: str, reports: List[str], notes: str = "") -> bool:
+def add_client(name: str, email: str, client_type: str, reports: List[str], notes: str = "", podcast: bool = False) -> bool:
     """Agrega un nuevo cliente"""
     db = load_database()
     
@@ -164,6 +165,7 @@ def add_client(name: str, email: str, client_type: str, reports: List[str], note
         "type": client_type,
         "reports": reports,
         "active": True,
+        "podcast": podcast,
         "notes": notes
     }
     
@@ -189,17 +191,19 @@ def remove_client(email: str) -> bool:
     return False
 
 
-def update_client_reports(email: str, reports: List[str]) -> bool:
-    """Actualiza los reportes de un cliente"""
+def update_client_reports(email: str, reports: List[str], podcast: bool = None) -> bool:
+    """Actualiza los reportes (y opcionalmente podcast) de un cliente"""
     db = load_database()
-    
+
     for client in db["clients"]:
         if client["email"].lower() == email.lower():
             client["reports"] = reports
+            if podcast is not None:
+                client["podcast"] = podcast
             save_database(db)
             print(f"[OK] Reportes actualizados para: {client['name']}")
             return True
-    
+
     print(f"[ERROR] Cliente no encontrado: {email}")
     return False
 

@@ -18,9 +18,22 @@ import json
 import time
 import shutil
 import subprocess
+import platform
+import webbrowser
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+
+
+def _open_file(path):
+    """Open a file with the OS default application (cross-platform)."""
+    p = str(path)
+    if sys.platform == "win32":
+        os.startfile(p)
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", p])
+    else:
+        subprocess.Popen(["xdg-open", p])
 
 # Fix Windows encoding before anything else
 if sys.platform == 'win32':
@@ -406,10 +419,33 @@ def save_directives(content: str):
     DIRECTIVES_FILE.write_text(header + content, encoding='utf-8')
 
 
-def get_recent_council_results() -> List[Dict]:
-    """Lista resultados de council recientes."""
+def get_recent_council_results(client_id: str = None) -> List[Dict]:
+    """Lista resultados de council recientes, filtrados por cliente si se especifica."""
     results = []
-    for f in sorted(COUNCIL_DIR.glob("council_result_*.json"), reverse=True)[:5]:
+    if client_id:
+        patterns = [f"{client_id}_council_*.json", "council_result_*.json"]
+    else:
+        patterns = ["council_result_*.json"]
+    all_files = []
+    for pat in patterns:
+        all_files.extend(COUNCIL_DIR.glob(pat))
+    all_files = sorted(set(all_files), reverse=True)
+    if client_id:
+        # Filter: only files with client metadata or client prefix
+        filtered = []
+        for f in all_files:
+            try:
+                with open(f, 'r', encoding='utf-8') as fp:
+                    data = json.load(fp)
+                meta = data.get('metadata', {})
+                if meta.get('client') == client_id or f.name.startswith(f"{client_id}_"):
+                    filtered.append(f)
+            except Exception:
+                continue
+        all_files = filtered[:5]
+    else:
+        all_files = all_files[:5]
+    for f in all_files:
         try:
             with open(f, 'r', encoding='utf-8') as fp:
                 data = json.load(fp)
@@ -544,7 +580,7 @@ with st.sidebar:
     # Quick status
     research_files = get_research_files()
     directives = get_directives()
-    recent_results = get_recent_council_results()
+    recent_results = get_recent_council_results(CLIENT_ID)
 
     st.markdown("**Estado Actual**")
     st.markdown(f"- Research: **{len(research_files)}** archivos")
@@ -793,7 +829,7 @@ if page == "Pipeline":
         st.markdown("---")
         st.markdown('<div class="section-header">Reportes Generados</div>', unsafe_allow_html=True)
 
-        recent = get_recent_reports()
+        recent = get_client_reports(CLIENT_ID) if CLIENT_ID else get_recent_reports()
         today = datetime.now().strftime('%Y-%m-%d')
         today_reports = [r for r in recent if today in r['name']]
 
@@ -808,7 +844,7 @@ if page == "Pipeline":
                     st.caption(format_size(r['size']))
                 with c3:
                     if st.button("Abrir", key=f"open_{r['name']}"):
-                        os.startfile(str(r['path']))
+                        _open_file(r['path'])
         else:
             st.info("No hay reportes generados hoy.")
 
@@ -822,7 +858,11 @@ elif page == "Reportes":
     render_header()
     st.markdown('<div class="main-subtitle">Reportes Generados</div>', unsafe_allow_html=True)
 
-    recent = get_recent_reports()
+    # Use client-specific reports if authenticated, otherwise generic
+    if CLIENT_ID:
+        recent = get_client_reports(CLIENT_ID)
+    else:
+        recent = get_recent_reports()
 
     if not recent:
         st.info("No hay reportes generados todavia.")
@@ -852,13 +892,13 @@ elif page == "Reportes":
                     st.caption(r['modified'].strftime('%H:%M'))
                 with c4:
                     if st.button("Abrir", key=f"view_{r['name']}"):
-                        os.startfile(str(r['path']))
+                        _open_file(r['path'])
 
     # Council results
     st.markdown("---")
     st.markdown('<div class="section-header">Council Results</div>', unsafe_allow_html=True)
 
-    council_results = get_recent_council_results()
+    council_results = get_recent_council_results(CLIENT_ID)
     if council_results:
         for cr in council_results:
             c1, c2, c3 = st.columns([5, 2, 2])
@@ -923,7 +963,7 @@ elif page == "Historico":
                     st.caption(r['modified'].strftime('%H:%M'))
                 with c4:
                     if st.button("Abrir", key=f"hist_{r['date_folder']}_{r['name']}"):
-                        os.startfile(str(r['path']))
+                        _open_file(r['path'])
 
         st.markdown("---")
         st.caption(f"Total: {len(client_reports)} reportes")
