@@ -56,7 +56,8 @@ class MacroReportRenderer:
         # Inicializar generador de contenido (with data provider for real Chile data)
         self.content_generator = MacroContentGenerator(
             self.council_result, data_provider=self._data_provider,
-            forecast_data=self.forecast_data)
+            forecast_data=self.forecast_data,
+            company_name=self.branding.get('company_name', ''))
 
     def _print(self, msg: str):
         if self.verbose:
@@ -79,6 +80,7 @@ class MacroReportRenderer:
         # 1. Generar contenido
         self._print("[1/3] Generando contenido macro...")
         content = self.content_generator.generate_all_content()
+        self.last_content = content
 
         # 2. Renderizar con Jinja2
         self._print("[2/3] Cargando template profesional...")

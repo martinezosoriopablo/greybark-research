@@ -45,7 +45,8 @@ class RFReportRenderer:
         )
 
         self.content_generator = RFContentGenerator(
-            self.council_result, self.market_data, forecast_data=self.forecast_data)
+            self.council_result, self.market_data, forecast_data=self.forecast_data,
+            company_name=self.branding.get('company_name', ''))
 
     def _print(self, msg: str):
         if self.verbose:
@@ -67,6 +68,7 @@ class RFReportRenderer:
 
         self._print("[1/4] Generando contenido de renta fija...")
         content = self.content_generator.generate_all_content()
+        self.last_content = content
 
         self._print("[2/4] Cargando template profesional...")
         template = self._jinja_env.get_template(self.template_name)

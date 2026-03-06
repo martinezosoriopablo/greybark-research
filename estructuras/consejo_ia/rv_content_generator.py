@@ -26,10 +26,11 @@ class RVContentGenerator:
     """Generador de contenido narrativo para Reporte de Renta Variable."""
 
     def __init__(self, council_result: Dict = None, market_data: Dict = None,
-                 forecast_data: Dict = None):
+                 forecast_data: Dict = None, company_name: str = ""):
         self.council = council_result or {}
         self.market_data = market_data or {}
         self.forecast = forecast_data or {}
+        self.company_name = company_name
         self.date = datetime.now()
         self.month_name = self._get_spanish_month(self.date.month)
         self.year = self.date.year
@@ -190,31 +191,17 @@ class RVContentGenerator:
         }
 
     def _generate_global_stance(self) -> Dict[str, Any]:
-        """Genera postura global de equity."""
+        """Genera postura global de equity con narrativa Claude-powered."""
         result = {
             'view': 'CONSTRUCTIVO',
             'cambio': '=',
             'conviccion': 'MEDIA-ALTA',
-            'driver_principal': 'Earnings resilientes y valuaciones razonables ex-US',
-            'narrativa': (
-                "Mantenemos una postura constructiva en renta variable global. Los earnings "
-                "corporativos muestran resiliencia, con revisiones positivas en la mayoria de regiones. "
-                "Si bien las valuaciones en US estan elevadas, el resto del mundo ofrece oportunidades "
-                "atractivas. Preferimos Europa, Japon y Chile sobre US en terminos relativos."
-            )
+            'driver_principal': '',
+            'narrativa': '',
         }
 
-        if not self._has_council():
-            return result
-
-        rv = self._panel('rv')
-        final = self._final()
-
-        # Enrich narrativa from RV panel
-        if rv:
-            paragraphs = [p.strip() for p in rv.split('\n\n') if len(p.strip()) > 50]
-            if paragraphs:
-                result['narrativa'] = self._md_to_html(paragraphs[0][:500])
+        rv = self._panel('rv') if self._has_council() else ''
+        final = self._final() if self._has_council() else ''
 
         # Extract view from final recommendation
         if final:
@@ -235,6 +222,49 @@ class RVContentGenerator:
             elif 'neutral' in text:
                 result['view'] = 'NEUTRAL'
                 result['conviccion'] = 'MEDIA'
+
+        # Generate narrativa via Claude
+        if rv or final:
+            from narrative_engine import generate_narrative
+            council_ctx = f"RV PANEL:\n{rv[:2000]}\n\nFINAL REC:\n{final[:1500]}"
+
+            narrativa = generate_narrative(
+                section_name="rv_global_stance",
+                prompt=(
+                    f"Escribe un parrafo de postura global en renta variable para {self.month_name} {self.year}. "
+                    f"La postura es {result['view']} con conviccion {result['conviccion']}. "
+                    "Explica en 3-4 oraciones el fundamento: earnings, valuaciones, preferencias regionales "
+                    "y principal driver. Usa SOLO datos del council. Maximo 80 palabras."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=300,
+            )
+            if narrativa:
+                result['narrativa'] = narrativa
+
+            driver = generate_narrative(
+                section_name="rv_driver_principal",
+                prompt=(
+                    "Extrae en UNA frase corta (max 10 palabras) el principal driver de la postura en renta variable "
+                    "segun el council. Ejemplo: 'Earnings solidos con valuaciones atractivas ex-US'. "
+                    "Solo la frase, sin puntos ni explicacion."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=50,
+            )
+            if driver:
+                result['driver_principal'] = driver
+
+        # Fallbacks
+        if not result['narrativa']:
+            result['narrativa'] = (
+                f"Nuestra postura en renta variable global es {result['view'].lower()} "
+                f"para {self.month_name} {self.year}."
+            )
+        if not result['driver_principal']:
+            result['driver_principal'] = 'Ver analisis detallado en secciones siguientes'
 
         return result
 
@@ -303,52 +333,57 @@ class RVContentGenerator:
         return defaults
 
     def _generate_key_calls(self) -> List[str]:
-        """Genera key calls del mes con datos reales."""
+        """Genera key calls del mes via Claude + datos reales."""
+        from narrative_engine import generate_narrative
+
         # Chile call dinámico con datos BCCh + yfinance
         v = self._val('chile') if self._has_data() else {}
         pe = v.get('pe_trailing') or v.get('pe_forward')
         ipsa_level = self._bcch_val('ipsa')
         ipsa_ytd = self._bcch_ret('ipsa', 'ytd')
 
-        chile_call = "Chile OW: "
+        chile_quant = ""
         if pe and ipsa_level:
-            chile_call += f"IPSA en {ipsa_level:,.0f} ({pe:.1f}x P/E)"
+            chile_quant = f"IPSA en {ipsa_level:,.0f} ({pe:.1f}x P/E)"
             if ipsa_ytd is not None:
-                chile_call += f", {ipsa_ytd:+.1f}% YTD"
-            chile_call += " — valuación atractiva con tasas bajando"
+                chile_quant += f", {ipsa_ytd:+.1f}% YTD"
         elif pe:
-            chile_call += f"ECH a {pe:.1f}x P/E con upside de 15-20% en 12 meses"
-        else:
-            chile_call += "IPSA con upside de 15-20% en 12 meses"
+            chile_quant = f"ECH a {pe:.1f}x P/E"
 
-        defaults = [
-            "Preferimos Europa y Japon sobre US - valuacion relativa mas atractiva",
-            "Sectores favoritos: Technology (selectivo), Healthcare, Financials, Materials",
-            "Style: Barbell Quality + Value; evitar Growth especulativo",
-            chile_call,
-            "Principal riesgo: Re-aceleracion de inflacion que fuerce pausa de bancos centrales"
+        rv = self._panel('rv') if self._has_council() else ''
+        cio = self._cio() if self._has_council() else ''
+        final = self._final() if self._has_council() else ''
+
+        if rv or cio or final:
+            council_ctx = f"RV PANEL:\n{rv[:1500]}\n\nCIO:\n{cio[:1000]}\n\nFINAL:\n{final[:1000]}"
+            quant_ctx = f"Datos Chile: {chile_quant}" if chile_quant else ""
+
+            result = generate_narrative(
+                section_name="rv_key_calls",
+                prompt=(
+                    f"Genera exactamente 5 key calls de renta variable para {self.month_name} {self.year}. "
+                    "Cada call en una linea, formato: area/region + recomendacion + fundamento breve. "
+                    "Cubrir: preferencia regional, sectores favoritos, style/factor tilt, Chile, y principal riesgo. "
+                    "Usa datos del council — NO inventes numeros. "
+                    "Devuelve cada call en una linea separada por \\n. Sin bullets ni numeracion."
+                ),
+                council_context=council_ctx,
+                quant_context=quant_ctx,
+                company_name=self.company_name,
+                max_tokens=500,
+            )
+            if result:
+                lines = [l.strip() for l in result.split('\n') if l.strip()]
+                if len(lines) >= 3:
+                    return lines
+
+        # Minimal fallback
+        calls = [
+            "Ver analisis sectorial y regional en secciones siguientes",
         ]
-
-        if not self._has_council():
-            return defaults
-
-        rv = self._panel('rv')
-        cio = self._cio()
-        source = rv or cio or ''
-
-        # Try to extract bullet points from council
-        if source:
-            bullets = []
-            for line in source.split('\n'):
-                line = line.strip()
-                if line.startswith(('-', '*', '•')) and len(line) > 20:
-                    bullets.append(self._md_to_html(line.lstrip('-*• ').strip()[:200]))
-                if len(bullets) >= 5:
-                    break
-            if len(bullets) >= 3:
-                return bullets
-
-        return defaults
+        if chile_quant:
+            calls.append(f"Chile: {chile_quant}")
+        return calls
 
     # =========================================================================
     # SECCION 2: VALORIZACIONES GLOBALES
@@ -2109,82 +2144,101 @@ class RVContentGenerator:
         }
 
     def _generate_equity_risks(self) -> List[Dict[str, Any]]:
-        """Genera top riesgos para equity enriquecidos con credit y risk data."""
+        """Genera top riesgos para equity via Claude + datos de credit/risk."""
+        import json as _json
+        from narrative_engine import generate_narrative
 
         cd = self._credit_data()
         has_credit = cd and 'error' not in cd
         rd = self._risk_data()
         has_risk = rd and 'error' not in rd
 
-        # Señales de riesgo reales para enriquecer descripciones
-        credit_context = ''
+        # Quantitative context
+        quant_parts = []
         if has_credit:
             hy = cd.get('hy_spread')
             hy_pct = cd.get('hy_percentile')
             ig = cd.get('ig_spread')
             if hy is not None:
-                credit_context = f" HY spread actual: {hy:.0f}bp (percentil {hy_pct:.0f}%)." if hy_pct else f" HY spread: {hy:.0f}bp."
-
-        risk_context = ''
+                quant_parts.append(f"HY spread: {hy:.0f}bp" + (f" (percentil {hy_pct:.0f}%)" if hy_pct else ""))
+            if ig is not None:
+                quant_parts.append(f"IG spread: {ig:.0f}bp")
         if has_risk:
             var95 = rd.get('var_95_daily')
-            max_dd = rd.get('max_drawdown')
             if var95 is not None:
-                risk_context = f" VaR 95%: {var95:.2f}% diario."
+                quant_parts.append(f"VaR 95%: {var95:.2f}% diario")
 
-        defaults = [
-            {
-                'riesgo': 'Reflacion / Fed Hawkish',
-                'probabilidad': '25%',
-                'impacto': 'Alto',
-                'descripcion': f'Inflacion rebota, Fed pausa recortes. Tasas largas suben, P/E comprime.{credit_context}',
-                'sectores_afectados': ['Growth', 'Real Estate', 'Utilities'],
-                'hedge': 'Financials, Energy, cortos en long duration'
-            },
-            {
-                'riesgo': 'Recesion Hard Landing',
-                'probabilidad': '15%',
-                'impacto': 'Muy Alto',
-                'descripcion': f'Economia cae en recesion, earnings colapsan -20%+.{risk_context}',
-                'sectores_afectados': ['Cyclicals', 'Financials', 'Small Caps'],
-                'hedge': 'Cash, Healthcare, Staples, Gold'
-            },
-            {
-                'riesgo': 'China Hard Landing',
-                'probabilidad': '20%',
-                'impacto': 'Alto',
-                'descripcion': 'Property crisis se profundiza, contagio a commodities y EM.',
-                'sectores_afectados': ['Materials', 'EM', 'Luxury', 'Autos'],
-                'hedge': 'Reducir EM, preferir DM domestico'
-            },
+        riesgo_panel = self._panel('riesgo') if self._has_council() else ''
+        final = self._final() if self._has_council() else ''
+
+        if riesgo_panel or final:
+            council_ctx = f"RISK PANEL:\n{riesgo_panel[:2000]}\n\nFINAL REC:\n{final[:1000]}"
+            quant_ctx = " | ".join(quant_parts) if quant_parts else ""
+
+            result = generate_narrative(
+                section_name="rv_equity_risks",
+                prompt=(
+                    "Genera exactamente 3 top riesgos para renta variable basados en el council. "
+                    "Devuelve un JSON array donde cada elemento tiene: "
+                    '{"riesgo": "nombre corto", "probabilidad": "XX%", "impacto": "Alto/Muy Alto/Medio", '
+                    '"descripcion": "1-2 oraciones", "sectores_afectados": ["sector1", "sector2"], '
+                    '"hedge": "string corto con cobertura sugerida"}. '
+                    "Usa riesgos que el council realmente identifica. NO inventes probabilidades — "
+                    "usa las del council o estima conservadoramente."
+                ),
+                council_context=council_ctx,
+                quant_context=quant_ctx,
+                company_name=self.company_name,
+                max_tokens=800,
+                temperature=0.2,
+            )
+            if result:
+                try:
+                    cleaned = result.strip()
+                    if cleaned.startswith('```'):
+                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                        if cleaned.endswith('```'):
+                            cleaned = cleaned[:-3]
+                        cleaned = cleaned.strip()
+                    risks = _json.loads(cleaned)
+                    if isinstance(risks, list) and len(risks) >= 2:
+                        return risks
+                except (_json.JSONDecodeError, KeyError):
+                    pass
+
+        # Minimal fallback
+        return [
+            {'riesgo': 'Riesgo macro', 'probabilidad': 'N/D', 'impacto': 'Alto',
+             'descripcion': 'Ver seccion de riesgos del council para detalle.',
+             'sectores_afectados': [], 'hedge': 'Diversificacion'},
         ]
-
-        if not self._has_council():
-            return defaults
-
-        riesgo = self._panel('riesgo')
-        if riesgo:
-            for risk in defaults:
-                name_lower = risk['riesgo'].lower()
-                for para in riesgo.split('\n\n'):
-                    p = para.strip()
-                    if len(p) > 50:
-                        keywords = name_lower.split('/')
-                        if any(kw.strip() in p.lower() for kw in keywords):
-                            risk['descripcion'] = self._md_to_html(p[:300])
-                            break
-
-        return defaults
 
     def _generate_positive_catalysts(self) -> List[str]:
-        """Genera catalizadores positivos."""
-        return [
-            "AI monetization supera expectativas - boost a Tech earnings",
-            "China estimulo agresivo - lift a EM y Materials",
-            "Soft landing confirmado - expansion de multiples",
-            "Deals M&A aceleran - bid for assets",
-            "Buybacks record en 2026 - soporte tecnico"
-        ]
+        """Genera catalizadores positivos via Claude."""
+        from narrative_engine import generate_narrative
+
+        rv = self._panel('rv') if self._has_council() else ''
+        final = self._final() if self._has_council() else ''
+
+        if rv or final:
+            council_ctx = f"RV PANEL:\n{rv[:1500]}\n\nFINAL:\n{final[:1000]}"
+            result = generate_narrative(
+                section_name="rv_catalysts",
+                prompt=(
+                    "Genera exactamente 4-5 catalizadores positivos para renta variable "
+                    "basados en lo que discute el council. Cada catalizador en una linea, "
+                    "formato: 'Catalizador - impacto esperado'. Sin bullets ni numeracion."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=300,
+            )
+            if result:
+                lines = [l.strip() for l in result.split('\n') if l.strip()]
+                if len(lines) >= 3:
+                    return lines
+
+        return ["Ver analisis del council para catalizadores especificos"]
 
     def _generate_event_calendar(self) -> List[Dict[str, Any]]:
         """Genera calendario de eventos."""
@@ -2201,37 +2255,71 @@ class RVContentGenerator:
     # =========================================================================
 
     def generate_positioning_summary(self) -> Dict[str, Any]:
-        """Genera resumen final de posicionamiento."""
+        """Genera resumen final de posicionamiento via Claude."""
+        import json as _json
+        from narrative_engine import generate_narrative
 
-        result = {
-            'tabla_final': [
-                {'categoria': 'Equity Global', 'recomendacion': 'OW vs benchmark'},
-                {'categoria': 'Region Preferida', 'recomendacion': 'Europa, Japon, Chile'},
-                {'categoria': 'Region Neutral', 'recomendacion': 'Estados Unidos'},
-                {'categoria': 'Sectores OW', 'recomendacion': 'Tech (selectivo), Healthcare, Financials, Materials'},
-                {'categoria': 'Sectores UW', 'recomendacion': 'Utilities, Real Estate, Consumer Staples'},
-                {'categoria': 'Style', 'recomendacion': 'Quality + Value barbell'},
-                {'categoria': 'Factor Tilt', 'recomendacion': 'Quality, Value'},
-                {'categoria': 'Size', 'recomendacion': 'Large Caps preferido'},
-            ],
-            'mensaje_clave': (
-                "Mantenemos postura constructiva en equity global con preferencia por mercados "
-                "ex-US que ofrecen valuacion mas atractiva. Barbell de Quality Growth y Deep Value "
-                "en sectores ciclicos. Chile destaca como oportunidad local con upside de 18%."
+        rv = self._panel('rv') if self._has_council() else ''
+        final = self._final() if self._has_council() else ''
+
+        tabla_final = []
+        mensaje_clave = ''
+
+        if rv or final:
+            council_ctx = f"RV PANEL:\n{rv[:2000]}\n\nFINAL REC:\n{final[:2000]}"
+
+            # Generate positioning table
+            tabla_raw = generate_narrative(
+                section_name="rv_positioning_table",
+                prompt=(
+                    "Genera una tabla de posicionamiento en renta variable como JSON array. "
+                    "Cada fila: {\"categoria\": \"string\", \"recomendacion\": \"string\"}. "
+                    "Incluir: Equity Global (OW/N/UW), Region Preferida, Region a evitar/neutral, "
+                    "Sectores OW, Sectores UW, Style tilt, Factor tilt, Size preference. "
+                    "Basa las recomendaciones en lo que dice el council."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=500,
+                temperature=0.1,
             )
-        }
+            if tabla_raw:
+                try:
+                    cleaned = tabla_raw.strip()
+                    if cleaned.startswith('```'):
+                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                        if cleaned.endswith('```'):
+                            cleaned = cleaned[:-3]
+                        cleaned = cleaned.strip()
+                    parsed = _json.loads(cleaned)
+                    if isinstance(parsed, list) and len(parsed) >= 3:
+                        tabla_final = parsed
+                except (_json.JSONDecodeError, KeyError):
+                    pass
 
-        if not self._has_council():
-            return result
+            # Generate key message
+            mensaje_clave = generate_narrative(
+                section_name="rv_mensaje_clave",
+                prompt=(
+                    "Escribe 2-3 oraciones resumiendo el posicionamiento en renta variable: "
+                    "postura general, principales preferencias, y principal riesgo a monitorear. "
+                    "Usa datos del council. Maximo 60 palabras."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=200,
+            )
 
-        final = self._final()
-        if final:
-            # Use first substantial paragraph from final recommendation
-            paragraphs = [p.strip() for p in final.split('\n\n') if len(p.strip()) > 50]
-            if paragraphs:
-                result['mensaje_clave'] = self._md_to_html(paragraphs[0][:400])
+        # Fallbacks
+        if not tabla_final:
+            tabla_final = [
+                {'categoria': 'Equity Global', 'recomendacion': 'Ver analisis detallado'},
+                {'categoria': 'Posicionamiento', 'recomendacion': 'Basado en council del mes'},
+            ]
+        if not mensaje_clave:
+            mensaje_clave = f'Ver analisis detallado de {self.month_name} {self.year} para posicionamiento.'
 
-        return result
+        return {'tabla_final': tabla_final, 'mensaje_clave': mensaje_clave}
 
     # =========================================================================
     # METODO PRINCIPAL

@@ -35,10 +35,11 @@ class RFContentGenerator:
     """Generador de contenido narrativo para Reporte de Renta Fija."""
 
     def __init__(self, council_result: Dict = None, market_data: Dict = None,
-                 forecast_data: Dict = None):
+                 forecast_data: Dict = None, company_name: str = ""):
         self.council = council_result or {}
         self.market_data = market_data or {}
         self.forecast = forecast_data or {}
+        self.company_name = company_name
         self.date = datetime.now()
         self.month_name = self._get_spanish_month(self.date.month)
         self.year = self.date.year
@@ -152,30 +153,53 @@ class RFContentGenerator:
             elif 'neutral' in text and 'renta fija' in text:
                 view = 'NEUTRAL'
 
-        # Dynamic narrative using determined view
+        # Generate narrative via Claude if council available
         stance_map = {'CONSTRUCTIVO': 'constructiva', 'CAUTELOSO': 'cautelosa',
                       'NEUTRAL': 'neutral', 'AGRESIVO': 'agresiva'}
         stance_word = stance_map.get(view, 'constructiva')
-        parts = [f"Mantenemos una postura {stance_word} en renta fija global. "]
-        if fed and ecb:
-            parts.append(
-                f"Con la Fed en {self._fmt_pct(fed)} y el BCE en {self._fmt_pct(ecb)}, "
-                "las tasas tienen espacio para comprimir modestamente. "
+
+        narrativa = ''
+        rf_panel = self.council.get('panel_outputs', {}).get('rf', '')
+        if rf_panel or final:
+            from narrative_engine import generate_narrative
+            quant_parts = []
+            if fed:
+                quant_parts.append(f"Fed: {self._fmt_pct(fed)}")
+            if ecb:
+                quant_parts.append(f"BCE: {self._fmt_pct(ecb)}")
+            if tpm:
+                quant_parts.append(f"BCCh TPM: {self._fmt_pct(tpm)}")
+
+            narrativa = generate_narrative(
+                section_name="rf_global_stance",
+                prompt=(
+                    f"Escribe un parrafo de postura global en renta fija para {self.month_name} {self.year}. "
+                    f"La postura es {stance_word}. Explica en 3-4 oraciones el fundamento: "
+                    "ambiente de tasas, posicionamiento de duration, y credito. "
+                    "Integra los datos cuantitativos disponibles. Usa SOLO datos del council. Maximo 80 palabras."
+                ),
+                council_context=f"RF PANEL:\n{rf_panel[:2000]}\n\nFINAL:\n{final[:1000]}",
+                quant_context=" | ".join(quant_parts),
+                company_name=self.company_name,
+                max_tokens=300,
             )
-        else:
-            parts.append("Con los bancos centrales en modo de recorte o pausa, las tasas tienen espacio para comprimir. ")
-        if tpm:
-            parts.append(
-                f"Chile (TPM {self._fmt_pct(tpm)}) y Europa tienen ciclos de recorte aún en desarrollo. "
-            )
-        parts.append("Somos selectivos en credito, favoreciendo IG sobre HY dado spreads comprimidos.")
+
+        if not narrativa:
+            # Fallback with quant data but no stale market calls
+            parts = [f"Nuestra postura en renta fija global es {stance_word}. "]
+            if fed and ecb:
+                parts.append(f"Con la Fed en {self._fmt_pct(fed)} y el BCE en {self._fmt_pct(ecb)}, evaluamos "
+                            "el espacio para movimientos de tasas. ")
+            if tpm:
+                parts.append(f"Chile (TPM {self._fmt_pct(tpm)}) mantiene dinamica propia. ")
+            narrativa = ''.join(parts)
 
         result = {
             'view': view,
             'duration_stance': 'NEUTRAL A LARGA',
             'credit_stance': 'OW SELECTIVO',
             'conviccion': 'MEDIA-ALTA',
-            'narrativa': ''.join(parts),
+            'narrativa': narrativa,
         }
 
         # Tabla de policy rates
@@ -687,19 +711,36 @@ class RFContentGenerator:
         }
 
     def _generate_rates_narrative(self) -> str:
-        """Genera narrativa general de tasas (dinámica con datos reales)."""
+        """Genera narrativa general de tasas via Claude + datos reales."""
         ust_10y = self._val('yield_curve', 'current_curve', '10Y') or self._val('yield_curve', 'current_curve', 'DGS10')
         chile_10y = self._chile_bcp('10Y')
 
         us_str = self._fmt_pct(ust_10y) if ust_10y else 'N/D'
         cl_str = self._fmt_pct(chile_10y) if chile_10y else 'N/D'
 
+        rf_panel = self.council.get('panel_outputs', {}).get('rf', '')
+        final = self.council.get('final_recommendation', '')
+
+        if rf_panel or final:
+            from narrative_engine import generate_narrative
+            result = generate_narrative(
+                section_name="rf_rates_narrative",
+                prompt=(
+                    f"Escribe un parrafo sobre el ambiente de tasas para {self.month_name} {self.year}. "
+                    "Cubrir: nivel actual de yields, dinamica de curvas, y preferencia de duration. "
+                    "Integrar datos cuantitativos. Maximo 60 palabras."
+                ),
+                council_context=f"RF PANEL:\n{rf_panel[:1500]}\n\nFINAL:\n{final[:800]}",
+                quant_context=f"US 10Y: {us_str} | Chile 10Y: {cl_str}",
+                company_name=self.company_name,
+                max_tokens=250,
+            )
+            if result:
+                return result
+
         return (
-            "El ambiente de tasas se ha estabilizado tras la volatilidad de 2024. Los rendimientos "
-            "de bonos soberanos ofrecen carry atractivo en la mayoria de mercados desarrollados, "
-            f"con US 10Y en {us_str} y Chile 10Y en {cl_str}. Las curvas muestran normalizacion gradual "
-            "a medida que los bancos centrales completan sus ciclos de recortes. Preferimos "
-            "duration en mercados donde el ciclo de politica monetaria aun tiene recorrido."
+            f"Los rendimientos soberanos ofrecen carry diferenciado, "
+            f"con US 10Y en {us_str} y Chile 10Y en {cl_str}."
         )
 
     # =========================================================================
@@ -1729,50 +1770,102 @@ class RFContentGenerator:
         }
 
     def _generate_rf_risks(self) -> List[Dict[str, Any]]:
-        """Genera top riesgos para renta fija."""
+        """Genera top riesgos para renta fija via Claude."""
+        import json as _json
+        from narrative_engine import generate_narrative
+
+        riesgo_panel = self.council.get('panel_outputs', {}).get('riesgo', '')
+        rf_panel = self.council.get('panel_outputs', {}).get('rf', '')
+        final = self.council.get('final_recommendation', '')
+
+        if riesgo_panel or rf_panel or final:
+            council_ctx = (
+                f"RISK PANEL:\n{riesgo_panel[:1500]}\n\n"
+                f"RF PANEL:\n{rf_panel[:1000]}\n\n"
+                f"FINAL:\n{final[:1000]}"
+            )
+            result = generate_narrative(
+                section_name="rf_risks",
+                prompt=(
+                    "Genera exactamente 3 top riesgos para renta fija basados en el council. "
+                    "Devuelve un JSON array donde cada elemento tiene: "
+                    '{"riesgo": "nombre corto", "probabilidad": "XX%", "impacto": "Alto/Medio-Alto/Medio", '
+                    '"descripcion": "1 oracion", "hedge": "cobertura sugerida"}. '
+                    "Usa riesgos que el council identifica. NO inventes probabilidades."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=600,
+                temperature=0.2,
+            )
+            if result:
+                try:
+                    cleaned = result.strip()
+                    if cleaned.startswith('```'):
+                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                        if cleaned.endswith('```'):
+                            cleaned = cleaned[:-3]
+                        cleaned = cleaned.strip()
+                    risks = _json.loads(cleaned)
+                    if isinstance(risks, list) and len(risks) >= 2:
+                        return risks
+                except (_json.JSONDecodeError, KeyError):
+                    pass
+
         return [
-            {
-                'riesgo': 'Reflacion / Tasas Suben',
-                'probabilidad': '20%',
-                'impacto': 'Alto',
-                'descripcion': 'Inflacion rebota, bancos centrales revierten. Tasas suben 50-100bp.',
-                'hedge': 'Duration corta, TIPS, floating rate'
-            },
-            {
-                'riesgo': 'Credit Event / Spread Widening',
-                'probabilidad': '15%',
-                'impacto': 'Medio-Alto',
-                'descripcion': 'Default de emisor grande, contagio a spreads. HY vulnerable.',
-                'hedge': 'Reducir HY, preferir IG, CDS protection'
-            },
-            {
-                'riesgo': 'Liquidity Crisis',
-                'probabilidad': '10%',
-                'impacto': 'Alto',
-                'descripcion': 'Stress de liquidez en mercados de credito. Bid-ask se amplia.',
-                'hedge': 'Mantener liquidez, preferir on-the-run'
-            },
+            {'riesgo': 'Ver council', 'probabilidad': 'N/D', 'impacto': 'N/D',
+             'descripcion': 'Consultar analisis de riesgos del periodo.', 'hedge': 'Diversificacion'},
         ]
 
     def _generate_rf_opportunities(self) -> List[str]:
-        """Genera oportunidades en RF (con datos reales donde disponible)."""
+        """Genera oportunidades en RF via Claude + datos reales."""
+        from narrative_engine import generate_narrative
+
         bcp_5y = self._chile_bcp('5Y')
         bcu_10y = self._chile_bcu('10Y')
         ig_spread = self._val('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
         ust_10y = self._val('yield_curve', 'current_curve', '10Y')
 
-        bcp5_str = self._fmt_pct(bcp_5y) if bcp_5y else ''
-        bcu10_str = self._fmt_pct(bcu_10y) if bcu_10y else ''
-        ig_yield_str = ''
+        quant_parts = []
+        if bcp_5y:
+            quant_parts.append(f"Chile BCP 5Y: {self._fmt_pct(bcp_5y)}")
+        if bcu_10y:
+            quant_parts.append(f"Chile BCU 10Y: {self._fmt_pct(bcu_10y)}")
         if ust_10y and ig_spread:
-            ig_yield_str = self._fmt_pct(float(ust_10y) + float(ig_spread) / 100)
+            quant_parts.append(f"IG yield: {self._fmt_pct(float(ust_10y) + float(ig_spread)/100)}")
+        if ig_spread:
+            quant_parts.append(f"IG spread: {self._fmt_bp(ig_spread)}")
 
+        rf_panel = self.council.get('panel_outputs', {}).get('rf', '')
+        final = self.council.get('final_recommendation', '')
+
+        if rf_panel or final:
+            council_ctx = f"RF PANEL:\n{rf_panel[:1500]}\n\nFINAL:\n{final[:1000]}"
+            result = generate_narrative(
+                section_name="rf_opportunities",
+                prompt=(
+                    "Genera exactamente 4-5 oportunidades en renta fija basadas en el council. "
+                    "Cada oportunidad en una linea: 'Instrumento/Segmento: fundamento breve'. "
+                    "Integrar datos cuantitativos si disponibles. Sin bullets ni numeracion."
+                ),
+                council_context=council_ctx,
+                quant_context=" | ".join(quant_parts),
+                company_name=self.company_name,
+                max_tokens=400,
+            )
+            if result:
+                lines = [l.strip() for l in result.split('\n') if l.strip()]
+                if len(lines) >= 3:
+                    return lines
+
+        # Fallback with quant data only
         ops = []
-        ops.append(f"Chile BCP 5Y: Carry de {bcp5_str} + upside de capital por recortes BCCh" if bcp5_str else "Chile BCP 5Y: Upside de capital por recortes BCCh")
-        ops.append(f"IG Corporates US: Carry de {ig_yield_str} con fundamentales solidos" if ig_yield_str else "IG Corporates US: Carry atractivo con fundamentales solidos")
-        ops.append("Mexico Soberano: Spread atractivo con Banxico credible")
-        ops.append("US 2s10s Steepener: Normalizacion de curva en proceso")
-        ops.append(f"BCU 10Y: Real yield de {bcu10_str} muy atractivo para largo plazo" if bcu10_str else "BCU 10Y: Real yield atractivo para largo plazo")
+        if bcp_5y:
+            ops.append(f"Chile BCP 5Y: Carry de {self._fmt_pct(bcp_5y)}")
+        if bcu_10y:
+            ops.append(f"Chile BCU 10Y: Real yield de {self._fmt_pct(bcu_10y)}")
+        if not ops:
+            ops.append("Ver analisis detallado del council para oportunidades")
         return ops
 
     def _generate_recommended_trades(self) -> List[Dict[str, Any]]:
@@ -1851,13 +1944,32 @@ class RFContentGenerator:
                 {'dimension': 'Inflacion/TIPS', 'recomendacion': 'Neutral US, OW Chile BCU'},
                 {'dimension': 'Chile Soberanos', 'recomendacion': chile_rec},
             ],
-            'mensaje_clave': (
-                "Mantenemos postura constructiva en renta fija con preferencia por duration en mercados "
-                "donde el ciclo de recortes continua (Chile, Europa). En credito, preferimos IG sobre HY "
-                "dado spreads comprimidos. Chile destaca como oportunidad con carry excelente en BCP y "
-                "real yield atractivo en BCU."
-            )
+            'mensaje_clave': self._generate_rf_positioning_message()
         }
+
+    def _generate_rf_positioning_message(self) -> str:
+        """Genera mensaje clave de posicionamiento RF via Claude."""
+        from narrative_engine import generate_narrative
+
+        rf_panel = self.council.get('panel_outputs', {}).get('rf', '')
+        final = self.council.get('final_recommendation', '')
+
+        if rf_panel or final:
+            result = generate_narrative(
+                section_name="rf_positioning_msg",
+                prompt=(
+                    "Escribe 2-3 oraciones resumiendo el posicionamiento en renta fija: "
+                    "postura general de duration, preferencia de credito, y mercado destacado. "
+                    "Usa datos del council. Maximo 60 palabras."
+                ),
+                council_context=f"RF PANEL:\n{rf_panel[:1500]}\n\nFINAL:\n{final[:1000]}",
+                company_name=self.company_name,
+                max_tokens=200,
+            )
+            if result:
+                return result
+
+        return f'Ver analisis detallado de {self.month_name} {self.year} para posicionamiento en renta fija.'
 
     # =========================================================================
     # METODO PRINCIPAL

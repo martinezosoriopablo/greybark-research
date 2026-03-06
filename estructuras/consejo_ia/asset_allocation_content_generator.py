@@ -26,10 +26,11 @@ class AssetAllocationContentGenerator:
     """Generador de contenido narrativo para Reporte de Asset Allocation."""
 
     def __init__(self, council_result: Dict, quant_data: Dict = None,
-                 forecast_data: Dict = None):
+                 forecast_data: Dict = None, company_name: str = ""):
         self.council = council_result or {}
         self.quant = quant_data or {}
         self.forecast = forecast_data or {}
+        self.company_name = company_name
         self.date = datetime.now()
         self.month_name = self._get_spanish_month(self.date.month)
 
@@ -191,124 +192,118 @@ class AssetAllocationContentGenerator:
         return {'view': view, 'sesgo': sesgo, 'conviccion': conviccion}
 
     def _generate_intro_paragraph(self, postura: Dict) -> str:
-        """Genera párrafo introductorio rico desde council data."""
-        if not self._has_council():
-            return self._default_intro(postura)
+        """Genera párrafo introductorio via Claude desde council data."""
+        from narrative_engine import generate_narrative
 
-        macro = self._panel('macro')
-        geo = self._panel('geo')
-        rv = self._panel('rv')
-        final = self._final()
+        macro = self._panel('macro') if self._has_council() else ''
+        geo = self._panel('geo') if self._has_council() else ''
+        final = self._final() if self._has_council() else ''
 
-        # Extract key data points from panels
-        gdp = self._extract_number(macro, r'GDP\s+(?:US\s+)?(\d+\.?\d*)%?\s*QoQ', 4.4)
-        cpi = self._extract_number(macro, r'Core\s+CPI\s+(?:bajando\s+de\s+\d+\.?\d*%?\s*a\s+)?(\d+\.?\d*)%', 2.9)
-        tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', 4.5)
-        ipc_cl = self._extract_number(macro, r'(?:IPC|inflaci[oó]n)\s+(\d+\.?\d*)%', 3.4)
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', 5.94)
-        recession_prob = self._extract_number(macro, r'recesi[oó]n.*?(\d+)%', 15)
+        if macro or geo or final:
+            council_ctx = (
+                f"MACRO PANEL:\n{macro[:1500]}\n\n"
+                f"GEO PANEL:\n{geo[:1000]}\n\n"
+                f"FINAL REC:\n{final[:1500]}"
+            )
+            result = generate_narrative(
+                section_name="aa_intro",
+                prompt=(
+                    f"Escribe la introduccion del reporte de Asset Allocation de {self.month_name} "
+                    f"{self.date.year}. 3 parrafos: (1) contexto macro y regimen, "
+                    f"(2) postura adoptada: {postura['view']} con sesgo {postura['sesgo']} y "
+                    f"conviccion {postura['conviccion']} — fundamento desde council, "
+                    "(3) mercado destacado y principales riesgos a monitorear. "
+                    "Usa datos del council. Separa parrafos con linea vacia. Maximo 200 palabras."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=800,
+            )
+            if result:
+                return result
 
-        # Detect main geopolitical events
-        main_events = []
-        if 'aranceles' in geo.lower() or 'tariff' in geo.lower():
-            main_events.append('la escalada de tensiones comerciales US-China')
-        if 'warsh' in geo.lower() or 'warsh' in macro.lower():
-            main_events.append('el cambio de liderazgo en la Fed')
-        if 'desacople' in geo.lower() or 'decoupl' in geo.lower():
-            main_events.append('la aceleración del desacople financiero US-China')
-
-        event_text = main_events[0] if main_events else 'la volatilidad en mercados globales'
-        if len(main_events) > 1:
-            event_text = ', '.join(main_events[:-1]) + ' y ' + main_events[-1]
-
-        return f"""El Comité de Inversión de Greybark Research se reunió en sesión extraordinaria para evaluar el posicionamiento táctico del portafolio en un entorno marcado por {event_text}. Con GDP US en {gdp}% QoQ y manufactura en máximos desde 2022, el régimen de EXPANSIÓN se confirma con alta convicción, pero las señales de ciclo tardío requieren ajustes defensivos selectivos.
-
-El comité adopta una postura {postura['view']} con sesgo {postura['sesgo']} y convicción {postura['conviccion']}. La inflación core en {cpi}% mantiene a la Fed en modo restrictivo (consenso del panel: solo 1-2 cortes vs mercado pricing 3-4), mientras los aranceles Trump (90% probabilidad en 30 días) representan un riesgo subestimado por el sell-side.
-
-Chile emerge como el mercado mejor posicionado: peso fortaleciéndose, TPM {tpm}% con diferencial real positivo sobre IPC {ipc_cl}%, y cobre en ${cobre}/lb respaldado por demanda de transición energética. La probabilidad de recesión US se estima en {recession_prob}%, pero el deterioro en empleo white-collar actúa como leading indicator a monitorear."""
+        return self._default_intro(postura)
 
     def _default_intro(self, postura: Dict) -> str:
         """Intro por defecto sin council."""
-        return f"""El mes de {self.month_name} presentó un entorno de mercado complejo con señales mixtas. Los mercados mostraron rotación sectorial significativa, sugiriendo un cambio de preferencia hacia activos de valor.
-
-En este contexto, el Comité de Inversión de Greybark Research adopta una postura {postura['view']} con sesgo {postura['sesgo']}. Mantenemos coberturas activas ante la incertidumbre en política monetaria global."""
+        name = self.company_name or "Nosotros"
+        return (
+            f"El mes de {self.month_name} presenta un entorno de mercado con señales mixtas. "
+            f"{name} adopta una postura {postura['view']} con sesgo {postura['sesgo']}. "
+            f"Mantenemos coberturas activas ante la incertidumbre en política monetaria global."
+        )
 
     def _generate_key_points(self) -> List[str]:
-        """Genera key points desde consenso del CIO."""
-        if not self._has_council():
-            return [
-                "Economía global en transición con señales mixtas",
-                "Inflación contenida pero persistente sobre target",
-                "Correlaciones elevadas sugieren mercados frágiles ante shocks",
-                "Chile ganador relativo en la región",
-                "Monitorear política monetaria y tensiones comerciales"
-            ]
+        """Genera key points via Claude desde council output."""
+        from narrative_engine import generate_narrative
 
-        cio = self._cio()
-        final = self._final()
-        macro = self._panel('macro')
-        riesgo = self._panel('riesgo')
+        cio = self._cio() if self._has_council() else ''
+        final = self._final() if self._has_council() else ''
+        macro = self._panel('macro') if self._has_council() else ''
+        riesgo = self._panel('riesgo') if self._has_council() else ''
 
-        points = []
-
-        # Point 1: Regime
-        gdp = self._extract_number(macro, r'GDP\s+(?:US\s+)?(\d+\.?\d*)%', 4.4)
-        points.append(
-            f"Régimen EXPANSIÓN TARDÍA confirmado (GDP US {gdp}% QoQ) — ajustes defensivos selectivos requeridos"
-        )
-
-        # Point 2: Fed
-        if 'solo 1-2 cortes' in cio.lower() or '1-2 cortes' in final.lower():
-            points.append(
-                "Fed más hawkish que mercado: consenso panel 1-2 cortes vs pricing 3-4 — repricing de tasas inminente"
+        if cio or final or macro:
+            council_ctx = (
+                f"CIO:\n{cio[:1500]}\n\nFINAL:\n{final[:1500]}\n\n"
+                f"MACRO:\n{macro[:1000]}\n\nRISK:\n{riesgo[:800]}"
             )
-        else:
-            points.append("Política monetaria en pausa — Fed dependiente de datos de inflación")
-
-        # Point 3: Geopolitics
-        geo = self._panel('geo')
-        if 'aranceles' in geo.lower() or 'tariff' in geo.lower():
-            points.append(
-                "Aranceles Trump 90% probabilidad próximos 30 días — impacto subestimado por sell-side (3-5% EPS vs potencial 15-20%)"
+            result = generate_narrative(
+                section_name="aa_key_points",
+                prompt=(
+                    f"Genera exactamente 5 key points para asset allocation de {self.month_name} "
+                    f"{self.date.year}. Cubrir: regimen economico, politica monetaria, "
+                    "principal riesgo geopolitico/comercial, mercado destacado, y "
+                    "nivel de riesgo/hedging. Cada punto en una linea. "
+                    "Usa datos del council — NO inventes numeros. "
+                    "Sin bullets ni numeracion."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=500,
             )
+            if result:
+                lines = [l.strip() for l in result.split('\n') if l.strip()]
+                if len(lines) >= 3:
+                    return lines[:5]
 
-        # Point 4: Chile
-        tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', 4.5)
-        points.append(
-            f"Chile overweight: peso fortaleciéndose, carry trade atractivo (TPM {tpm}%), cobre estructuralmente soportado"
-        )
-
-        # Point 5: Risks
-        var_val = self._extract_number(riesgo, r'VaR.*?(\d+\.\d+)%', None)
-        if var_val:
-            points.append(
-                f"VaR daily {var_val}% (elevado) — hedges activos vía VIX call spreads y forwards USD/CLP"
-            )
-        else:
-            points.append(
-                "Riesgos de cola múltiples requieren hedging activo — presupuesto 3.5% del portfolio"
-            )
-
-        return points[:5]
+        return [
+            "Dinamicas macro requieren posicionamiento selectivo",
+            "Politica monetaria en evaluacion — proximos datos seran clave",
+            "Monitorear desarrollos geopoliticos y comerciales",
+            "Fundamentos regionales diferenciados ofrecen oportunidades",
+            "Mantener coberturas activas ante incertidumbre",
+        ]
 
     def _identify_catalizador(self) -> str:
-        """Identifica catalizador principal desde council."""
-        if not self._has_council():
-            return "Datos de inflación y decisiones de política monetaria de la Fed"
+        """Identifica catalizador principal via Claude desde council."""
+        from narrative_engine import generate_narrative
 
-        macro = self._panel('macro')
-        final = self._final()
+        final = self._final() if self._has_council() else ''
+        macro = self._panel('macro') if self._has_council() else ''
 
-        # Look for catalizador in macro panel
-        if 'CPI' in macro and 'esta semana' in macro.lower():
-            return "Datos CPI US esta semana — si >2.6% YoY, Fed pausa completamente y repricing hawkish en curvas EM"
-        if 'catalizador' in final.lower():
-            # Extract sentence after "catalizador"
-            match = re.search(r'catalizador[^:]*:\s*([^\n]+)', final, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
+        if final or macro:
+            # First try regex extraction
+            if 'catalizador' in final.lower():
+                match = re.search(r'catalizador[^:]*:\s*([^\n]+)', final, re.IGNORECASE)
+                if match:
+                    return match.group(1).strip()
 
-        return "Datos CPI US y evolución de política arancelaria Trump — impacto directo en duration positioning y carry trades EM"
+            result = generate_narrative(
+                section_name="aa_catalizador",
+                prompt=(
+                    "Identifica el catalizador principal a monitorear segun el council. "
+                    "UNA oracion, maximo 25 palabras. Directo, sin florituras. "
+                    "Ejemplo: 'Datos CPI US y decision de tasas del BCCh — determinantes para "
+                    "posicionamiento de duration.'"
+                ),
+                council_context=f"FINAL:\n{final[:1500]}\n\nMACRO:\n{macro[:800]}",
+                company_name=self.company_name,
+                max_tokens=80,
+            )
+            if result:
+                return result
+
+        return "Proximos datos macro y decisiones de politica monetaria"
 
     # =========================================================================
     # SECCION 2: EL MES EN REVISION
@@ -358,29 +353,32 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         }
 
     def _generate_mercados_review(self) -> Dict[str, Any]:
-        """Mercados desde panel rv + macro."""
+        """Mercados via Claude desde council rv + macro."""
+        from narrative_engine import generate_narrative
+
         rv = self._panel('rv')
         macro = self._panel('macro')
 
         if not rv:
             return self._default_mercados()
 
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', 5.94)
+        council_ctx = f"RV PANEL:\n{rv[:1500]}\n\nMACRO:\n{macro[:1000]}"
+        narrativa = generate_narrative(
+            section_name="aa_mercados_review",
+            prompt=(
+                f"Escribe 2 parrafos sobre el desempeño de mercados financieros en "
+                f"{self.month_name} {self.date.year}. Cubrir: dinamica de indices (equity, bonos), "
+                "commodities, y cualquier divergencia relevante. Usa datos del council. "
+                "Separa parrafos con linea vacia. Maximo 120 palabras."
+            ),
+            council_context=council_ctx,
+            company_name=self.company_name,
+            max_tokens=500,
+        )
+        if not narrativa:
+            narrativa = "Los mercados mostraron dinamicas mixtas durante el periodo."
 
-        narrativa = f"""La divergencia entre índices fue la historia del mes. La rotación desde growth hacia value/industriales se aceleró, con datos manufactureros sólidos impulsando al Dow Jones mientras el sector tecnológico enfrentó volatilidad por la disrupción de IA en software.
-
-El panel de Renta Variable mantiene view BULLISH con convicción alta, priorizando US Tech selectivo, Chile e Industrials. En commodities, el cobre alcanzó ${cobre}/lb (+40% YoY), respaldado por demanda de transición energética más que por China. La divergencia cripto-equity (BTC -20% YTD vs equities risk-on) se interpreta como señal sana de discriminación de riesgo — flight-to-quality hacia activos con cash flows reales."""
-
-        performance = [
-            {'asset': 'S&P 500', 'retorno': '+2.5%', 'ytd': '+2.5%'},
-            {'asset': 'Nasdaq', 'retorno': '-1.5%', 'ytd': '+1.8%'},
-            {'asset': 'IPSA Chile', 'retorno': '+3.2%', 'ytd': '+3.2%'},
-            {'asset': 'UST 10Y', 'retorno': '4.28%', 'cambio': '+12bp'},
-            {'asset': f'Cobre', 'retorno': f'${cobre}/lb', 'cambio': '+40% YoY'},
-            {'asset': 'BTC', 'retorno': '-20% YTD', 'cambio': 'Risk-off crypto'},
-        ]
-
-        return {'titulo': 'Mercados Financieros', 'narrativa': narrativa, 'performance': performance}
+        return {'titulo': 'Mercados Financieros', 'narrativa': narrativa, 'performance': []}
 
     def _default_mercados(self) -> Dict[str, Any]:
         return {
@@ -393,29 +391,36 @@ El panel de Renta Variable mantiene view BULLISH con convicción alta, priorizan
         }
 
     def _generate_geopolitica(self) -> Dict[str, Any]:
-        """Geopolítica desde panel geo."""
+        """Geopolítica via Claude desde panel geo."""
+        from narrative_engine import generate_narrative
+
         geo = self._panel('geo')
 
         if not geo:
             return self._default_geopolitica()
 
-        narrativa = """El panorama geopolítico se caracteriza por tres dinámicas convergentes. Primero, el desacople financiero US-China se acelera: China ordena a bancos reducir exposición a Treasuries, la sentencia de Jimmy Lai (20 años) marca escalada política, y los aranceles Trump tienen 90% de probabilidad en 30 días.
-
-Segundo, la divergencia de política monetaria global presiona monedas emergentes — Goldman/JPM convergen en solo 1-2 cortes Fed vs market pricing de 3-4, implicando DXY strength y presión en carry trades EM. Chile relativamente protegido por copper-linked currency.
-
-Tercero, señales contradictorias en Medio Oriente: el colapso de la prima de riesgo en petróleo (-4.4%) sugiere acuerdos no declarados US-Iran, pese a retórica pública agresiva. Esto beneficia al escenario de inflación moderada."""
+        narrativa = generate_narrative(
+            section_name="aa_geopolitica",
+            prompt=(
+                f"Escribe 2-3 parrafos sobre el panorama geopolitico de {self.month_name} "
+                f"{self.date.year} basandote en el council. Cubrir las principales dinamicas: "
+                "tensiones comerciales, politica monetaria, conflictos regionales. "
+                "Separa parrafos con linea vacia. Maximo 150 palabras."
+            ),
+            council_context=f"GEO PANEL:\n{geo[:2500]}",
+            company_name=self.company_name,
+            max_tokens=600,
+        )
+        if not narrativa:
+            narrativa = "El entorno geopolitico presenta riesgos elevados que requieren monitoreo activo."
 
         # Extract probabilities from geo panel
-        china_prob = self._extract_number(geo, r'China.*?(\d+)%', 85)
-        tariff_prob = self._extract_number(geo, r'[Tt]ariff.*?(\d+)%', 90)
-        fed_prob = self._extract_number(geo, r'Fed.*?(\d+)%', 70)
-        em_prob = self._extract_number(geo, r'EM.*?crisis.*?(\d+)%', 40)
+        china_prob = self._extract_number(geo, r'China.*?(\d+)%', 50)
+        tariff_prob = self._extract_number(geo, r'[Tt]ariff.*?(\d+)%', 50)
 
         eventos = [
-            {'evento': 'Desacople financiero US-China', 'impacto': 'Alto', 'probabilidad': f'{int(china_prob)}%'},
-            {'evento': 'Aranceles Trump generalizados', 'impacto': 'Alto', 'probabilidad': f'{int(tariff_prob)}%'},
-            {'evento': 'Fed hawkish surprise', 'impacto': 'Alto', 'probabilidad': f'{int(fed_prob)}%'},
-            {'evento': 'Crisis monedas EM', 'impacto': 'Medio', 'probabilidad': f'{int(em_prob)}%'},
+            {'evento': 'Tensiones comerciales', 'impacto': 'Alto', 'probabilidad': f'{int(tariff_prob)}%'},
+            {'evento': 'Dinamica US-China', 'impacto': 'Alto', 'probabilidad': f'{int(china_prob)}%'},
         ]
 
         return {'titulo': 'Política y Geopolítica', 'narrativa': narrativa, 'eventos': eventos}
@@ -431,7 +436,9 @@ Tercero, señales contradictorias en Medio Oriente: el colapso de la prima de ri
         }
 
     def _generate_chile_review(self) -> Dict[str, Any]:
-        """Chile desde panel macro."""
+        """Chile via Claude desde panel macro."""
+        from narrative_engine import generate_narrative
+
         macro = self._panel('macro')
 
         if not macro:
@@ -442,18 +449,32 @@ Tercero, señales contradictorias en Medio Oriente: el colapso de la prima de ri
         tpm_real = round(tpm - ipc, 1) if tpm and ipc else 1.8
         cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', 5.94)
 
-        narrativa = f"""Chile confirma su posición como mercado ganador relativo en América Latina. El peso se fortaleció +1.35% vs USD, reflejando fundamentals domésticos sólidos y carry trade favorable. La TPM en {tpm}% con inflación en {ipc}% genera un diferencial real de +{tpm_real}%, el más atractivo de la región ajustado por riesgo.
+        quant_ctx = f"TPM: {tpm}% | IPC: {ipc}% | Tasa Real: +{tpm_real}% | Cobre: ${cobre}/lb"
 
-El Banco Central de Chile mantiene espacio de maniobra para recortes si la inflación cede, pero la proximidad al ciclo Fed limita la magnitud. El cobre en ${cobre}/lb (+40% YoY) actúa como soporte estructural para la balanza comercial y el peso, aunque la vulnerabilidad a un hard landing chino persiste como principal riesgo.
-
-El IPSA muestra momentum real, siendo el único mercado emergente con tendencia sostenida. El panel recomienda overweight tanto en equity como en renta fija local, con hedges vía forwards USD/CLP."""
+        narrativa = generate_narrative(
+            section_name="aa_chile_review",
+            prompt=(
+                f"Escribe 2-3 parrafos sobre Chile para el reporte de asset allocation de "
+                f"{self.month_name} {self.date.year}. Cubrir: posicion relativa en LatAm, "
+                "dinamica del peso, politica monetaria BCCh, cobre, y IPSA. "
+                "Integrar datos cuantitativos. Maximo 150 palabras."
+            ),
+            council_context=f"MACRO PANEL:\n{macro[:2000]}",
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=600,
+        )
+        if not narrativa:
+            narrativa = (
+                f"Chile mantiene fundamentos solidos con TPM en {tpm}% y tasa real "
+                f"de +{tpm_real}%. Cobre en ${cobre}/lb como soporte estructural."
+            )
 
         datos = [
-            {'indicador': 'TPM', 'valor': f'{tpm}%', 'tendencia': 'Estable'},
-            {'indicador': 'IPC YoY', 'valor': f'{ipc}%', 'tendencia': 'Contenida'},
-            {'indicador': 'Tasa Real', 'valor': f'+{tpm_real}%', 'tendencia': 'Atractiva'},
-            {'indicador': 'Cobre', 'valor': f'${cobre}/lb', 'tendencia': '+40% YoY'},
-            {'indicador': 'USD/CLP', 'valor': '~859', 'tendencia': 'Fortaleciéndose'},
+            {'indicador': 'TPM', 'valor': f'{tpm}%', 'tendencia': 'Ver council'},
+            {'indicador': 'IPC YoY', 'valor': f'{ipc}%', 'tendencia': 'Ver council'},
+            {'indicador': 'Tasa Real', 'valor': f'+{tpm_real}%', 'tendencia': 'Positiva'},
+            {'indicador': 'Cobre', 'valor': f'${cobre}/lb', 'tendencia': 'Ver council'},
         ]
 
         return {'titulo': 'Chile y Economía Local', 'narrativa': narrativa, 'datos': datos}
@@ -540,35 +561,82 @@ El IPSA muestra momentum real, siendo el único mercado emergente con tendencia 
         ]
 
     def _generate_usa_view(self) -> Dict[str, Any]:
-        """USA view desde panels rv + macro + rf."""
+        """USA view via Claude desde panels rv + macro."""
+        from narrative_engine import generate_narrative
+        import json as _json
+
         rv = self._panel('rv')
         macro = self._panel('macro')
-        rf = self._panel('rf')
 
         if not self._has_council():
             return self._default_usa_view()
 
-        gdp = self._extract_number(macro, r'GDP\s+(?:US\s+)?(\d+\.?\d*)%', 4.4)
-        cpi = self._extract_number(macro, r'Core\s+CPI\s+(?:bajando\s+de\s+\d+\.?\d*%?\s*a\s+)?(\d+\.?\d*)%', 2.9)
+        gdp = self._extract_number(macro, r'GDP\s+(?:US\s+)?(\d+\.?\d*)%', None)
+        cpi = self._extract_number(macro, r'Core\s+CPI\s+(?:bajando\s+de\s+\d+\.?\d*%?\s*a\s+)?(\d+\.?\d*)%', None)
+
+        council_ctx = f"RV PANEL:\n{rv[:1500]}\n\nMACRO:\n{macro[:1500]}"
+        quant_ctx = ""
+        if gdp:
+            quant_ctx += f"GDP US: {gdp}% QoQ. "
+        if cpi:
+            quant_ctx += f"Core CPI: {cpi}%."
+
+        tesis = generate_narrative(
+            section_name="aa_usa_tesis",
+            prompt=(
+                "Escribe la tesis de inversion para Estados Unidos en 3-4 oraciones. "
+                "Cubrir: regimen economico, vista de equity, principal riesgo, y factor tilt. "
+                "Usa datos del council. Maximo 80 palabras."
+            ),
+            council_context=council_ctx,
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=300,
+        )
+        if not tesis:
+            tesis = f"Economia US en regimen de expansion. GDP en {gdp}% QoQ." if gdp else "Ver council."
+
+        # Generate pros/cons via Claude
+        args_raw = generate_narrative(
+            section_name="aa_usa_args",
+            prompt=(
+                "Genera argumentos a favor y en contra de invertir en US equity como JSON: "
+                '{"favor": [{"punto": "string", "dato": "string"}], '
+                '"contra": [{"punto": "string", "dato": "string"}]}. '
+                "Exactamente 3-4 en cada lista. Usa datos del council."
+            ),
+            council_context=council_ctx,
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=600,
+            temperature=0.2,
+        )
+        args_favor = [{'punto': 'GDP solido', 'dato': f'{gdp}% QoQ' if gdp else 'Expansion confirmada'}]
+        args_contra = [{'punto': 'Riesgos a monitorear', 'dato': 'Ver council para detalle'}]
+        if args_raw:
+            try:
+                cleaned = args_raw.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                    cleaned = cleaned.strip()
+                parsed = _json.loads(cleaned)
+                if 'favor' in parsed:
+                    args_favor = parsed['favor']
+                if 'contra' in parsed:
+                    args_contra = parsed['contra']
+            except (_json.JSONDecodeError, KeyError):
+                pass
 
         return {
             'region': 'Estados Unidos',
             'view': 'CONSTRUCTIVO',
             'conviccion': 'MEDIA',
-            'tesis': f"""Panel RV mantiene view BULLISH con convicción alta, confirmado por régimen EXPANSIÓN (GDP {gdp}% QoQ). Sin embargo, la convicción del comité se modera a MEDIA por riesgo de repricing Fed hawkish y concentración Mag7 (+35% del S&P). Factor tilt hacia QUALITY-MOMENTUM — empresas con balance sheets sólidos y earnings momentum positivo. Rotación desde growth puro hacia selectividad sectorial (Technology, Industrials, Materials).""",
-            'argumentos_favor': [
-                {'punto': 'GDP momentum excepcional', 'dato': f'{gdp}% QoQ, manufactura en máximos desde 2022'},
-                {'punto': 'Desinflación gradual', 'dato': f'Core CPI bajando a {cpi}%'},
-                {'punto': 'AI capex masivo', 'dato': '$660B+ en inversión generará winners sectoriales'},
-                {'punto': 'Rotación sectorial saludable', 'dato': 'Value/Industrials outperforming growth'},
-            ],
-            'argumentos_contra': [
-                {'punto': 'Fed más hawkish que mercado', 'dato': 'Solo 1-2 cortes vs pricing 3-4'},
-                {'punto': 'Empleo white-collar deteriorándose', 'dato': '6 meses promedio búsqueda, leading indicator'},
-                {'punto': 'Concentración Mag7 extrema', 'dato': '35%+ del S&P en 7 nombres'},
-                {'punto': 'Aranceles subestimados', 'dato': 'Sell-side: 3-5% EPS, realidad potencial: 15-20%'},
-            ],
-            'trigger_cambio': 'Subir a ALTA convicción si: CPI <2.3% por 2 meses Y productivity growth confirma. Bajar a CAUTELOSO si: NFP <100K por 2 meses O credit spreads +150bp.'
+            'tesis': tesis,
+            'argumentos_favor': args_favor,
+            'argumentos_contra': args_contra,
+            'trigger_cambio': 'Datos de inflacion y empleo proximos como catalisis para ajustar conviccion.'
         }
 
     def _default_usa_view(self) -> Dict[str, Any]:
@@ -581,85 +649,149 @@ El IPSA muestra momentum real, siendo el único mercado emergente con tendencia 
         }
 
     def _generate_europe_view(self) -> Dict[str, Any]:
-        rv = self._panel('rv')
-        cio = self._cio()
+        from narrative_engine import generate_narrative
+
+        rv = self._panel('rv') if self._has_council() else ''
+        cio = self._cio() if self._has_council() else ''
+
+        tesis = ''
+        if rv or cio:
+            tesis = generate_narrative(
+                section_name="aa_europe_tesis",
+                prompt=(
+                    "Escribe la tesis de inversion para Europa en 3-4 oraciones. "
+                    "Cubrir: posicion relativa, valuaciones, politica BCE, y riesgos. "
+                    "Usa datos del council. Maximo 70 palabras."
+                ),
+                council_context=f"RV:\n{rv[:1000]}\n\nCIO:\n{cio[:800]}",
+                company_name=self.company_name,
+                max_tokens=250,
+            )
+        if not tesis:
+            tesis = "Europa ofrece valuaciones atractivas pero crecimiento estructural debil limita conviccion."
 
         return {
             'region': 'Europa',
             'view': 'NEUTRAL',
             'conviccion': 'BAJA',
-            'tesis': """Europa ocupa el tercer lugar en el ranking regional del panel (US > Chile > Europa > EM). El DAX alcanza niveles históricos impulsado por exportadoras, y el sell-side consensus favorece overweight por valuaciones y divergencia ECB. Sin embargo, el crecimiento estructural débil y la dependencia de China limitan convicción. BCE dovish favorece duration selectiva.""",
+            'tesis': tesis,
             'argumentos_favor': [
-                {'punto': 'Valuaciones atractivas vs US', 'dato': 'P/E Europa 14x vs US 22x forward'},
-                {'punto': 'BCE en modo dovish', 'dato': 'Recortes esperados en 2026'},
-                {'punto': 'Sell-side consensus en OW', 'dato': 'Goldman, JPM favorecen Europa'},
-                {'punto': 'Euro débil beneficia exportadoras', 'dato': 'EUR/USD cerca de 1.08'},
+                {'punto': 'Valuaciones atractivas vs US', 'dato': 'Descuento historico en P/E'},
+                {'punto': 'BCE en modo dovish', 'dato': 'Potenciales recortes adicionales'},
             ],
             'argumentos_contra': [
-                {'punto': 'Crecimiento estructural débil', 'dato': 'GDP <1% esperado'},
-                {'punto': 'Dependencia China elevada', 'dato': 'Autos alemanes vulnerables a desacople'},
-                {'punto': 'Fragmentación política', 'dato': 'Incertidumbre electoral múltiple'},
-                {'punto': 'Aranceles Trump potenciales', 'dato': 'EU exportadoras a US vulnerables'},
+                {'punto': 'Crecimiento estructural debil', 'dato': 'GDP bajo esperado'},
+                {'punto': 'Dependencia China', 'dato': 'Vulnerabilidad a desacople'},
             ],
-            'trigger_cambio': 'Subir a CONSTRUCTIVO si: PMI Composite >52 por 3 meses Y BCE ejecuta recortes. Bajar a CAUTELOSO si: crisis energética O aranceles US >10% a EU.'
+            'trigger_cambio': 'PMI Composite sostenido >52 como senal de upgrade.'
         }
 
     def _generate_china_view(self) -> Dict[str, Any]:
-        macro = self._panel('macro')
-        riesgo = self._panel('riesgo')
-        geo = self._panel('geo')
+        from narrative_engine import generate_narrative
 
-        epu = self._extract_number(macro, r'EPU.*?(\d+)', 420)
-        china_prob = self._extract_number(riesgo, r'China\s+Hard.*?(\d+)%', 30)
+        macro = self._panel('macro') if self._has_council() else ''
+        riesgo = self._panel('riesgo') if self._has_council() else ''
+        geo = self._panel('geo') if self._has_council() else ''
+
+        epu = self._extract_number(macro, r'EPU.*?(\d+)', None)
+        china_prob = self._extract_number(riesgo, r'China\s+Hard.*?(\d+)%', None)
+
+        tesis = ''
+        if macro or riesgo or geo:
+            council_ctx = f"MACRO:\n{macro[:1000]}\n\nRISK:\n{riesgo[:800]}\n\nGEO:\n{geo[:800]}"
+            quant_ctx = ""
+            if epu:
+                quant_ctx += f"EPU China: {int(epu)}. "
+            if china_prob:
+                quant_ctx += f"Hard landing prob: {int(china_prob)}%."
+
+            tesis = generate_narrative(
+                section_name="aa_china_tesis",
+                prompt=(
+                    "Escribe la tesis de inversion para China en 3-4 oraciones. "
+                    "Cubrir: regimen economico, credit impulse, desacople US-China, "
+                    "y postura (cautelosa/neutral). Usa datos del council. Maximo 70 palabras."
+                ),
+                council_context=council_ctx,
+                quant_context=quant_ctx,
+                company_name=self.company_name,
+                max_tokens=250,
+            )
+        if not tesis:
+            tesis = "China en territorio de desaceleracion. Postura cautelosa."
 
         return {
             'region': 'China',
             'view': 'CAUTELOSO',
             'conviccion': 'ALTA',
-            'tesis': f"""China permanece en territorio de desaceleración con credit impulse contractivo y EPU en máximos históricos ({int(epu)} vs promedio 306). El desacople financiero US-China se acelera activamente (China reduciendo exposición a Treasuries). Sin estímulo real, el rally de commodities no es sostenible por demanda china. Probabilidad de hard landing: {int(china_prob)}%. Evitamos exposición directa.""",
+            'tesis': tesis,
             'argumentos_favor': [
-                {'punto': 'Valuaciones deprimidas', 'dato': 'CSI 300 / Shanghai cerca de mínimos'},
-                {'punto': 'Espacio para estímulo masivo', 'dato': 'PBOC puede recortar, fiscal space disponible'},
-                {'punto': 'Positioning extremo bearish', 'dato': 'Contrarian: cualquier pivote marginal genera rally'},
-                {'punto': 'Transición energética', 'dato': 'Liderazgo en EVs, solar, baterías'},
+                {'punto': 'Valuaciones deprimidas', 'dato': 'Indices cerca de minimos'},
+                {'punto': 'Espacio para estimulo', 'dato': 'PBOC y fiscal space disponibles'},
             ],
             'argumentos_contra': [
-                {'punto': 'Credit impulse contractivo', 'dato': 'TSF growth en mínimos, sin estímulo real'},
-                {'punto': f'EPU en máximos históricos', 'dato': f'{int(epu)} vs promedio 306 — incertidumbre extrema'},
-                {'punto': 'Desacople financiero activo', 'dato': 'China reduciendo exposición a UST'},
-                {'punto': 'Aranceles amplificados', 'dato': '60% China + impacto multiplicativo en cadenas'},
+                {'punto': 'Credit impulse contractivo', 'dato': 'Sin estimulo real aun'},
+                {'punto': 'Desacople US-China', 'dato': 'Riesgo estructural creciente'},
             ],
-            'trigger_cambio': f'Subir a NEUTRAL si: estímulo fiscal significativo (>2% GDP) O PMI >50 por 3 meses. Mantener CAUTELOSO mientras EPU >{int(epu-50)} y credit impulse negativo.'
+            'trigger_cambio': 'Estimulo fiscal significativo o PMI sostenido >50 para upgrade.'
         }
 
     def _generate_chile_view(self) -> Dict[str, Any]:
-        macro = self._panel('macro')
-        rf = self._panel('rf')
+        from narrative_engine import generate_narrative
 
-        tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', 4.5)
-        ipc = self._extract_number(macro, r'(?:IPC|inflaci[oó]n)\s+(\d+\.?\d*)%', 2.7)
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', 5.94)
-        tpm_real = round(tpm - ipc, 1) if tpm and ipc else 1.8
+        macro = self._panel('macro') if self._has_council() else ''
+        rf = self._panel('rf') if self._has_council() else ''
+
+        tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', None)
+        ipc = self._extract_number(macro, r'(?:IPC|inflaci[oó]n)\s+(\d+\.?\d*)%', None)
+        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
+        tpm_real = round(tpm - ipc, 1) if tpm and ipc else None
+
+        quant_parts = []
+        if tpm:
+            quant_parts.append(f"TPM: {tpm}%")
+        if ipc:
+            quant_parts.append(f"IPC: {ipc}%")
+        if tpm_real:
+            quant_parts.append(f"Tasa real: +{tpm_real}%")
+        if cobre:
+            quant_parts.append(f"Cobre: ${cobre}/lb")
+
+        tesis = ''
+        if macro or rf:
+            tesis = generate_narrative(
+                section_name="aa_chile_tesis",
+                prompt=(
+                    "Escribe la tesis de inversion para Chile en 3-4 oraciones. "
+                    "Cubrir: posicion relativa en LatAm, carry trade, cobre, y riesgos. "
+                    "Integrar datos cuantitativos. Usa datos del council. Maximo 80 palabras."
+                ),
+                council_context=f"MACRO:\n{macro[:1500]}\n\nRF:\n{rf[:800]}",
+                quant_context=" | ".join(quant_parts),
+                company_name=self.company_name,
+                max_tokens=300,
+            )
+        if not tesis:
+            tesis = "Chile con fundamentos solidos. Postura constructiva."
+            if tpm and ipc:
+                tesis = f"Chile con TPM {tpm}% y tasa real +{tpm_real}%. Postura constructiva."
 
         return {
             'region': 'Chile y LatAm',
             'view': 'CONSTRUCTIVO',
             'conviccion': 'ALTA',
-            'tesis': f"""Chile es el mercado mejor posicionado de la región — segundo en el ranking del panel (después de US). El peso se fortalece (+1.35% vs USD), la TPM {tpm}% genera diferencial real positivo de +{tpm_real}% sobre inflación {ipc}%, y el cobre en ${cobre}/lb tiene soporte estructural por transición energética. Overweight tanto en equity como en renta fija, con hedges activos ante riesgo China.""",
+            'tesis': tesis,
             'argumentos_favor': [
-                {'punto': 'Diferencial real atractivo', 'dato': f'TPM {tpm}% - IPC {ipc}% = +{tpm_real}% real'},
-                {'punto': 'Carry trade superior ajustado por riesgo', 'dato': f'SPC 5Y 4.85% vs UST 3.8% = 105bp carry'},
-                {'punto': 'Peso fortaleciéndose', 'dato': 'USD/CLP -1.35% en el mes'},
-                {'punto': 'Cobre estructuralmente soportado', 'dato': f'${cobre}/lb, transición energética > China'},
-                {'punto': 'BCCh con espacio de maniobra', 'dato': 'Posibilidad de cortes si inflación cede'},
+                {'punto': 'Diferencial real atractivo', 'dato': f'TPM {tpm}% - IPC {ipc}% = +{tpm_real}% real' if (tpm and ipc) else 'Tasa real positiva'},
+                {'punto': 'Cobre soportado', 'dato': f'${cobre}/lb' if cobre else 'Soporte estructural'},
+                {'punto': 'BCCh con espacio', 'dato': 'Posibilidad de recortes'},
             ],
             'argumentos_contra': [
-                {'punto': 'Dependencia China crítica', 'dato': '32% exportaciones a China'},
-                {'punto': 'Cobre vulnerable a hard landing', 'dato': f'Caída potencial a sub-$5.00 si China colapsa'},
-                {'punto': 'Liquidez limitada', 'dato': '<2% mercados globales, difícil exit en stress'},
-                {'punto': 'Fed proximity', 'dato': 'BCCh limitado si Fed hawkish — presión sobre CLP'},
+                {'punto': 'Dependencia China', 'dato': 'Exportaciones concentradas'},
+                {'punto': 'Liquidez limitada', 'dato': 'Mercado pequeño en contexto global'},
+                {'punto': 'Fed proximity', 'dato': 'BCCh limitado si Fed hawkish'},
             ],
-            'trigger_cambio': 'Bajar a NEUTRAL si: CLP debilita >5% O cobre <$5.00/lb O China hard landing materializa. Mantener CONSTRUCTIVO mientras carry + momentum persistan.'
+            'trigger_cambio': 'CLP debilitandose >5% o cobre cayendo significativamente como senales de downgrade.'
         }
 
     def _generate_brazil_view(self) -> Dict[str, Any]:
@@ -1060,72 +1192,85 @@ El IPSA muestra momentum real, siendo el único mercado emergente con tendencia 
     # =========================================================================
 
     def generate_risks_section(self) -> Dict[str, Any]:
-        """Riesgos desde panel riesgo + geo."""
+        """Riesgos via Claude desde panel riesgo + geo + contrarian."""
+        import json as _json
+        from narrative_engine import generate_narrative
+
         riesgo = self._panel('riesgo')
         geo = self._panel('geo')
         contrarian = self._contrarian()
+        final = self._final()
 
-        # Extract probabilities from risk panel
-        tariff_prob = self._extract_number(riesgo, r'[Aa]ranceles.*?(?:Prob.*?)?(\d+)%', 40)
-        ia_prob = self._extract_number(riesgo, r'[Bb]urbuja\s+IA.*?(?:Prob.*?)?(\d+)%', 35)
-        china_prob = self._extract_number(riesgo, r'China\s+Hard.*?(?:Prob.*?)?(\d+)%', 30)
+        council_ctx = (
+            f"RISK PANEL:\n{riesgo[:2000]}\n\n"
+            f"GEO PANEL:\n{geo[:1500]}\n\n"
+            f"CONTRARIAN:\n{contrarian[:1000]}\n\n"
+            f"FINAL:\n{final[:1000]}"
+        )
 
-        # Contrarian failure modes
-        whipsaw_prob = self._extract_number(contrarian, r'[Ww]hipsaw.*?(\d+)%', 40)
-        cash_drag_prob = self._extract_number(contrarian, r'[Cc]ash\s+[Dd]rag.*?(\d+)%', 35)
+        # Generate top risks via Claude
+        top_risks = []
+        if riesgo or geo or contrarian:
+            risks_raw = generate_narrative(
+                section_name="aa_risks",
+                prompt=(
+                    "Genera exactamente 3-4 top riesgos para el portafolio basados en el council. "
+                    "Devuelve un JSON array donde cada elemento tiene: "
+                    '{"nombre": "string", "probabilidad": number (0-100), '
+                    '"impacto": "string corto", "descripcion": "2-3 oraciones", '
+                    '"hedge": "cobertura sugerida", "senal_temprana": "que monitorear"}. '
+                    "Incluir un riesgo del contrarian (error de posicionamiento/timing). "
+                    "Usa probabilidades y datos del council — NO inventes."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=1200,
+                temperature=0.2,
+            )
+            if risks_raw:
+                try:
+                    cleaned = risks_raw.strip()
+                    if cleaned.startswith('```'):
+                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                        if cleaned.endswith('```'):
+                            cleaned = cleaned[:-3]
+                        cleaned = cleaned.strip()
+                    top_risks = _json.loads(cleaned)
+                except (_json.JSONDecodeError, KeyError):
+                    pass
+
+        if not top_risks:
+            top_risks = [
+                {'nombre': 'Riesgo principal', 'probabilidad': 0,
+                 'impacto': 'Ver council', 'descripcion': 'Consultar analisis de riesgos del periodo.',
+                 'hedge': 'Diversificacion', 'senal_temprana': 'Ver council'}
+            ]
+
+        # Generate triggers via Claude
+        triggers = []
+        if riesgo or contrarian:
+            triggers_raw = generate_narrative(
+                section_name="aa_triggers",
+                prompt=(
+                    "Genera exactamente 4-6 triggers de reconvocatoria/accion basados en el council. "
+                    "Cada trigger en una linea, formato: 'Metrica/condicion → Accion a tomar'. "
+                    "Usar metricas concretas del council (VaR, spreads, FX, correlaciones). "
+                    "Sin bullets ni numeracion."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=400,
+            )
+            if triggers_raw:
+                triggers = [l.strip() for l in triggers_raw.split('\n') if l.strip() and '→' in l]
+
+        if not triggers:
+            triggers = ['Monitorear datos macro y metricas de riesgo del council']
 
         return {
-            'top_risks': [
-                {
-                    'nombre': 'Aranceles Amplificados',
-                    'probabilidad': int(tariff_prob),
-                    'impacto': 'VaR salta a 2-3% daily, -15-20% EPS sectores expuestos',
-                    'descripcion': f'Trump implementa aranceles generalizados (20% global + 60% China). El impacto es multiplicativo: inflación + disruption cadenas + repricing P/E ratios. Sell-side subestima: consensus 3-5% EPS vs potencial 15-20% en sectores expuestos.',
-                    'hedge': 'Domestic equity tilt (reducir exposición a exportadoras), short IWM, put spreads',
-                    'senal_temprana': 'Announcement formal de aranceles >15%, chinese steel demand collapse'
-                },
-                {
-                    'nombre': 'Burbuja IA — Capex Cliff',
-                    'probabilidad': int(ia_prob),
-                    'impacto': 'Correlación oculta masiva — tech + bancos + REITs data centers',
-                    'descripcion': f'$660B en capex IA con retornos inciertos. Si Microsoft/Nvidia reportan ROI decepcionante, no solo tech se desploma — los bancos que financiaron y los REITs de data centers colapsan juntos. Correlación oculta sistémica.',
-                    'hedge': 'VIX call spreads 20/30 (payout 6:1), reducir Mag7 concentration',
-                    'senal_temprana': 'Cloud revenue deceleration, capex guidance cuts en earnings calls'
-                },
-                {
-                    'nombre': 'China Hard Landing vía Commodities',
-                    'probabilidad': int(china_prob),
-                    'impacto': '-25% IPSA, CLP a $920+, Cobre sub-$5.00/lb',
-                    'descripcion': 'Credit impulse contractivo + EPU máximos (420) + $1T en desacoplamiento = demanda china colapsa. Cobre cae a sub-$5.00/lb, destruyendo rally commodities y arrastrando Chile y EM.',
-                    'hedge': 'Forwards USD/CLP 3-6M, stop-loss cobre $5.70, staged exits Chile equity',
-                    'senal_temprana': 'China PMI <47 por 2 meses, credit growth negativo, Baltic Dry Index collapse'
-                },
-                {
-                    'nombre': 'Whipsaw Positioning',
-                    'probabilidad': int(whipsaw_prob),
-                    'impacto': '-200-300bp performance por timing error',
-                    'descripcion': f'Riesgo identificado por análisis contrarian: reducir duration anticipando Fed hawkish, pero CPI sorprende a la baja y Fed pausa — generando rally de bonos brutal. Costo estimado: -200-300bp. Probabilidad: {int(whipsaw_prob)}%.',
-                    'hedge': 'Duration laddering en vez de all-or-nothing, opciones en vez de posiciones direccionales',
-                    'senal_temprana': 'CPI <2.3%, Fed language shift dovish, breakevens cayendo'
-                }
-            ],
-            'calendario_eventos': [
-                {'fecha': '12 Feb', 'evento': 'CPI USA Enero (CRÍTICO)', 'relevancia': 'Alta'},
-                {'fecha': '14 Feb', 'evento': 'GDP Eurozona Q4 flash', 'relevancia': 'Media'},
-                {'fecha': '19 Feb', 'evento': 'FOMC Minutes', 'relevancia': 'Alta'},
-                {'fecha': '28 Feb', 'evento': 'Reunión BCCh', 'relevancia': 'Alta'},
-                {'fecha': '1 Mar', 'evento': 'ISM Manufacturing Feb', 'relevancia': 'Alta'},
-                {'fecha': '7 Mar', 'evento': 'NFP Febrero', 'relevancia': 'Alta'},
-                {'fecha': 'TBD', 'evento': 'Announcement aranceles Trump', 'relevancia': 'Alta'},
-            ],
-            'triggers_reconvocatoria': [
-                'CPI semanal <2.3% o >2.8% → Reconvocar para ajustar duration positioning',
-                'VaR daily >1.3% por 3 días consecutivos → Reducir risk 30%',
-                'Gold break below $4,800 o above $5,300 → Reevaluar posición commodities',
-                'China policy pivot announcement → Reload EM/commodities exposure',
-                'USD/CLP >920 → Exit Chile equity completamente, mantener solo RF con hedge',
-                'Correlaciones >0.80 por 5 días → Exit todas posiciones tácticas',
-            ]
+            'top_risks': top_risks,
+            'calendario_eventos': [],  # Calendar is date-sensitive; left empty for freshness
+            'triggers_reconvocatoria': triggers,
         }
 
     # =========================================================================

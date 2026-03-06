@@ -31,11 +31,13 @@ class MacroContentGenerator:
     """Generador de contenido narrativo para Reporte Macro."""
 
     def __init__(self, council_result: Dict = None, quant_data: Dict = None,
-                 data_provider=None, forecast_data: Dict = None):
+                 data_provider=None, forecast_data: Dict = None,
+                 company_name: str = ""):
         self.council = council_result or {}
         self.quant = quant_data or {}
         self.data = data_provider  # ChartDataProvider for real BCCh data
         self.forecast = forecast_data or {}
+        self.company_name = company_name
         self.date = datetime.now()
         self.month_name = self._get_spanish_month(self.date.month)
         self.year = self.date.year
@@ -160,97 +162,81 @@ class MacroContentGenerator:
         return {'view': view}
 
     def _generate_macro_intro(self) -> str:
-        """Genera parrafo introductorio macro comprehensivo usando council output."""
+        """Genera parrafo introductorio macro usando council output via Claude."""
+        from narrative_engine import generate_narrative
 
-        # Try to build from council insights
         final_rec = self.council.get('final_recommendation', '')
         cio = self.council.get('cio_synthesis', '')
-
-        if final_rec or cio:
-            return self._build_council_intro(final_rec, cio)
-
-        # Fallback si no hay council
-        return (
-            f"El escenario macro global de {self.month_name} {self.year} se caracteriza por "
-            f"un crecimiento económico resiliente en EE.UU., una desinflación gradual pero persistente, "
-            f"y bancos centrales en modo de normalización de tasas. Nuestras proyecciones de crecimiento "
-            f"se mantienen por encima del consenso para EE.UU. y China, mientras anticipamos un ciclo "
-            f"de recortes de tasas más moderado de lo que descuenta el mercado."
-        )
-
-    def _build_council_intro(self, final_rec: str, cio: str) -> str:
-        """Construye intro comprehensivo desde council output."""
         panels = self.council.get('panel_outputs', {})
         macro_panel = panels.get('macro', '')
         geo_panel = panels.get('geo', '')
-        rf_panel = panels.get('rf', '')
 
-        # Extract key data points from panels
-        regime = 'EXPANSION' if 'EXPANSION' in macro_panel.upper() else 'crecimiento moderado'
-        fed_view = '1-2 cortes' if '1-2 cortes' in (cio + final_rec) else 'recortes graduales'
+        council_context = f"FINAL REC:\n{final_rec}\n\nCIO:\n{cio}\n\nMACRO PANEL:\n{macro_panel[:2000]}\n\nGEO PANEL:\n{geo_panel[:1000]}"
 
-        # Build comprehensive multi-paragraph intro
-        para1 = (
-            f"El escenario macro global de {self.month_name} {self.year} se define por una "
-            f"tension fundamental: datos de actividad solidos en expansion tardia coexistiendo con "
-            f"multiples riesgos de cola convergentes. Nuestro AI Council, compuesto por cinco "
-            f"analistas especializados, identifica un regimen de <strong>{regime}</strong> con "
-            f"conviccion alta, pero recomienda posicionamiento defensivo selectivo ante la acumulacion "
-            f"de riesgos geopoliticos, inflacionarios y de valoracion."
+        result = generate_narrative(
+            section_name="macro_intro",
+            prompt=(
+                f"Escribe la introduccion ejecutiva del reporte macro de {self.month_name} {self.year}. "
+                "3-4 parrafos cubriendo: (1) panorama macro global y regimen economico actual, "
+                "(2) principales dinamicas de EE.UU. (crecimiento, inflacion, Fed), "
+                "(3) principales riesgos geopoliticos y comerciales del mes, "
+                "(4) sintesis de Europa, China y Chile. "
+                "Usa los datos del council como base — NO inventes numeros. "
+                "Separa parrafos con <br><br>. Maximo 400 palabras."
+            ),
+            council_context=council_context,
+            company_name=self.company_name,
+            max_tokens=1200,
         )
+        if result:
+            return result
 
-        para2 = (
-            f"<br><br><strong>Estados Unidos</strong> lidera el crecimiento global con GDP expandiendose "
-            f"a tasas solidas, impulsado por consumo privado y el boom de inversion en inteligencia "
-            f"artificial. Sin embargo, el mercado laboral muestra senales de bifurcacion: mientras el "
-            f"empleo agregado se mantiene firme, el segmento white-collar experimenta deterioro rapido "
-            f"— un indicador adelantado que historicamente precede recesiones con 6-9 meses de adelanto. "
-            f"La inflacion de servicios permanece sticky, y anticipamos que la Fed implementara solo "
-            f"{fed_view} en 2026, significativamente menos de lo que descuenta el mercado."
+        # Fallback minimal
+        return (
+            f"El escenario macro global de {self.month_name} {self.year} se caracteriza por "
+            f"dinamicas complejas en crecimiento, inflacion y politica monetaria. "
+            f"Este reporte detalla nuestro analisis por region y escenarios ponderados por probabilidad."
         )
-
-        para3 = (
-            f"<br><br><strong>Geopolitica y comercio</strong> emergen como el factor dominante este mes. "
-            f"Aranceles Trump 2.0 tienen probabilidad del 90% de materializarse en los proximos 30 dias, "
-            f"con impacto potencial subestimado por el consenso (3-5% en EPS vs nuestro escenario de "
-            f"15-20% en sectores expuestos). Simultáneamente, el desacople financiero US-China se "
-            f"acelera activamente, con China reduciendo exposicion a bonos del Tesoro. El rally del "
-            f"oro sobre US$5,000/oz refleja esta incertidumbre estructural."
-        )
-
-        para4 = (
-            f"<br><br><strong>Europa</strong> muestra recuperacion gradual con el BCE cerca de neutral, "
-            f"mientras <strong>China</strong> enfrenta debilidad estructural (credit impulse contractivo, "
-            f"incertidumbre politica en maximos historicos). <strong>Chile</strong> se diferencia positivamente "
-            f"con inflacion convergiendo a meta, peso apreciandose, y cobre como soporte estructural a "
-            f"cuentas externas. Este reporte detalla nuestro analisis por region, escenarios ponderados "
-            f"por probabilidad, y las conclusiones del comite de inversion para informar las decisiones "
-            f"de asset allocation y renta fija de los reportes complementarios."
-        )
-
-        return para1 + para2 + para3 + para4
 
     def _generate_key_takeaways(self) -> List[str]:
-        """Genera key takeaways del mes, usando council output si disponible."""
+        """Genera key takeaways del mes via Claude, usando council output."""
+        from narrative_engine import generate_narrative
+
         final_rec = self.council.get('final_recommendation', '')
         cio = self.council.get('cio_synthesis', '')
 
-        if final_rec or cio:
+        if not (final_rec or cio):
             return [
-                "<strong>Regimen de Expansion Tardia</strong>: Datos de actividad solidos (GDP US robusto, manufactura en maximos desde 2022) pero con multiples riesgos de cola convergentes que justifican posicionamiento defensivo selectivo.",
-                "<strong>Fed mas hawkish que el mercado</strong>: Anticipamos solo 1-2 recortes en 2026 vs 3-4 que descuenta el mercado. La inflacion de servicios permanece sticky y el CPI esta semana sera determinante para el path de tasas.",
-                "<strong>Geopolitica como factor dominante</strong>: Aranceles Trump 2.0 inminentes (90% probabilidad), desacople financiero US-China activo, y divergencia cripto-equity como senal de discriminacion de riesgo. El oro sobre US$5,000 valida la incertidumbre.",
-                "<strong>IA y tecnologia como motor estructural</strong>: El boom de capex en inteligencia artificial (US$660B+) impulsa crecimiento e inversion, pero genera riesgo de concentracion (Mag 7 = 35% del S&P) y correlaciones ocultas si los retornos decepcionan.",
-                "<strong>Chile diferenciado positivamente</strong>: Inflacion convergiendo a meta, peso apreciandose (+1.35% vs USD), cobre con fundamentos estructurales solidos (deficit proyectado 2026-2027). BCCh con espacio para recortes graduales pero condicionado por Fed.",
-                "<strong>China estructuralmente debil</strong>: Credit impulse contractivo, incertidumbre politica en maximos (EPU 420), sin catalizador de estimulo real. Cualquier pivot marginal podria generar rally de commodities — monitorear como tail risk positivo.",
+                "Crecimiento global con dinamicas mixtas entre regiones desarrolladas y emergentes",
+                "Inflacion convergiendo gradualmente en economias desarrolladas, servicios con inercia",
+                "Bancos centrales en modo de evaluacion; proximos movimientos dependen de datos",
+                "Chile con fundamentos solidos; cobre como soporte a cuentas externas",
             ]
 
+        council_context = f"FINAL REC:\n{final_rec[:2000]}\n\nCIO:\n{cio[:2000]}"
+
+        result = generate_narrative(
+            section_name="macro_takeaways",
+            prompt=(
+                f"Genera exactamente 5-6 key takeaways del reporte macro de {self.month_name} {self.year}. "
+                "Cada takeaway debe tener formato: '<strong>Titulo Corto</strong>: Explicacion en 1-2 oraciones.' "
+                "Cubrir: regimen economico, politica monetaria, geopolitica/comercio, tecnologia/IA (si relevante), "
+                "Chile, y un riesgo clave. Usa SOLO datos que aparecen en el council. "
+                "Devuelve cada takeaway separado por \\n (una linea por takeaway). NO uses bullets ni numeracion."
+            ),
+            council_context=council_context,
+            company_name=self.company_name,
+            max_tokens=800,
+        )
+        if result:
+            lines = [l.strip() for l in result.split('\n') if l.strip()]
+            if len(lines) >= 3:
+                return lines
+
         return [
-            "Crecimiento global proyectado en 2.9% para 2026, con EE.UU. mostrando resiliencia post-soft landing",
-            "Inflacion core en target o cerca en la mayoria de DM; servicios aun con inercia pero convergiendo",
-            "Fed en modo de espera tras recortes de 2025; proximos movimientos dependen de datos de empleo",
-            "China con crecimiento estable en 4.5% pero riesgos estructurales persisten (property, demografia)",
-            "Chile: Inflacion en meta, BCCh con TPM cerca de neutral; cobre como soporte a cuentas externas"
+            "Dinamicas macro complejas requieren posicionamiento selectivo",
+            "Politica monetaria en evaluacion; datos proximos seran determinantes",
+            "Chile con fundamentos diferenciados positivamente en la region",
         ]
 
     def _fc(self, *keys, default=None):
@@ -1513,102 +1499,77 @@ class MacroContentGenerator:
                 + '. <em>Base histórica = 100. Valores sobre 200 indican incertidumbre elevada.</em>'
             )
 
-        # Theme 1: Geopolitics — PROMINENT per user request
-        geo_theme = {
-            'titulo': 'Geopolitica, Aranceles y Comercio Global',
-            'descripcion': (
-                "<strong>Tema dominante del mes.</strong> El panorama geopolitico se ha intensificado "
-                "significativamente con tres vectores convergentes: (1) <strong>Aranceles Trump 2.0</strong> "
-                "con probabilidad del 90% de materializarse en los proximos 30 dias — el consenso "
-                "subestima el impacto asumiendo aranceles 'normales' (3-5% EPS), pero si se implementan "
-                "aranceles generalizados (20% global + 60% China), el shock seria multiplicativo: "
-                "inflacion + disrupcion de cadenas + repricing de multiplos. "
-                "(2) <strong>Desacople financiero US-China activo</strong>: China ordena a bancos reducir "
-                "exposicion a bonos del Tesoro, lo que va mas alla de una guerra comercial hacia un "
-                "desacoplamiento financiero estructural. (3) <strong>Conflictos regionales</strong> que "
-                "mantienen presion sobre energía y defensa. El rally del oro sobre US$5,000 refleja "
-                "esta incertidumbre geopolitica profunda. Para Chile, el cobre se beneficia como "
-                "safe haven commodity vs activos en USD, pero es vulnerable si China retalia "
-                "comprando menos commodities sudamericanos."
-                + epu_html
+        # Generate themes dynamically from council output via Claude
+        from narrative_engine import generate_narrative
+        import json as _json
+
+        panels = self.council.get('panel_outputs', {})
+        final_rec = self.council.get('final_recommendation', '')
+        council_text = (
+            f"GEO PANEL:\n{geo_panel[:1500]}\n\n"
+            f"RV PANEL:\n{rv_panel[:1000]}\n\n"
+            f"RISK PANEL:\n{risk_panel[:1000]}\n\n"
+            f"FINAL REC:\n{final_rec[:1500]}"
+        )
+
+        result = generate_narrative(
+            section_name="macro_themes",
+            prompt=(
+                f"Genera exactamente 3-4 temas macro clave de {self.month_name} {self.year} "
+                "basandote SOLO en lo que discute el council. "
+                "Devuelve un JSON array donde cada elemento tiene: "
+                '{"titulo": "string", "descripcion": "string (HTML, 80-120 palabras)", '
+                '"impacto_macro": {"key": "value string"}}. '
+                "Las descripciones deben ser en prosa analitica, no listas. "
+                "Usa <strong> solo para datos criticos o price targets. "
+                "NO inventes datos que no aparezcan en el council."
             ),
-            'impacto_macro': {
-                'gdp_global': '-0.3 a -0.5pp en escenario de guerra comercial plena',
-                'inflación_us': '+0.5pp por aranceles, hasta +1pp en escenario severo',
-                'emergentes': 'Dispersion alta: Mexico (nearshoring winner) vs China (perdedor)',
-                'chile': 'Cobre supportive pero vulnerable a retaliacion china'
+            council_context=council_text,
+            company_name=self.company_name,
+            max_tokens=1500,
+            temperature=0.2,
+        )
+
+        if result:
+            # Try to parse JSON from Claude response
+            try:
+                # Strip markdown code fences if present
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                    cleaned = cleaned.strip()
+                themes = _json.loads(cleaned)
+                if isinstance(themes, list) and len(themes) >= 2:
+                    # Append EPU data to first theme if available
+                    if epu_html and themes:
+                        themes[0]['descripcion'] = themes[0].get('descripcion', '') + epu_html
+                    return themes
+            except (_json.JSONDecodeError, KeyError, IndexError):
+                pass
+
+        # Minimal fallback — no stale market calls
+        fallback = [
+            {
+                'titulo': 'Panorama Geopolitico y Comercial',
+                'descripcion': (
+                    "Las dinamicas geopoliticas y comerciales dominan el panorama macro de este mes. "
+                    "Monitorear desarrollos de politica comercial y tensiones regionales."
+                    + epu_html
+                ),
+                'impacto_macro': {'global': 'Incertidumbre elevada requiere posicionamiento defensivo selectivo'}
             },
-            'escenarios': [
-                {'escenario': 'Base (55%)', 'descripcion': 'Aranceles selectivos, negociacion activa, impacto contenido'},
-                {'escenario': 'Downside (30%)', 'descripcion': 'Escalada a 25% blanket + 60% China, disrupcion de cadenas'},
-                {'escenario': 'Upside (15%)', 'descripcion': 'Deal comprehensivo reduce tensiones, relief rally global'}
-            ]
-        }
-
-        # Theme 2: AI & Technology — PROMINENT per user request
-        ai_theme = {
-            'titulo': 'Inteligencia Artificial: Boom de Inversion y Riesgos de Concentracion',
-            'descripcion': (
-                "<strong>El factor estructural mas importante de este ciclo.</strong> La adopcion "
-                "de IA generativa esta transformando el panorama de inversion global con US$660B+ "
-                "en capex comprometido para data centers, semiconductores e infraestructura AI. "
-                "Nvidia lidera la recuperacion tech (+7.8%), y el sector industrial se beneficia "
-                "del reshoring y la construccion de infraestructura. "
-                "<br><br>Sin embargo, emergen riesgos significativos: (1) <strong>Concentracion extrema</strong>: "
-                "las Mag 7 representan 35%+ del S&P 500 — cualquier repricing tech arrastra todo. "
-                "(2) <strong>Capex cliff potencial</strong>: si Microsoft/Nvidia reportan ROI decepcionante, "
-                "no solo tech se desploma — los bancos que financiaron la expansion y los REITs de "
-                "data centers colapsan juntos, revelando correlaciones ocultas masivas. "
-                "(3) <strong>Impacto laboral asimetrico</strong>: empleos white-collar ya muestran "
-                "deterioro rapido (6 meses promedio de busqueda) mientras roles tech se benefician. "
-                "Los efectos en productividad son de largo plazo (+0.3pp adicional en 5+ anos), "
-                "pero el impacto en inversion y empleo es inmediato."
-            ),
-            'impacto_macro': {
-                'inversion': 'Boom US$660B+ en data centers y semiconductores',
-                'empleo': 'Bifurcacion: deterioro white-collar, demanda tech acelerada',
-                'productividad': '+0.3pp adicional en largo plazo; corto plazo es capex-driven',
-                'riesgo_sistémico': 'Correlacion oculta Mag7-bancos-REITs si ROI decepciona'
-            }
-        }
-
-        # Theme 3: Divergencia Cripto-Equity
-        divergence_theme = {
-            'titulo': 'Divergencia Risk-On vs Cripto: Senal de Discriminacion',
-            'descripcion': (
-                "Una senal llamativa del mercado: mientras equities mantienen postura risk-on, "
-                "Bitcoin cae -20% YTD. Nuestro comite interpreta esto como senal <strong>positiva</strong> "
-                "de discriminacion de riesgo — un flight-to-quality hacia activos con cash flows "
-                "reales versus especulacion pura. Sin embargo, historicamente cripto anticipa "
-                "equity stress con 2-3 meses de adelanto, lo que amerita monitoreo cercano como "
-                "early warning indicator."
-            ),
-            'impacto_macro': {
-                'equities': 'Selectividad favorece quality y fundamentals',
-                'liquidity': 'Cripto como canario en la mina de condiciones financieras',
-                'monitoreo': 'Si BTC rompe soporte adicional, aumentar hedges equity'
-            }
-        }
-
-        # Theme 4: Fiscal Dominance
-        fiscal_theme = {
-            'titulo': 'Dominancia Fiscal y Presion sobre Bancos Centrales',
-            'descripcion': (
-                "Los deficits fiscales elevados en economias desarrolladas generan presion "
-                "sobre tasas largas y cuestionan la independencia de bancos centrales. "
-                "EE.UU. con deficit de ~6% del GDP, Francia con crisis politica fiscal. "
-                "El term premium se mantiene elevado (50bp+) y el servicio de la deuda "
-                "consume una porcion creciente del presupuesto. Riesgo de downgrades "
-                "crediticios (Moody's mantiene outlook negativo sobre US AAA)."
-            ),
-            'impacto_macro': {
-                'tasas_largas': 'Term premium elevado (50bp+), pressure on long-end',
-                'bancos_centrales': 'Presion politica sobre independencia en US y Europa',
-                'ratings': 'Riesgo de downgrades (US, Francia, Italia)'
-            }
-        }
-
-        return [geo_theme, ai_theme, divergence_theme, fiscal_theme]
+            {
+                'titulo': 'Dinamicas de Crecimiento e Inflacion',
+                'descripcion': (
+                    "El balance entre crecimiento e inflacion sigue siendo el factor central "
+                    "para la politica monetaria y el posicionamiento de portafolios."
+                ),
+                'impacto_macro': {'global': 'Bancos centrales en modo data-dependent'}
+            },
+        ]
+        return fallback
 
     def _generate_events_calendar(self) -> List[Dict[str, Any]]:
         """Genera calendario de eventos clave."""
@@ -1749,118 +1710,100 @@ class MacroContentGenerator:
 
     def _build_council_conclusions(self, final_rec: str, cio: str,
                                     panels: Dict) -> Dict[str, Any]:
-        """Construye conclusiones desde council output."""
+        """Construye conclusiones desde council output via Claude."""
+        from narrative_engine import generate_narrative
+        import json as _json
+
+        council_text = (
+            f"FINAL REC:\n{final_rec[:3000]}\n\n"
+            f"CIO:\n{cio[:2000]}\n\n"
+            f"MACRO:\n{panels.get('macro', '')[:1000]}\n\n"
+            f"RF:\n{panels.get('rf', '')[:1000]}\n\n"
+            f"GEO:\n{panels.get('geo', '')[:1000]}\n\n"
+            f"RIESGO:\n{panels.get('riesgo', '')[:1000]}"
+        )
+
+        # Generate intro paragraph
+        intro = generate_narrative(
+            section_name="conclusions_intro",
+            prompt=(
+                f"Escribe 2-3 oraciones introductorias para la seccion de conclusiones del "
+                f"reporte macro de {self.month_name} {self.year}. Indica que estas son las vistas "
+                "principales y como se comparan con el consenso. Tono: directo, profesional. "
+                "NO menciones 'comité', 'panel', 'council', 'agentes'. Maximo 60 palabras."
+            ),
+            council_context=council_text[:1000],
+            company_name=self.company_name,
+            max_tokens=200,
+        )
+        if not intro:
+            intro = (
+                f"Las conclusiones de {self.month_name} {self.year} reflejan nuestro analisis "
+                f"integrado de las principales variables macro."
+            )
+
+        # Generate vistas as structured JSON
+        vistas_raw = generate_narrative(
+            section_name="conclusions_vistas",
+            prompt=(
+                "Genera exactamente 4-5 vistas tematicas basadas en lo que discute el council. "
+                "Devuelve un JSON array donde cada elemento tiene: "
+                '{"tema": "string (ej: Inflacion, Crecimiento, Bancos Centrales, etc)", '
+                '"vista_grb": "string (2-4 oraciones con nuestra lectura, usando datos del council)", '
+                '"vs_consenso": "string corto (ej: Por encima del consenso, Alineado, Mas cauto)", '
+                '"vs_detalle": "string (1-2 oraciones explicando la diferencia vs consenso)"}. '
+                "Los temas deben reflejar lo que realmente discutio el council — NO usar temas genericos "
+                "si el council no los aborda. Usa datos concretos del council."
+            ),
+            council_context=council_text,
+            company_name=self.company_name,
+            max_tokens=1500,
+            temperature=0.2,
+        )
+
+        vistas = []
+        if vistas_raw:
+            try:
+                cleaned = vistas_raw.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                    cleaned = cleaned.strip()
+                vistas = _json.loads(cleaned)
+            except (_json.JSONDecodeError, KeyError):
+                pass
+
+        if not vistas:
+            vistas = [
+                {'tema': 'Panorama General', 'vista_grb': 'Ver seccion de analisis para detalle.',
+                 'vs_consenso': 'Ver detalle', 'vs_detalle': 'Analisis completo en secciones anteriores.'}
+            ]
+
+        # Generate positioning summary
+        pos_resumen = generate_narrative(
+            section_name="conclusions_positioning",
+            prompt=(
+                "Escribe un parrafo de posicionamiento general (3-4 oraciones). "
+                "Resume la postura (risk-on/off/selectivo), las principales preferencias "
+                "de activos, y el catalizador clave a monitorear. "
+                "Usa <strong> para la postura general. Maximo 80 palabras."
+            ),
+            council_context=f"FINAL REC:\n{final_rec[:2000]}",
+            company_name=self.company_name,
+            max_tokens=300,
+        )
+        if not pos_resumen:
+            pos_resumen = 'Postura selectiva con enfasis en datos proximos como catalizador.'
 
         return {
-            'titulo': 'Conclusiones y Vista del Comite de Inversion',
-            'intro': (
-                f"Las conclusiones de este reporte de {self.month_name} {self.year} reflejan "
-                f"el analisis integrado de nuestro AI Council — cinco analistas especializados "
-                f"(macro, renta variable, renta fija, riesgo y geopolitica) mas una capa de "
-                f"sintesis que incluye CIO, contrarian y refinamiento. A continuacion, nuestras "
-                f"vistas principales y como se comparan con el consenso del mercado."
-            ),
-            'vistas': [
-                {
-                    'tema': 'Inflacion',
-                    'vista_grb': (
-                        'Anticipamos que la inflacion core permanecera por encima del target de 2% '
-                        'durante 2026, con servicios como componente mas persistente. El CPI headline '
-                        'converge gradualmente pero la inflacion de servicios ex-housing se mantiene '
-                        'sticky. En Chile, la inflacion converge a meta con IPC en torno a 3%.'
-                    ),
-                    'vs_consenso': 'Por encima del consenso',
-                    'vs_detalle': (
-                        'El consenso sell-side espera convergencia a 2% en H2 2026. Nosotros vemos '
-                        'riesgos al alza por aranceles (+0.5pp) y salarios aun elevados. Nuestra '
-                        'proyeccion de Core PCE es 2.3% vs consenso 2.1%.'
-                    )
-                },
-                {
-                    'tema': 'Crecimiento',
-                    'vista_grb': (
-                        'Regimen de expansion confirmado con alta conviccion. GDP US solido impulsado '
-                        'por consumo y boom de inversion AI. Sin embargo, identificamos una bifurcacion '
-                        'preocupante: empleo white-collar deteriorandose rapido mientras el agregado '
-                        'se mantiene — historicamente un leading indicator con 6-9 meses de adelanto. '
-                        'Probabilidad de recesion: 15% (nuestro modelo indica 4.5%, ajustamos al alza '
-                        'por factores cualitativos). China estable en 4.5% pero sin catalizadores.'
-                    ),
-                    'vs_consenso': 'Alineado en dirección, cauteloso en durabilidad',
-                    'vs_detalle': (
-                        'El consenso comparte la vision de soft landing. Nos diferenciamos en: (1) mayor '
-                        'atencion a señales de deterioro white-collar, (2) mayor probabilidad a recesion '
-                        '(15% vs ~10% consenso), y (3) mayor GDP Chile (2.5% vs 2.2% consenso) por '
-                        'soporte del cobre y consumo privado.'
-                    )
-                },
-                {
-                    'tema': 'Bancos Centrales',
-                    'vista_grb': (
-                        '<strong>Fed</strong>: Solo 1-2 recortes en 2026 (vs mercado 3-4). Inflacion '
-                        'de servicios sticky y mercado laboral aun firme limitan espacio. La tasa real '
-                        'positiva es apropiada para el regimen actual. '
-                        '<strong>BCE</strong>: Cerca de neutral, posible recorte adicional de 25bp en H2 '
-                        'si crecimiento decepciona. '
-                        '<strong>BCCh</strong>: TPM cerca de neutral con espacio para recortes graduales, '
-                        'pero condicionado por el path de la Fed. Preferimos neutral en duracion Chile '
-                        'hasta confirmar pausa Fed.'
-                    ),
-                    'vs_consenso': 'Mas hawkish que consenso en Fed',
-                    'vs_detalle': (
-                        'JPMorgan espera 2 cortes Fed (junio + sept), Goldman solo 1-2. Estamos alineados '
-                        'con el extremo hawkish del sell-side. En BCCh, el consenso espera TPM 4.25% YE '
-                        '— coincidimos pero vemos riesgo de que se mantenga en 4.5% si la Fed no corta.'
-                    )
-                },
-                {
-                    'tema': 'Geopolitica y Comercio',
-                    'vista_grb': (
-                        'Factor dominante y subestimado. Aranceles Trump 2.0 con probabilidad 90% en '
-                        'proximos 30 dias. El desacople financiero US-China va mas alla del comercio '
-                        '— es un realineamiento estructural. El oro sobre US$5,000 es sintoma de esta '
-                        'transicion. Para Chile, el cobre es beneficiario neto por transicion energetica '
-                        'y reshoring, pero vulnerable si China retalia.'
-                    ),
-                    'vs_consenso': 'Mayor impacto que consenso anticipa',
-                    'vs_detalle': (
-                        'El consenso estima impacto aranceles en 3-5% EPS. Nuestro escenario severo '
-                        '(30% probabilidad) contempla 15-20% en sectores expuestos, con efectos '
-                        'multiplicativos via inflacion + disrupcion de cadenas + repricing de PE.'
-                    )
-                },
-                {
-                    'tema': 'IA y Tecnologia',
-                    'vista_grb': (
-                        'El boom de capex en AI (US$660B+) es el factor estructural mas importante '
-                        'del ciclo. Impulsa crecimiento, inversion e innovacion, pero genera riesgos '
-                        'de concentracion sin precedentes. Las Mag 7 al 35% del S&P crean correlaciones '
-                        'ocultas. Los ganadores (semiconductores, industriales, infraestructura) son '
-                        'claros; el riesgo esta en los perdedores (empleos white-collar, empresas con '
-                        'capex excesivo sin ROI, REITs de oficinas).'
-                    ),
-                    'vs_consenso': 'Mas matizado que el consenso bullish',
-                    'vs_detalle': (
-                        'El consenso es mayoritariamente bullish en AI. Nosotros compartimos el '
-                        'optimismo estructural pero destacamos el riesgo de capex cliff (35% prob) '
-                        'si los retornos decepcionan, y el impacto social/laboral en el corto plazo.'
-                    )
-                },
-            ],
-            'posicionamiento_resumen': (
-                '<strong>Postura general: RISK-ON SELECTIVO con coberturas defensivas.</strong> '
-                'Mantenemos exposicion a crecimiento via equities US (selectivo en tech quality e '
-                'industriales) y Chile (cobre + fundamentals domesticos). Reducimos duracion '
-                'anticipando Fed hawkish, tomamos utilidades parciales en oro (30%), y aumentamos '
-                'cash al 5% como dry powder para oportunidades en volatilidad. El principal '
-                'catalizador a monitorear: datos CPI de esta semana que podrian confirmar o '
-                'revertir nuestro thesis de Fed hawkish.'
-            ),
+            'titulo': f'Conclusiones — {self.month_name} {self.year}',
+            'intro': intro,
+            'vistas': vistas,
+            'posicionamiento_resumen': pos_resumen,
             'proximo_reporte': (
-                'Este analisis macro sirve como input fundamental para nuestros reportes de '
-                'Asset Allocation (con recomendaciones OW/UW por perfil) y Renta Fija '
-                '(posicionamiento de duracion y curva). Las conclusiones aqui detalladas '
-                'seran incorporadas en las recomendaciones tacticas de cada reporte complementario.'
+                'Este analisis macro sirve como input para los reportes complementarios de '
+                'Asset Allocation y Renta Fija.'
             )
         }
 
@@ -1874,22 +1817,16 @@ class MacroContentGenerator:
             ),
             'vistas': [
                 {
-                    'tema': 'Inflacion',
-                    'vista_grb': 'Desinflacion gradual continuando, con servicios como ultimo componente en ceder.',
-                    'vs_consenso': 'Alineado',
-                    'vs_detalle': 'Coincidimos con el consenso en la trayectoria de convergencia.'
+                    'tema': 'Crecimiento e Inflacion',
+                    'vista_grb': 'Dinamicas mixtas requieren monitoreo cercano de datos proximos.',
+                    'vs_consenso': 'En evaluacion',
+                    'vs_detalle': 'Pendiente de datos clave para definir posicion relativa al consenso.'
                 },
                 {
-                    'tema': 'Crecimiento',
-                    'vista_grb': 'Soft landing como escenario base con probabilidad 55%.',
+                    'tema': 'Politica Monetaria',
+                    'vista_grb': 'Bancos centrales en modo data-dependent.',
                     'vs_consenso': 'Alineado',
-                    'vs_detalle': 'Coincidimos con el consenso en crecimiento positivo pero moderado.'
-                },
-                {
-                    'tema': 'Bancos Centrales',
-                    'vista_grb': 'Recortes graduales en 2026 para Fed, BCE y BCCh.',
-                    'vs_consenso': 'Alineado',
-                    'vs_detalle': 'Vista alineada con el consenso sell-side.'
+                    'vs_detalle': 'Vista alineada con expectativas del mercado.'
                 },
             ],
             'posicionamiento_resumen': 'Postura neutral con sesgo constructivo.',

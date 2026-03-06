@@ -49,7 +49,8 @@ class AssetAllocationRenderer:
         # Inicializar generador de contenido con datos cuantitativos
         self.content_generator = AssetAllocationContentGenerator(
             self.council_result, quant_data=self.market_data,
-            forecast_data=self.forecast_data
+            forecast_data=self.forecast_data,
+            company_name=self.branding.get('company_name', '')
         )
 
     def _print(self, msg: str):
@@ -73,6 +74,7 @@ class AssetAllocationRenderer:
         # 1. Generar contenido
         self._print("[1/3] Generando contenido narrativo...")
         content = self.content_generator.generate_all_content()
+        self.last_content = content
 
         # 2. Cargar template Jinja2
         self._print("[2/3] Cargando template profesional...")

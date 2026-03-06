@@ -47,7 +47,8 @@ class RVReportRenderer:
         )
 
         self.content_generator = RVContentGenerator(
-            self.council_result, self.market_data, forecast_data=self.forecast_data)
+            self.council_result, self.market_data, forecast_data=self.forecast_data,
+            company_name=self.branding.get('company_name', ''))
 
     def _print(self, msg: str):
         if self.verbose:
@@ -70,6 +71,7 @@ class RVReportRenderer:
         # 1. Generar contenido
         self._print("[1/4] Generando contenido de renta variable...")
         content = self.content_generator.generate_all_content()
+        self.last_content = content
 
         # 2. Generar charts
         self._print("[2/4] Generando charts de renta variable...")
