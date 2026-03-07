@@ -514,6 +514,7 @@ class CouncilDataCollector:
             'quantitative': quant_data,
             'daily_context': daily_context,
             'intelligence_briefing': getattr(self, '_intelligence_briefing', ''),
+            'wsj_context': getattr(self, '_wsj_context', ''),
             'daily_summary': daily_summary,
             'intelligence': intelligence,
             'user_directives': user_directives,

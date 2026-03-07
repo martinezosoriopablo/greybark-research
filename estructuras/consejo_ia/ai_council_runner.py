@@ -263,6 +263,11 @@ class AICouncilRunner:
         # Usar intelligence briefing (~2K) si existe, sino daily_context truncado (~10K)
         context_for_agents = intelligence_briefing if intelligence_briefing else daily_context[:10000]
 
+        # Append WSJ summaries if available
+        wsj_context = council_input.get('wsj_context', '')
+        if wsj_context:
+            context_for_agents += f"\n\n## WSJ SUMMARIES (últimos 7 días)\n{wsj_context[:3000]}"
+
         # Extraer bloomberg_context ANTES de serializar a JSON
         bloomberg_context = agent_data.pop('bloomberg_context', '')
 
@@ -686,21 +691,25 @@ El output debe ser profesional y listo para el cliente.
         # Recopilar datos
         council_input = self.data_collector.prepare_council_input(report_type)
 
-        # Run analytics modules
-        self._print("\n  Ejecutando analytics modules...")
-        try:
-            from modules import run_all_modules
-            module_results = run_all_modules(verbose=self.verbose)
-            module_texts = []
-            for name, out in module_results.items():
-                instance = out.get('_instance')
-                if instance:
-                    module_texts.append(instance.get_council_input())
-            council_input['module_outputs'] = "\n\n".join(module_texts)
-            self._print(f"  -> {len(module_results)} analytics modules OK")
-        except Exception as e:
-            self._print(f"  [WARN] Analytics modules failed: {e}")
+        # Run analytics modules (skip if _skip_modules flag is set)
+        if getattr(self, '_skip_modules', False):
+            self._print("\n  Analytics modules: SKIPPED (--no-modules)")
             council_input['module_outputs'] = ''
+        else:
+            self._print("\n  Ejecutando analytics modules...")
+            try:
+                from modules import run_all_modules
+                module_results = run_all_modules(verbose=self.verbose)
+                module_texts = []
+                for name, out in module_results.items():
+                    instance = out.get('_instance')
+                    if instance:
+                        module_texts.append(instance.get_council_input())
+                council_input['module_outputs'] = "\n\n".join(module_texts)
+                self._print(f"  -> {len(module_results)} analytics modules OK")
+            except Exception as e:
+                self._print(f"  [WARN] Analytics modules failed: {e}")
+                council_input['module_outputs'] = ''
 
         # Preflight gate: NO-GO aborta la sesión
         preflight = council_input.get('preflight', {})

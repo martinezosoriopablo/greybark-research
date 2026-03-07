@@ -660,6 +660,16 @@ class MonthlyPipeline:
                 runner.data_collector._intelligence_briefing = intelligence_briefing
                 self._print_step("Intelligence briefing inyectado al Council input")
 
+            # Inyectar WSJ summaries al collector del runner
+            wsj_data = data.get('wsj', {})
+            if wsj_data.get('available') and wsj_data.get('summaries'):
+                wsj_text = "\n\n".join(
+                    f"[{s.get('date', 'N/D')}] {s.get('summary', '')}"
+                    for s in wsj_data['summaries'][:7]
+                )
+                runner.data_collector._wsj_context = wsj_text
+                self._print_step(f"WSJ summaries inyectados ({len(wsj_data['summaries'])} resumenes)")
+
             print()
             result = runner.run_session_sync(report_type='macro')
 

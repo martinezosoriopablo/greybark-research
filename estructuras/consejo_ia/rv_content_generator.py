@@ -591,15 +591,10 @@ class RVContentGenerator:
                 f"El Equity Risk Premium (ERP) del S&P 500 se ubica en {datos[0]['erp']} "
                 f"(earnings yield {datos[0]['earning_yield']} menos tasa real {datos[0]['tasa_real']}). "
             )
-            if erp_us < 3:
-                narrativa += "Este nivel es bajo históricamente, sugiriendo que el equity US está caro vs bonos. "
-            else:
-                narrativa += "Este nivel es razonable, con equity compensando adecuadamente el riesgo. "
-
-            # Comparar con ex-US
+            # Comparar con ex-US — solo datos, sin opinión
             ex_us_erps = [d for d in datos[1:] if d['erp'] != 'N/D']
             if ex_us_erps:
-                narrativa += f"Mercados ex-US ofrecen ERPs más amplios, reforzando la preferencia relativa."
+                narrativa += f"Mercados ex-US: {', '.join(d['mercado'] + ' ERP ' + d['erp'] for d in ex_us_erps)}."
         else:
             narrativa = (
                 "El Equity Risk Premium no pudo ser calculado con datos actuales. "
@@ -643,7 +638,7 @@ class RVContentGenerator:
             gv = {
                 'spread_ytd': f"{gv_ytd:+.1f}pp",
                 'comentario': 'Growth lidera' if gv_ytd > 3 else ('Value lidera' if gv_ytd < -3 else 'Equilibrado'),
-                'implicancia': 'Barbell approach preferido',
+                'implicancia': 'N/D — ver council para preferencia de estilo',
             }
         else:
             gv = {'spread_ytd': 'N/D', 'comentario': 'Sin datos de style', 'implicancia': '-'}
@@ -702,7 +697,7 @@ class RVContentGenerator:
                 parts.append(f"En contraste, {', '.join(ex_us_parts)} ofrecen valuaciones más atractivas. ")
 
             if us_pe and any([eu_pe, em_pe, ch_pe]):
-                parts.append("Este diferencial justifica nuestra preferencia por mercados ex-US.")
+                parts.append("Ver council para preferencia regional.")
 
             return ''.join(parts)
 
@@ -1241,7 +1236,7 @@ class RVContentGenerator:
                 'growth_ytd': 'N/D', 'value_ytd': 'N/D', 'spread_ytd': 'N/D',
                 'growth_1m': 'N/D', 'value_1m': 'N/D',
             }
-            narrativa = "Datos de style no disponibles. Mantenemos enfoque barbell Quality + Value como default."
+            narrativa = "Datos de style no disponibles."
             style_signal = 'BALANCED'
 
         return {
@@ -1252,7 +1247,7 @@ class RVContentGenerator:
             },
             'narrativa': narrativa,
             'view': 'BARBELL' if style_signal == 'BALANCED' else style_signal,
-            'preferencia': 'Quality Growth + Deep Value',
+            'preferencia': 'N/D — ver council',
         }
 
     def _generate_factor_performance(self) -> List[Dict[str, Any]]:
@@ -1788,7 +1783,7 @@ class RVContentGenerator:
                     'ticker': p['ticker'],
                     'pe': f"{pe:.1f}x" if pe and pe < 80 else 'N/D',
                     'div_yield': f"{div_y:.1f}%" if div_y else 'N/D',
-                    'rationale': rationale_map.get(p['ticker'], 'Valuación atractiva'),
+                    'rationale': rationale_map.get(p['ticker'], 'N/D'),
                 })
             return top_picks
 

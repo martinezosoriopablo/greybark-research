@@ -637,10 +637,7 @@ class AssetAllocationContentGenerator:
             max_tokens=600,
         )
         if not narrativa:
-            narrativa = (
-                f"Chile mantiene fundamentos solidos con TPM en {tpm_str} y tasa real "
-                f"de {tpm_real_str}. Cobre en {cobre_str} como soporte estructural."
-            )
+            narrativa = f"Chile: TPM {tpm_str}, tasa real {tpm_real_str}, cobre {cobre_str}."
 
         datos = [
             {'indicador': 'TPM', 'valor': tpm_str, 'tendencia': 'Ver council'},
@@ -1195,17 +1192,19 @@ class AssetAllocationContentGenerator:
         if 'real estate' in rv.lower():
             sectores_uw.append('Real Estate')
 
-        if not sectores_ow:
-            sectores_ow = ['Technology', 'Industrials', 'Materials']
-        if not sectores_uw:
-            sectores_uw = ['Consumer Discretionary', 'Real Estate']
-
-        # Detect factor tilt
-        factor = 'QUALITY-MOMENTUM'
+        # No fallback sectors — if council doesn't mention them, leave empty
+        # Detect factor tilt from council only
+        factor = 'N/D'
         if 'quality' in rv.lower() and 'momentum' in rv.lower():
             factor = 'QUALITY-MOMENTUM'
+        elif 'value' in rv.lower() and 'quality' in rv.lower():
+            factor = 'VALUE + QUALITY'
+        elif 'quality' in rv.lower():
+            factor = 'QUALITY'
         elif 'value' in rv.lower():
-            factor = 'VALUE con toque QUALITY'
+            factor = 'VALUE'
+        elif 'momentum' in rv.lower():
+            factor = 'MOMENTUM'
 
         # Get structured equity views from parser
         eq_views = self.parser.get_equity_views()
@@ -1779,89 +1778,46 @@ class AssetAllocationContentGenerator:
     # =========================================================================
 
     def generate_model_portfolios(self) -> List[Dict[str, Any]]:
-        """5 portafolios modelo por perfil de riesgo."""
+        """5 portafolios modelo generados por Claude basados en council output."""
+        from narrative_engine import generate_narrative
+        import json as _json
 
-        # Base allocations - these are adjusted by council recommendations
-        # when available (e.g., CIO says reduce equities, increase cash)
-        portfolios = [
-            {
-                'perfil': 'Ultra Conservador',
-                'risk_score': '1-2',
-                'allocations': [
-                    {'asset': 'RV USA', 'pct': 5, 'cambio': '→'},
-                    {'asset': 'RV Europa', 'pct': 2, 'cambio': '→'},
-                    {'asset': 'RV Chile', 'pct': 3, 'cambio': '→'},
-                    {'asset': 'RV EM', 'pct': 0, 'cambio': '→'},
-                    {'asset': 'RF Gobierno', 'pct': 45, 'cambio': '↑'},
-                    {'asset': 'RF Credito', 'pct': 15, 'cambio': '→'},
-                    {'asset': 'RF Chile', 'pct': 15, 'cambio': '→'},
-                    {'asset': 'Commodities', 'pct': 0, 'cambio': '→'},
-                    {'asset': 'Cash', 'pct': 15, 'cambio': '↑'},
-                ]
-            },
-            {
-                'perfil': 'Conservador',
-                'risk_score': '3',
-                'allocations': [
-                    {'asset': 'RV USA', 'pct': 12, 'cambio': '→'},
-                    {'asset': 'RV Europa', 'pct': 5, 'cambio': '→'},
-                    {'asset': 'RV Chile', 'pct': 5, 'cambio': '↑'},
-                    {'asset': 'RV EM', 'pct': 3, 'cambio': '→'},
-                    {'asset': 'RF Gobierno', 'pct': 35, 'cambio': '→'},
-                    {'asset': 'RF Credito', 'pct': 15, 'cambio': '→'},
-                    {'asset': 'RF Chile', 'pct': 12, 'cambio': '→'},
-                    {'asset': 'Commodities', 'pct': 3, 'cambio': '→'},
-                    {'asset': 'Cash', 'pct': 10, 'cambio': '↑'},
-                ]
-            },
-            {
-                'perfil': 'Moderado',
-                'risk_score': '4-5',
-                'allocations': [
-                    {'asset': 'RV USA', 'pct': 22, 'cambio': '↓'},
-                    {'asset': 'RV Europa', 'pct': 8, 'cambio': '→'},
-                    {'asset': 'RV Chile', 'pct': 10, 'cambio': '↑'},
-                    {'asset': 'RV EM', 'pct': 5, 'cambio': '→'},
-                    {'asset': 'RF Gobierno', 'pct': 20, 'cambio': '→'},
-                    {'asset': 'RF Credito', 'pct': 12, 'cambio': '→'},
-                    {'asset': 'RF Chile', 'pct': 10, 'cambio': '→'},
-                    {'asset': 'Commodities', 'pct': 8, 'cambio': '→'},
-                    {'asset': 'Cash', 'pct': 5, 'cambio': '↑'},
-                ]
-            },
-            {
-                'perfil': 'Agresivo',
-                'risk_score': '6-7',
-                'allocations': [
-                    {'asset': 'RV USA', 'pct': 30, 'cambio': '↓'},
-                    {'asset': 'RV Europa', 'pct': 10, 'cambio': '→'},
-                    {'asset': 'RV Chile', 'pct': 12, 'cambio': '↑'},
-                    {'asset': 'RV EM', 'pct': 8, 'cambio': '→'},
-                    {'asset': 'RF Gobierno', 'pct': 10, 'cambio': '→'},
-                    {'asset': 'RF Credito', 'pct': 10, 'cambio': '→'},
-                    {'asset': 'RF Chile', 'pct': 8, 'cambio': '→'},
-                    {'asset': 'Commodities', 'pct': 8, 'cambio': '→'},
-                    {'asset': 'Cash', 'pct': 4, 'cambio': '→'},
-                ]
-            },
-            {
-                'perfil': 'Ultra Agresivo',
-                'risk_score': '8-10',
-                'allocations': [
-                    {'asset': 'RV USA', 'pct': 35, 'cambio': '↓'},
-                    {'asset': 'RV Europa', 'pct': 12, 'cambio': '→'},
-                    {'asset': 'RV Chile', 'pct': 15, 'cambio': '↑'},
-                    {'asset': 'RV EM', 'pct': 10, 'cambio': '→'},
-                    {'asset': 'RF Gobierno', 'pct': 5, 'cambio': '→'},
-                    {'asset': 'RF Credito', 'pct': 5, 'cambio': '→'},
-                    {'asset': 'RF Chile', 'pct': 5, 'cambio': '→'},
-                    {'asset': 'Commodities', 'pct': 10, 'cambio': '→'},
-                    {'asset': 'Cash', 'pct': 3, 'cambio': '→'},
-                ]
-            },
-        ]
+        final_rec = self.council.get('final_recommendation', '')
+        cio = self.council.get('cio_synthesis', '')
+        if not (final_rec or cio):
+            return [{'perfil': 'N/D', 'risk_score': '-', 'allocations': [], 'nota': 'Portafolios modelo requieren council session.'}]
 
-        return portfolios
+        council_ctx = f"FINAL REC:\n{final_rec[:2000]}\n\nCIO:\n{cio[:1500]}"
+        result = generate_narrative(
+            section_name="model_portfolios",
+            prompt=(
+                "Genera 5 portafolios modelo (Ultra Conservador, Conservador, Moderado, Agresivo, Ultra Agresivo) "
+                "basados en las recomendaciones del council. Formato JSON: "
+                "[{\"perfil\": \"...\", \"risk_score\": \"1-2\", \"allocations\": "
+                "[{\"asset\": \"RV USA\", \"pct\": 5, \"cambio\": \"→\"}]}]. "
+                "Assets: RV USA, RV Europa, RV Chile, RV EM, RF Gobierno, RF Credito, RF Chile, Commodities, Cash. "
+                "Cada portafolio debe sumar 100%. Cambio: ↑/↓/→ vs mes anterior segun council. "
+                "SOLO JSON, sin explicacion."
+            ),
+            council_context=council_ctx,
+            company_name=self.company_name,
+            max_tokens=2000,
+        )
+        if result:
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                    cleaned = cleaned.strip()
+                parsed = _json.loads(cleaned)
+                if isinstance(parsed, list) and len(parsed) >= 3:
+                    return parsed
+            except (_json.JSONDecodeError, KeyError):
+                pass
+
+        return [{'perfil': 'N/D', 'risk_score': '-', 'allocations': [], 'nota': 'Error generando portafolios modelo.'}]
 
     # =========================================================================
     # SECCION 9: FOCUS LIST

@@ -154,7 +154,7 @@ class MacroContentGenerator:
         text = (final + ' ' + cio).lower()
 
         if not text.strip():
-            return {'view': 'NEUTRAL'}
+            return {'view': 'N/D'}
 
         import re as _re
         # AGRESIVO: solo si explícitamente dice "postura agresiva"
@@ -220,12 +220,7 @@ class MacroContentGenerator:
         cio = self.council.get('cio_synthesis', '')
 
         if not (final_rec or cio):
-            return [
-                "Crecimiento global con dinamicas mixtas entre regiones desarrolladas y emergentes",
-                "Inflacion convergiendo gradualmente en economias desarrolladas, servicios con inercia",
-                "Bancos centrales en modo de evaluacion; proximos movimientos dependen de datos",
-                "Chile con fundamentos solidos; cobre como soporte a cuentas externas",
-            ]
+            return ["N/D — key takeaways requieren council session."]
 
         council_context = f"FINAL REC:\n{final_rec[:2000]}\n\nCIO:\n{cio[:2000]}"
 
@@ -247,11 +242,7 @@ class MacroContentGenerator:
             if len(lines) >= 3:
                 return lines
 
-        return [
-            "Dinamicas macro complejas requieren posicionamiento selectivo",
-            "Politica monetaria en evaluacion; datos proximos seran determinantes",
-            "Chile con fundamentos diferenciados positivamente en la region",
-        ]
+        return ["N/D — narrative engine no retorno takeaways validos."]
 
     def _fc(self, *keys, default=None):
         """Accede a forecast_data siguiendo ruta de keys."""
@@ -655,20 +646,29 @@ class MacroContentGenerator:
         hs_val = f"{hs_raw/1000:.2f}M" if hs_raw else 'N/D'
         cc_val = self._fmt(d.get('consumer_confidence'), suffix='')
 
+        from narrative_engine import generate_narrative
+        quant_ctx = f"GDP QoQ anualizado: {gdp_val}. Mfg New Orders: {no_val}. Housing Starts: {hs_val}. Consumer Confidence: {cc_val}."
+        council_ctx = self.council.get('panel_outputs', {}).get('macro', '')[:1500]
+        narrativa = generate_narrative(
+            section_name="usa_growth",
+            prompt=(
+                "Describe el estado del crecimiento de EE.UU. en 2-3 oraciones basandote SOLO en los datos proporcionados. "
+                "NO asumas direccion (solido/debil) — deduce del GDP y leading indicators. Maximo 80 palabras."
+            ),
+            council_context=council_ctx,
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=250,
+        ) or f"GDP EE.UU.: {gdp_val}. Mfg New Orders: {no_val}. Housing Starts: {hs_val}. Consumer Confidence: {cc_val}."
+
         return {
             'titulo': 'Crecimiento Económico',
-            'narrativa': (
-                f"El crecimiento de EE.UU. se mantiene solido, con el GDP "
-                f"expandiendose a una tasa anualizada de {gdp_val} en el ultimo trimestre. "
-                f"El consumo privado sigue siendo el principal motor, soportado por un mercado laboral "
-                f"equilibrado y ganancias reales de salarios. La inversion empresarial se recupera "
-                f"con impulso del sector tech/AI."
-            ),
-            'drivers': [],  # GDP component breakdown not available via free APIs
+            'narrativa': narrativa,
+            'drivers': [],
             'leading_indicators': [
-                {'indicador': 'Mfg New Orders', 'valor': no_val, 'tendencia': 'Leading'},
-                {'indicador': 'Housing Starts', 'valor': hs_val, 'tendencia': 'Recuperando'},
-                {'indicador': 'Consumer Confidence', 'valor': cc_val, 'tendencia': 'Estable'},
+                {'indicador': 'Mfg New Orders', 'valor': no_val, 'tendencia': '-'},
+                {'indicador': 'Housing Starts', 'valor': hs_val, 'tendencia': '-'},
+                {'indicador': 'Consumer Confidence', 'valor': cc_val, 'tendencia': '-'},
             ]
         }
 
@@ -705,40 +705,74 @@ class MacroContentGenerator:
         qr_str = self._fmt(d.get('quits_rate'))
         qr_prev_str = self._fmt(d.get('quits_rate_prev'))
 
+        from narrative_engine import generate_narrative
+        quant_ctx = (
+            f"NFP: {nfp_str} (prev {nfp_prev_str}). U3: {u3_str} (prev {u3_prev_str}). "
+            f"U6: {u6_str}. LFPR: {lfpr_str}. Prime-Age: {prime_str}. "
+            f"Initial Claims: {ic_str} (prev {ic_prev_str}). Continuing Claims: {cc_str}. "
+            f"Job Openings: {jo_str} (prev {jo_prev_str}). Quits Rate: {qr_str}. AHE: {ahe_str} (prev {ahe_prev_str})."
+        )
+        council_ctx = self.council.get('panel_outputs', {}).get('macro', '')[:1500]
+        narrativa = generate_narrative(
+            section_name="usa_labor",
+            prompt=(
+                "Describe el estado del mercado laboral de EE.UU. en 2-3 oraciones basandote SOLO en los datos. "
+                "Deduce la direccion de los datos (anterior vs actual), NO asumas. Maximo 80 palabras."
+            ),
+            council_context=council_ctx, quant_context=quant_ctx,
+            company_name=self.company_name, max_tokens=250,
+        ) or f"NFP: {nfp_str}. Desempleo U3: {u3_str}. AHE: {ahe_str}."
+
+        narrativa_jolts = generate_narrative(
+            section_name="usa_jolts",
+            prompt=(
+                "Describe JOLTS en 1-2 oraciones con los datos proporcionados. NO asumas direccion. Maximo 40 palabras."
+            ),
+            council_context="", quant_context=f"Job Openings: {jo_str} (prev {jo_prev_str}). Quits Rate: {qr_str} (prev {qr_prev_str}).",
+            company_name=self.company_name, max_tokens=150,
+        ) or f"Job Openings: {jo_str}. Quits Rate: {qr_str}."
+
+        narrativa_salarios = generate_narrative(
+            section_name="usa_wages",
+            prompt=(
+                "Describe presiones salariales en 1-2 oraciones con los datos. NO inventes umbrales ni estimaciones. Maximo 40 palabras."
+            ),
+            council_context="", quant_context=f"AHE YoY: {ahe_str} (prev {ahe_prev_str}).",
+            company_name=self.company_name, max_tokens=150,
+        ) or f"AHE: {ahe_str}."
+
+        def _trend(curr, prev):
+            """Compute trend from current vs previous string values."""
+            try:
+                c = float(str(curr).replace('%', '').replace('K', '').replace('M', '').replace('$', '').replace('+', '').replace(',', '').strip())
+                p = float(str(prev).replace('%', '').replace('K', '').replace('M', '').replace('$', '').replace('+', '').replace(',', '').strip())
+                if c > p * 1.02: return 'Subiendo'
+                if c < p * 0.98: return 'Bajando'
+                return 'Estable'
+            except (ValueError, TypeError):
+                return '-'
+
         return {
             'titulo': 'Mercado Laboral',
-            'narrativa': (
-                f"El mercado laboral mantiene su fortaleza aunque con señales de normalización gradual. "
-                f"La creacion de empleo (NFP) se situa en {nfp_str} mensual. "
-                f"La tasa de desempleo se mantiene en {u3_str}, "
-                f"ligeramente por encima del NAIRU estimado de 4.0%. Las presiones salariales se "
-                f"moderan con el AHE en {ahe_str}."
-            ),
+            'narrativa': narrativa,
             'datos': [
-                {'indicador': 'Non-Farm Payrolls', 'valor': nfp_str, 'anterior': nfp_prev_str, 'tendencia': 'Moderando'},
-                {'indicador': 'Tasa Desempleo (U3)', 'valor': u3_str, 'anterior': u3_prev_str, 'tendencia': 'Estable'},
-                {'indicador': 'Desempleo Amplio (U6)', 'valor': u6_str, 'anterior': u6_prev_str, 'tendencia': 'Estable'},
-                {'indicador': 'Participación Laboral', 'valor': lfpr_str, 'anterior': lfpr_prev_str, 'tendencia': 'Estable'},
-                {'indicador': 'Participación Prime-Age', 'valor': prime_str, 'anterior': prime_prev_str, 'tendencia': 'Recuperando'},
-                {'indicador': 'Initial Claims', 'valor': ic_str, 'anterior': ic_prev_str, 'tendencia': 'Bajas'},
-                {'indicador': 'Continuing Claims', 'valor': cc_str, 'anterior': cc_prev_str, 'tendencia': 'Estable'},
+                {'indicador': 'Non-Farm Payrolls', 'valor': nfp_str, 'anterior': nfp_prev_str, 'tendencia': _trend(nfp, nfp_prev)},
+                {'indicador': 'Tasa Desempleo (U3)', 'valor': u3_str, 'anterior': u3_prev_str, 'tendencia': _trend(d.get('unemployment'), d.get('unemployment_prev'))},
+                {'indicador': 'Desempleo Amplio (U6)', 'valor': u6_str, 'anterior': u6_prev_str, 'tendencia': _trend(d.get('u6'), d.get('u6_prev'))},
+                {'indicador': 'Participación Laboral', 'valor': lfpr_str, 'anterior': lfpr_prev_str, 'tendencia': _trend(d.get('lfpr'), d.get('lfpr_prev'))},
+                {'indicador': 'Participación Prime-Age', 'valor': prime_str, 'anterior': prime_prev_str, 'tendencia': _trend(d.get('prime_age'), d.get('prime_age_prev'))},
+                {'indicador': 'Initial Claims', 'valor': ic_str, 'anterior': ic_prev_str, 'tendencia': _trend(ic_raw, ic_prev)},
+                {'indicador': 'Continuing Claims', 'valor': cc_str, 'anterior': cc_prev_str, 'tendencia': _trend(cc_raw, cc_prev)},
             ],
             'jolts': [
-                {'indicador': 'Job Openings', 'valor': jo_str, 'anterior': jo_prev_str, 'tendencia': 'Normalizando'},
-                {'indicador': 'Quits Rate', 'valor': qr_str, 'anterior': qr_prev_str, 'tendencia': 'Estable'},
+                {'indicador': 'Job Openings', 'valor': jo_str, 'anterior': jo_prev_str, 'tendencia': _trend(jo_raw, jo_prev)},
+                {'indicador': 'Quits Rate', 'valor': qr_str, 'anterior': qr_prev_str, 'tendencia': _trend(d.get('quits_rate'), d.get('quits_rate_prev'))},
             ],
             'salarios': [
-                {'indicador': 'AHE (Avg Hourly Earnings)', 'valor': ahe_str, 'anterior': ahe_prev_str, 'tendencia': 'Moderando'},
+                {'indicador': 'AHE (Avg Hourly Earnings)', 'valor': ahe_str, 'anterior': ahe_prev_str, 'tendencia': _trend(d.get('ahe_yoy'), d.get('ahe_yoy_prev'))},
             ],
-            'narrativa_jolts': (
-                f"Los datos JOLTS confirman la normalización del mercado laboral. Las ofertas de empleo "
-                f"se situan en {jo_str}, mientras el quits rate en {qr_str} se ha normalizado, "
-                f"sugiriendo menor confianza de los trabajadores para cambiar de empleo."
-            ),
-            'narrativa_salarios': (
-                f"Las presiones salariales se moderan gradualmente. El AHE crece {ahe_str}, "
-                f"aun por encima del nivel consistente con inflación de 2% (~3.5% con productividad de 1.5%)."
-            )
+            'narrativa_jolts': narrativa_jolts,
+            'narrativa_salarios': narrativa_salarios,
         }
 
     def _generate_usa_inflation(self) -> Dict[str, Any]:
@@ -756,15 +790,22 @@ class MacroContentGenerator:
         pce_c_mom_str = f"{pce_c_mom:+.2f}%" if pce_c_mom is not None else 'N/D'
         umich = self._fmt(d.get('umich_sentiment'), suffix='')
 
+        from narrative_engine import generate_narrative
+        quant_ctx = f"CPI Headline YoY: {cpi_h_yoy} (MoM: {cpi_h_mom_str}). CPI Core YoY: {cpi_c_yoy} (MoM: {cpi_c_mom_str}). PCE Core YoY: {pce_c_yoy} (MoM: {pce_c_mom_str}). UMich Sentiment: {umich}."
+        council_ctx = self.council.get('panel_outputs', {}).get('macro', '')[:1500]
+        narrativa = generate_narrative(
+            section_name="usa_inflation",
+            prompt=(
+                "Describe la inflacion de EE.UU. en 2-3 oraciones basandote SOLO en los datos. "
+                "Compara con target de 2% de la Fed. NO asumas direccion — deduce de los numeros. Maximo 80 palabras."
+            ),
+            council_context=council_ctx, quant_context=quant_ctx,
+            company_name=self.company_name, max_tokens=250,
+        ) or f"CPI Headline: {cpi_h_yoy}. CPI Core: {cpi_c_yoy}. PCE Core: {pce_c_yoy}."
+
         return {
             'titulo': 'Inflación',
-            'narrativa': (
-                f"La desinflación continua su curso, aunque a un ritmo más lento de lo esperado. "
-                f"El Core PCE, la metrica preferida de la Fed, se ubica en {pce_c_yoy}, aun por encima "
-                f"del target de 2%. El CPI headline se situa en {cpi_h_yoy}. "
-                f"La inflación de servicios ex-housing permanece sticky, mientras que la inflación "
-                f"de bienes se encuentra en desaceleración."
-            ),
+            'narrativa': narrativa,
             'datos': [
                 {'indicador': 'CPI Headline', 'valor': cpi_h_yoy, 'anterior': 'N/D', 'mom': cpi_h_mom_str},
                 {'indicador': 'CPI Core', 'valor': cpi_c_yoy, 'anterior': 'N/D', 'mom': cpi_c_mom_str},
@@ -1072,52 +1113,67 @@ class MacroContentGenerator:
         has_real = bool(eu.get('ecb_rate') is not None)
         src = ' (datos BCCh)' if has_real else ''
 
+        from narrative_engine import generate_narrative
+        quant_ctx = f"ECB Deposit Rate: {ecb_rate}. Bund 10Y: {bund_10y}."
+        council_ctx = self.council.get('panel_outputs', {}).get('macro', '')[:1000]
+        narrativa = generate_narrative(
+            section_name="ecb_policy",
+            prompt=(
+                "Describe la politica monetaria del BCE en 2-3 oraciones basandote SOLO en los datos. "
+                "NO proyectes recortes ni movimientos futuros — eso viene del council. Maximo 60 palabras."
+            ),
+            council_context=council_ctx, quant_context=quant_ctx,
+            company_name=self.company_name, max_tokens=200,
+        ) or f"ECB Deposit Rate: {ecb_rate}. Bund 10Y: {bund_10y}."
+
         return {
             'titulo': f'Política Monetaria - BCE{src}',
-            'narrativa': (
-                f"El BCE tiene la tasa de referencia en {ecb_rate}, cerca de su nivel neutral estimado. "
-                f"Bund 10Y en {bund_10y}. "
-                f"Tras los recortes de 2025, el BCE se encuentra en modo de espera evaluando "
-                f"si la inflación se mantiene anclada. Proyectamos un recorte adicional de 25bp "
-                f"en H2 2026 si el crecimiento decepciona."
-            ),
+            'narrativa': narrativa,
             'tasas': {
                 'deposito_actual': ecb_rate,
                 'refi_actual': bund_10y,
                 'proyección_2026': self._fc_pct('rate_forecasts', 'ecb', 'forecast_12m'),
                 'neutral_estimada': 'N/D',
             },
-            'próximos_movimientos': [],  # No market-implied probabilities available
+            'próximos_movimientos': [],
             'balance_riesgos': {
-                'dovish': 'Crecimiento aun debil, EUR fuerte, crédito restringido',
-                'hawkish': 'Inflación servicios rebotando, salarios acelerando'
+                'dovish': 'N/D — ver council',
+                'hawkish': 'N/D — ver council'
             }
         }
 
     def _generate_europe_risks(self) -> Dict[str, Any]:
-        """Genera riesgos especificos Europa."""
+        """Genera riesgos especificos Europa via Claude."""
+        from narrative_engine import generate_narrative
+        council_ctx = self.council.get('panel_outputs', {}).get('geo', '')[:1500]
+        result = generate_narrative(
+            section_name="europe_risks",
+            prompt=(
+                "Lista 2-3 riesgos especificos de Europa basandote en el council output. "
+                "Formato JSON: [{\"nombre\": \"...\", \"descripcion\": \"...\", \"probabilidad\": \"Alta/Media/Baja\", \"impacto\": \"Alto/Medio/Bajo\"}]. "
+                "Solo riesgos mencionados o derivados del council. Si no hay contexto, devuelve []."
+            ),
+            council_context=council_ctx, quant_context="",
+            company_name=self.company_name, max_tokens=400,
+        )
+        riesgos = []
+        if result:
+            import json as _json
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                    cleaned = cleaned.strip()
+                parsed = _json.loads(cleaned)
+                if isinstance(parsed, list):
+                    riesgos = parsed
+            except (_json.JSONDecodeError, KeyError):
+                pass
         return {
             'titulo': 'Riesgos Especificos Europa',
-            'riesgos': [
-                {
-                    'nombre': 'Competencia China en Manufactura',
-                    'descripcion': 'Overcapacity china presiona precios y margenes del sector automotriz y quimico europeo',
-                    'probabilidad': 'Alta',
-                    'impacto': 'Medio'
-                },
-                {
-                    'nombre': 'Costos de Energía',
-                    'descripcion': 'Precios del gas natural estructuralmente más altos que pre-2022, afectando competitividad',
-                    'probabilidad': 'Alta',
-                    'impacto': 'Medio'
-                },
-                {
-                    'nombre': 'Fragmentacion Política',
-                    'descripcion': 'Gobiernos debiles en Francia y Alemania limitan capacidad de reformás y política fiscal',
-                    'probabilidad': 'Media',
-                    'impacto': 'Medio'
-                }
-            ]
+            'riesgos': riesgos if riesgos else [{'nombre': 'N/D', 'descripcion': 'Ver council para riesgos Europa.', 'probabilidad': '-', 'impacto': '-'}]
         }
 
     # =========================================================================
@@ -1146,15 +1202,22 @@ class MacroContentGenerator:
         has_real = bool(cn.get('gdp_qoq') is not None)
         src = ' (datos BCCh)' if has_real else ''
 
+        from narrative_engine import generate_narrative
+        quant_ctx = f"China GDP QoQ: {gdp_val}. CPI: {cpi_val}. Desempleo urbano: {desemp_val}."
+        council_ctx = self.council.get('panel_outputs', {}).get('geo', '')[:1000]
+        narrativa = generate_narrative(
+            section_name="china_growth",
+            prompt=(
+                "Describe el crecimiento de China en 2-3 oraciones basandote SOLO en datos. "
+                "NO asumas direccion del property sector ni exportaciones sin datos. Maximo 60 palabras."
+            ),
+            council_context=council_ctx, quant_context=quant_ctx,
+            company_name=self.company_name, max_tokens=200,
+        ) or f"China GDP: {gdp_val}. CPI: {cpi_val}. Desempleo: {desemp_val}."
+
         return {
             'titulo': f'Crecimiento{src}',
-            'narrativa': (
-                f"China con GDP trimestral de {gdp_val}. "
-                f"CPI: {cpi_val}, desempleo urbano: {desemp_val}. "
-                f"El sector inmobiliario sigue como drag aunque menor, mientras que "
-                f"exportaciones enfrentan aranceles crecientes. El consumo domestico muestra "
-                f"recuperación gradual, siendo el foco de la política económica."
-            ),
+            'narrativa': narrativa,
             'datos': [
                 {'indicador': 'GDP ultimo trimestre', 'valor': gdp_val, 'anterior': 'BCCh' if has_real else 'Estimado'},
                 {'indicador': 'CPI YoY', 'valor': cpi_val, 'anterior': 'BCCh' if cn.get('cpi') is not None else 'Estimado'},
@@ -1173,17 +1236,16 @@ class MacroContentGenerator:
 
         has_bbg = prop_sales != 'N/D'
         if has_bbg:
-            narrativa = (
-                f"Las ventas de propiedades residenciales muestran una variacion YoY de {prop_sales}%. "
-                "El sector inmobiliario sigue bajo presion, pero las medidas de soporte del gobierno "
-                "apuntan a estabilizar la actividad gradualmente."
-            )
+            from narrative_engine import generate_narrative
+            narrativa = generate_narrative(
+                section_name="china_property",
+                prompt="Describe el sector inmobiliario de China en 1-2 oraciones con los datos. NO asumas direccion. Maximo 40 palabras.",
+                council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
+                quant_context=f"Property Sales YoY: {prop_sales}%.",
+                company_name=self.company_name, max_tokens=150,
+            ) or f"Ventas de propiedades residenciales YoY: {prop_sales}%."
         else:
-            narrativa = (
-                "El sector inmobiliario muestra señales de estabilizacion tras las agresivas "
-                "medidas de soporte, aunque los niveles de actividad permanecen deprimidos. "
-                "Datos detallados de propiedad no disponibles via APIs gratuitas."
-            )
+            narrativa = "Datos de sector inmobiliario no disponibles."
 
         return {
             'titulo': 'Sector Inmobiliario',
@@ -1194,12 +1256,7 @@ class MacroContentGenerator:
                 {'indicador': 'Home Prices (Tier 1)', 'valor': 'N/D', 'anterior': 'N/D'},
                 {'indicador': 'Developer Funding', 'valor': 'N/D', 'anterior': 'N/D'},
             ],
-            'políticas_soporte': [
-                'Reduccion tasas hipotecarias',
-                'Relajacion restricciónes de compra en ciudades Tier 2-3',
-                'Programa de compra de inventarios por gobiernos locales',
-                'Financiamiento a developers viables'
-            ],
+            'políticas_soporte': [],
             'drag_estimado': {}
         }
 
@@ -1216,19 +1273,19 @@ class MacroContentGenerator:
         if has_bbg:
             parts = []
             if tsf != 'N/D':
-                parts.append(f"TSF crece {tsf}% YoY")
+                parts.append(f"TSF: {tsf}% YoY")
             if m2 != 'N/D':
-                parts.append(f"M2 al {m2}% YoY")
-            narrativa = (
-                f"El impulso crediticio chino muestra {', '.join(parts)}. "
-                "Históricamente, el credit impulse positivo precede mejor demanda "
-                "de commodities y crecimiento global con lag de 6-9 meses."
-            )
+                parts.append(f"M2: {m2}% YoY")
+            from narrative_engine import generate_narrative
+            narrativa = generate_narrative(
+                section_name="china_credit",
+                prompt="Describe el impulso crediticio de China en 1-2 oraciones con los datos. NO asumas direccion. Maximo 40 palabras.",
+                council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
+                quant_context=', '.join(parts),
+                company_name=self.company_name, max_tokens=150,
+            ) or f"Impulso crediticio China: {', '.join(parts)}."
         else:
-            narrativa = (
-                "El impulso crediticio se ha vuelto positivo tras meses de contracción, "
-                "senalando mejor soporte al crecimiento."
-            )
+            narrativa = "Datos de impulso crediticio chino no disponibles."
 
         return {
             'titulo': 'Impulso Crediticio',
@@ -1258,24 +1315,21 @@ class MacroContentGenerator:
         if has_bbg:
             parts = []
             if exp_yoy != 'N/D':
-                parts.append(f"exportaciones al {exp_yoy}% YoY")
+                parts.append(f"Exports YoY: {exp_yoy}%")
             if imp_yoy != 'N/D':
-                parts.append(f"importaciones al {imp_yoy}% YoY")
+                parts.append(f"Imports YoY: {imp_yoy}%")
             if trade_bal != 'N/D':
-                parts.append(f"balanza comercial en USD {trade_bal}bn")
-            narrativa = (
-                f"Comercio exterior chino: {', '.join(parts)}. "
-                "El overcapacity industrial en sectores como EVs, paneles solares y maquinaria "
-                "mantiene tensiones comerciales con socios."
-            )
+                parts.append(f"Trade Balance: USD {trade_bal}bn")
+            from narrative_engine import generate_narrative
+            narrativa = generate_narrative(
+                section_name="china_trade",
+                prompt="Describe el comercio exterior de China en 1-2 oraciones con los datos. NO asumas direccion. Maximo 40 palabras.",
+                council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
+                quant_context=', '.join(parts),
+                company_name=self.company_name, max_tokens=150,
+            ) or f"Comercio exterior China: {', '.join(parts)}."
         else:
-            narrativa = (
-                "Las exportaciones chinas mantienen fortaleza impulsadas por productos "
-                "manufacturados, especialmente autos eléctricos, paneles solares y maquinaria. "
-                "El superávit comercial se mantiene en niveles record, generando tensiones "
-                "comerciales con socios. El overcapacity industrial es un riesgo para "
-                "competidores globales."
-            )
+            narrativa = "Datos de comercio exterior chino no disponibles."
 
         return {
             'titulo': 'Comercio Exterior',
@@ -1285,11 +1339,7 @@ class MacroContentGenerator:
                 {'indicador': 'Exports YoY', 'valor': exp_yoy, 'anterior': exp_prev},
                 {'indicador': 'Imports YoY', 'valor': imp_yoy, 'anterior': imp_prev},
             ],
-            'implicancias_commodities': [
-                'Demanda de cobre estable por sector construcción/infra',
-                'Demanda de petróleo moderada por EVs y eficiencia',
-                'Demanda de hierro debil por property sector'
-            ]
+            'implicancias_commodities': ['N/D — ver council para implicancias commodities']
         }
 
     def _generate_pboc_policy(self) -> Dict[str, Any]:
@@ -1303,14 +1353,22 @@ class MacroContentGenerator:
         has_real = bool(cn.get('pboc_rate') is not None)
         src = ' (datos BCCh)' if has_real else ''
 
+        from narrative_engine import generate_narrative
+        quant_ctx = f"PBOC Rate: {pboc_rate}. CNY/USD: {cny_val}. Shanghai Composite: {shanghai}."
+        narrativa = generate_narrative(
+            section_name="pboc_policy",
+            prompt=(
+                "Describe la politica monetaria del PBOC en 1-2 oraciones con los datos. "
+                "NO proyectes movimientos futuros — eso viene del council. Maximo 40 palabras."
+            ),
+            council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
+            quant_context=quant_ctx,
+            company_name=self.company_name, max_tokens=150,
+        ) or f"PBOC Rate: {pboc_rate}. CNY/USD: {cny_val}. Shanghai: {shanghai}."
+
         return {
             'titulo': f'Política Monetaria - PBOC{src}',
-            'narrativa': (
-                f"El PBOC tiene la tasa de referencia en {pboc_rate}. "
-                f"CNY/USD: {cny_val}. Shanghai Composite: {shanghai}. "
-                f"Las tasas se han reducido significativamente y ahora hay menos espacio. "
-                f"El RRR podria reducirse 25bp adicionales si el crecimiento decepciona."
-            ),
+            'narrativa': narrativa,
             'tasas': {
                 'pboc_rate': pboc_rate,
                 'lpr_1y': 'N/D',
@@ -1319,9 +1377,9 @@ class MacroContentGenerator:
                 'yuan_usdcny': cny_val,
             },
             'outlook': {
-                'tasas': 'Sesgo neutral, espacio limitado para más recortes',
-                'rrr': 'Posible -25bp si crecimiento decepciona',
-                'yuan': 'Depreciacion gradual aceptada'
+                'tasas': 'N/D — ver council',
+                'rrr': 'N/D — ver council',
+                'yuan': 'N/D — ver council'
             }
         }
 
@@ -1384,10 +1442,8 @@ class MacroContentGenerator:
         ipc_mom_str = f"+{self._fmt(ipc_mom)}" if ipc_mom is not None else 'N/D'
 
         narrativa = (
-            f"La desinflación continua on track, con el IPC convergiendo hacia la meta. "
-            f"El IPC headline se ubica en {ipc_yoy_str}, "
-            f"con una variación mensual de {ipc_mom_str}. "
-            f"Las expectativas de inflación son monitoreadas por el BCCh."
+            f"IPC Chile headline: {ipc_yoy_str}, variacion mensual: {ipc_mom_str}. "
+            f"Meta BCCh: 3.0%."
         )
 
         return {
@@ -1505,35 +1561,35 @@ class MacroContentGenerator:
                     'precio_actual': copper_str,
                     'precio_anterior': 'N/D',
                     'cambio': 'N/D',
-                    'outlook': 'Constructivo',
-                    'balance': 'Déficit proyectado 2026-2027',
-                    'drivers': 'Transición energetica, AI data centers, oferta limitada',
-                    'inventarios': {},  # No free API for LME/SHFE inventory data
-                    'supply': {},  # No free API for supply/demand balance
-                    'breakeven_costs': {},  # No free API for mining cost curves
+                    'outlook': 'N/D — ver council',
+                    'balance': 'N/D — ver council',
+                    'drivers': 'N/D — ver council',
+                    'inventarios': {},
+                    'supply': {},
+                    'breakeven_costs': {},
                 },
                 {
                     'nombre': 'Litio',
                     'precio_actual': litio_str,
                     'precio_anterior': 'N/D',
                     'cambio': 'N/D',
-                    'outlook': 'Estabilizando',
-                    'balance': 'Superávit moderandose por cierre de capacidad marginal',
-                    'drivers': 'Demanda EV solida pero oferta aun abundante',
-                    'inventarios': {},  # No free API for lithium inventory data
-                    'supply': {},  # No free API for supply/demand balance
-                    'breakeven_costs': {},  # No free API for cost curves
+                    'outlook': 'N/D — ver council',
+                    'balance': 'N/D — ver council',
+                    'drivers': 'N/D — ver council',
+                    'inventarios': {},
+                    'supply': {},
+                    'breakeven_costs': {},
                 },
                 {
                     'nombre': 'Petróleo (Brent)',
                     'precio_actual': brent_str,
                     'precio_anterior': 'N/D',
                     'cambio': 'N/D',
-                    'outlook': 'Neutral',
-                    'balance': 'Equilibrado con OPEC+ support',
-                    'drivers': 'Demanda China debil, OPEC+ disciplinado, geopolítica',
-                    'inventarios': {},  # No free API for OECD inventory data
-                    'breakeven_costs': {},  # No free API for cost curves
+                    'outlook': 'N/D — ver council',
+                    'balance': 'N/D — ver council',
+                    'drivers': 'N/D — ver council',
+                    'inventarios': {},
+                    'breakeven_costs': {},
                 }
             ],
             'transmisión_global': {},  # No free data for fiscal sensitivity analysis
@@ -1545,11 +1601,7 @@ class MacroContentGenerator:
         return {
             'titulo': 'Contexto LatAm',
             'paises': self._build_latam_table(),
-            'diferenciacion_chile': (
-                "Chile se diferencia positivamente por: (1) Inflación controlada y convergiendo, "
-                "(2) Banco central credible con espacio para recortes, (3) Cuentas externas "
-                "en correccion, (4) Precio del cobre favorable."
-            )
+            'diferenciacion_chile': 'N/D — ver council para diferenciacion Chile vs LatAm.'
         }
 
     def _build_latam_table(self) -> List[Dict]:
@@ -1683,38 +1735,41 @@ class MacroContentGenerator:
             except (_json.JSONDecodeError, KeyError, IndexError):
                 pass
 
-        # Minimal fallback — no stale market calls
-        fallback = [
-            {
-                'titulo': 'Panorama Geopolitico y Comercial',
-                'descripcion': (
-                    "Las dinamicas geopoliticas y comerciales dominan el panorama macro de este mes. "
-                    "Monitorear desarrollos de politica comercial y tensiones regionales."
-                    + epu_html
-                ),
-                'impacto_macro': {'global': 'Incertidumbre elevada requiere posicionamiento defensivo selectivo'}
-            },
-            {
-                'titulo': 'Dinamicas de Crecimiento e Inflacion',
-                'descripcion': (
-                    "El balance entre crecimiento e inflacion sigue siendo el factor central "
-                    "para la politica monetaria y el posicionamiento de portafolios."
-                ),
-                'impacto_macro': {'global': 'Bancos centrales en modo data-dependent'}
-            },
-        ]
-        return fallback
+        return [{
+            'titulo': 'N/D',
+            'descripcion': 'Temas macro no disponibles — council session requerida.' + epu_html,
+            'impacto_macro': {'global': 'N/D'}
+        }]
 
     def _generate_events_calendar(self) -> List[Dict[str, Any]]:
-        """Genera calendario de eventos clave."""
-        return [
-            {'fecha': '12 Feb', 'evento': 'CPI USA Enero', 'relevancia': 'Alta', 'impacto_potencial': 'Confirma path de inflación'},
-            {'fecha': '27 Feb', 'evento': 'GDP USA Q4 (final)', 'relevancia': 'Media', 'impacto_potencial': 'Validacion soft landing'},
-            {'fecha': '6 Mar', 'evento': 'ECB Decision', 'relevancia': 'Alta', 'impacto_potencial': 'Signal de terminal rate'},
-            {'fecha': '18-19 Mar', 'evento': 'FOMC + Dot Plot', 'relevancia': 'Alta', 'impacto_potencial': 'Path de tasas 2026'},
-            {'fecha': '25 Mar', 'evento': 'Reunion BCCh', 'relevancia': 'Alta', 'impacto_potencial': 'Signal de TPM path'},
-            {'fecha': '30 Abr', 'evento': 'PIB Chile Q1', 'relevancia': 'Media', 'impacto_potencial': 'Confirmacion recuperación'},
-        ]
+        """Genera calendario de eventos clave via Claude."""
+        from narrative_engine import generate_narrative
+        import json as _json
+        result = generate_narrative(
+            section_name="events_calendar",
+            prompt=(
+                f"Genera un calendario de 4-6 eventos macro clave para el proximo mes ({self.month_name} {self.year}). "
+                "Formato JSON: [{\"fecha\": \"DD Mon\", \"evento\": \"...\", \"relevancia\": \"Alta/Media\", \"impacto_potencial\": \"...\"}]. "
+                "Incluye: FOMC/Fed, ECB, BCCh, datos de inflacion y PIB relevantes. "
+                "Las fechas deben ser aproximadas para el mes indicado. Devuelve SOLO el JSON."
+            ),
+            council_context="", quant_context="",
+            company_name=self.company_name, max_tokens=500,
+        )
+        if result:
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                    cleaned = cleaned.strip()
+                parsed = _json.loads(cleaned)
+                if isinstance(parsed, list) and len(parsed) >= 2:
+                    return parsed
+            except (_json.JSONDecodeError, KeyError):
+                pass
+        return [{'fecha': '-', 'evento': 'Calendario no disponible', 'relevancia': '-', 'impacto_potencial': '-'}]
 
     # =========================================================================
     # SECCION 7: ESCENARIOS Y RIESGOS
@@ -1885,7 +1940,7 @@ class MacroContentGenerator:
             max_tokens=300,
         )
         if not pos_resumen:
-            pos_resumen = 'Postura selectiva con enfasis en datos proximos como catalizador.'
+            pos_resumen = 'N/D — narrative engine no genero posicionamiento.'
 
         return {
             'titulo': f'Conclusiones — {self.month_name} {self.year}',
@@ -1908,16 +1963,10 @@ class MacroContentGenerator:
             ),
             'vistas': [
                 {
-                    'tema': 'Crecimiento e Inflacion',
-                    'vista_grb': 'Dinamicas mixtas requieren monitoreo cercano de datos proximos.',
-                    'vs_consenso': 'En evaluacion',
-                    'vs_detalle': 'Pendiente de datos clave para definir posicion relativa al consenso.'
-                },
-                {
-                    'tema': 'Politica Monetaria',
-                    'vista_grb': 'Bancos centrales en modo data-dependent.',
-                    'vs_consenso': 'Alineado',
-                    'vs_detalle': 'Vista alineada con expectativas del mercado.'
+                    'tema': 'N/D',
+                    'vista_grb': 'N/D — council session requerida.',
+                    'vs_consenso': 'N/D',
+                    'vs_detalle': 'N/D'
                 },
             ],
             'posicionamiento_resumen': 'N/D — ver council para posicionamiento.',

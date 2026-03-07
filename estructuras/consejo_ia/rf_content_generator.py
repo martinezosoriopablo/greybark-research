@@ -810,7 +810,7 @@ class RFContentGenerator:
             'yield_real': self._fmt_pct(tips_10y) if tips_10y else 'N/D',
             'breakeven': self._fmt_pct(be_10y) if be_10y else 'N/D',
             'nominal': self._fmt_pct(nominal_10y) if nominal_10y else 'N/D',
-            'vs_historia': 'Alto',
+            'vs_historia': '-',
         }
         if tips_10y:
             us_row['_real'] = True
@@ -826,22 +826,19 @@ class RFContentGenerator:
             'yield_real': self._fmt_pct(bcu_10y) if bcu_10y else 'N/D',
             'breakeven': self._fmt_pct(chile_be) if chile_be else 'N/D',
             'nominal': self._fmt_pct(chile_nominal) if chile_nominal else 'N/D',
-            'vs_historia': 'Atractivo',
+            'vs_historia': '-',
         }
         if bcu_10y:
             chile_row['_real'] = True
 
         # German and UK real yields omitted — no public API for Euro/UK real yields or breakevens
 
-        narrativa = "Las tasas reales se mantienen en territorio positivo, reflejando política monetaria aún restrictiva. "
+        parts = []
         if tips_10y:
-            narrativa += f"US 10Y real en {self._fmt_pct(tips_10y)} ofrece rendimiento atractivo para inversionistas de largo plazo. "
-        else:
-            narrativa += "US 10Y real ofrece rendimiento atractivo para inversionistas de largo plazo. "
+            parts.append(f"US 10Y TIPS real yield: {self._fmt_pct(tips_10y)}")
         if bcu_10y:
-            narrativa += f"Chile real en {self._fmt_pct(bcu_10y)} es particularmente atractivo dado el perfil de riesgo."
-        else:
-            narrativa += "Chile real es particularmente atractivo dado el perfil de riesgo."
+            parts.append(f"Chile BCU 10Y real yield: {self._fmt_pct(bcu_10y)}")
+        narrativa = '. '.join(parts) + '.' if parts else 'Datos de tasas reales no disponibles.'
 
         return {
             'narrativa': narrativa,
@@ -1238,7 +1235,7 @@ class RFContentGenerator:
         spread_str = self._fmt_bp(hy_total_bps) if hy_total_bps else 'N/D'
         vs_hist = f"Percentil {int(hy_pctile)}%" if hy_pctile else 'N/D'
 
-        narrativa = f"High Yield ofrece yield atractivo pero spreads en {spread_str} están {vs_hist.lower()} vs historia. "
+        narrativa = f"High Yield spreads en {spread_str} ({vs_hist} vs historia). "
 
         # Get HY sub-rating views from council parser
         hy_rating_views = {}
@@ -1763,10 +1760,7 @@ class RFContentGenerator:
         lending_mortgage = self._val('chile_rates', 'lending', 'mortgage_uf')
         tpm = self._val('chile_rates', 'tpm', 'current')
 
-        narrativa = (
-            "El mercado de bonos corporativos chilenos ofrece spreads atractivos de 100-150bp "
-            "sobre soberanos con riesgo crediticio acotado. "
-        )
+        narrativa = ""
         if lending_commercial and tpm:
             spread_lending = round(lending_commercial - tpm, 1)
             narrativa += (
@@ -1841,7 +1835,7 @@ class RFContentGenerator:
         bcp_1y = self._chile_bcp('1Y')
         bcp_1y_str = self._fmt_pct(bcp_1y) if bcp_1y else None
 
-        narrativa = f"Las alternativas de corto plazo ofrecen rendimientos atractivos con la TPM en {tpm_str}. "
+        narrativa = f"Alternativas de corto plazo con TPM en {tpm_str}. "
         if dap_90_real:
             narrativa += f"DAP 90 dias rinde {self._fmt_pct(dap_90_real)}. "
         if bcp_1y_str:
@@ -1852,12 +1846,12 @@ class RFContentGenerator:
         result = {
             'narrativa': narrativa,
             'alternativas': [
-                {'instrumento': 'DAP 30 dias', 'tasa': dap_30, 'liquidez': 'Al vencimiento', 'view': 'Atractivo'},
-                {'instrumento': 'DAP 90 dias', 'tasa': dap_90, 'liquidez': 'Al vencimiento', 'view': 'Preferido'},
-                {'instrumento': 'DAP 180 dias', 'tasa': dap_180, 'liquidez': 'Al vencimiento', 'view': 'Lock-in rate'},
-                {'instrumento': 'DAP 360 dias', 'tasa': dap_1y_str, 'liquidez': 'Al vencimiento', 'view': 'Lock-in'},
-                {'instrumento': 'FM Money Market', 'tasa': fm_mm, 'liquidez': 'Diaria', 'view': 'Para liquidez'},
-                {'instrumento': 'Pactos BC', 'tasa': pactos, 'liquidez': 'Al vencimiento', 'view': 'Institucional'},
+                {'instrumento': 'DAP 30 dias', 'tasa': dap_30, 'liquidez': 'Al vencimiento', 'view': '-'},
+                {'instrumento': 'DAP 90 dias', 'tasa': dap_90, 'liquidez': 'Al vencimiento', 'view': '-'},
+                {'instrumento': 'DAP 180 dias', 'tasa': dap_180, 'liquidez': 'Al vencimiento', 'view': '-'},
+                {'instrumento': 'DAP 360 dias', 'tasa': dap_1y_str, 'liquidez': 'Al vencimiento', 'view': '-'},
+                {'instrumento': 'FM Money Market', 'tasa': fm_mm, 'liquidez': 'Diaria', 'view': '-'},
+                {'instrumento': 'Pactos BC', 'tasa': pactos, 'liquidez': 'Al vencimiento', 'view': '-'},
             ],
         }
         if dap_90_real:
@@ -1873,39 +1867,19 @@ class RFContentGenerator:
 
         be_str = self._fmt_pct(be_ref) if be_ref else 'N/D'
 
-        # Determinar view: si BE < 3%, UF barato; si > 3%, pesos barato
-        view = 'NEUTRAL'
+        narrativa = f"Breakeven de inflacion en {be_str}. Meta BCCh: 3.0%."
         if be_ref:
-            if be_ref < 2.7:
-                view = 'OW UF (BCU)'
-            elif be_ref > 3.3:
-                view = 'OW PESOS (BCP)'
-
-        narrativa = (
-            f"El breakeven de inflacion en {be_str} "
-        )
-        if be_ref and abs(be_ref - 3.0) < 0.3:
-            narrativa += "esta en linea con la meta del BCCh, sugiriendo que no hay valor obvio entre UF y pesos. "
-        elif be_ref and be_ref < 3.0:
-            narrativa += "esta por debajo de la meta del BCCh, sugiriendo que UF esta barato vs pesos. "
-        elif be_ref and be_ref > 3.0:
-            narrativa += "esta por sobre la meta del BCCh, sugiriendo cautela con UF. "
-        else:
-            narrativa += "esta cerca de la meta del BCCh. "
-        narrativa += (
-            "Para inversionistas con horizontes largos, la UF ofrece proteccion natural. "
-            "Para posiciones tacticas, evaluar vs breakeven actual."
-        )
+            narrativa += f" Diferencia vs meta: {be_ref - 3.0:+.1f}pp."
 
         result = {
             'breakeven': be_str,
-            'inflacion_esperada': '3.00%',  # BCCh target — not market data
-            'view': view,
+            'inflacion_esperada': 'N/D — meta BCCh 3.0% (no es expectativa de mercado)',
+            'view': 'N/D — ver council',
             'narrativa': narrativa,
             'recomendacion': {
-                'corto_plazo': 'Pesos (DAP, BCP corto)',
-                'mediano_plazo': 'Mix 50/50',
-                'largo_plazo': 'UF preferido (BCU)'
+                'corto_plazo': 'N/D — ver council',
+                'mediano_plazo': 'N/D — ver council',
+                'largo_plazo': 'N/D — ver council'
             }
         }
         if be_ref:
@@ -2054,7 +2028,7 @@ class RFContentGenerator:
             'us_tips': {
                 'view': view,
                 'yield_real_10y': self._fmt_pct(tips_10y) if tips_10y else 'N/D',
-                'rationale': tips_rationale if tips_rationale else 'Breakevens fair, real yield atractivo para largo plazo',
+                'rationale': tips_rationale if tips_rationale else 'N/D — ver council',
                 '_real': bool(tips_10y)
             },
             'euro_linkers': {
@@ -2075,12 +2049,18 @@ class RFContentGenerator:
         bcu_10y = self._chile_bcu('10Y')
         bcu_str = self._fmt_pct(bcu_10y) if bcu_10y else 'N/D'
 
-        return (
-            "Los breakevens de inflacion estan anclados cerca de las metas de los bancos centrales "
-            "en la mayoria de mercados, sugiriendo expectativas bien comportadas. No vemos valor "
-            f"tactico claro en posiciones de inflacion en US o Europa. Chile ofrece la oportunidad "
-            f"mas atractiva con BCU 10Y rindiendo {bcu_str} real, atractivo para horizontes largos."
+        from narrative_engine import generate_narrative
+        narrativa = generate_narrative(
+            section_name="rf_inflation_narrative",
+            prompt=(
+                "Describe el panorama de inflacion y breakevens en 2-3 oraciones con los datos. "
+                "NO emitas opinion sobre valor tactico. Maximo 60 palabras."
+            ),
+            council_context=self.council.get('panel_outputs', {}).get('rf', '')[:1000],
+            quant_context=f"Chile BCU 10Y real yield: {bcu_str}.",
+            company_name=self.company_name, max_tokens=200,
         )
+        return narrativa or f"Chile BCU 10Y real yield: {bcu_str}."
 
     # =========================================================================
     # SECCION 8: RIESGOS Y OPORTUNIDADES
