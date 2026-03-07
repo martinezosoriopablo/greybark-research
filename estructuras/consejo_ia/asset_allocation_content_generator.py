@@ -34,9 +34,25 @@ class AssetAllocationContentGenerator:
         self.date = datetime.now()
         self.month_name = self._get_spanish_month(self.date.month)
 
+        # External data providers (injected by caller)
+        self.data = None  # ChartDataProvider, injected externally
+        self.bloomberg = None  # BloombergReader, injected externally
+        self._parser = None
+
         # Cache parsed council data
         self._parsed_final = None
         self._parsed_cio = None
+
+    @property
+    def parser(self):
+        if self._parser is None:
+            try:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser(self.council)
+            except Exception:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser({})
+        return self._parser
 
     # =========================================================================
     # QUANT DATA HELPERS
@@ -56,6 +72,54 @@ class AssetAllocationContentGenerator:
     def _has_q(self, *keys) -> bool:
         """Verifica si quant_data tiene datos en la ruta."""
         return self._q(*keys) is not None
+
+    def _bbg_val(self, campo_id: str, default=None):
+        """Get latest Bloomberg value, returns None if unavailable."""
+        if self.bloomberg and self.bloomberg.has(campo_id):
+            return self.bloomberg.get_latest(campo_id)
+        return default
+
+    def _bbg_quant_summary(self) -> str:
+        """Build quant context string from Bloomberg data for narrative prompts."""
+        parts = []
+        if not self.bloomberg or not self.bloomberg.available:
+            return ''
+        # PE Forward valuations
+        pe_map = {'S&P 500': 'pe_spx', 'STOXX 600': 'pe_stoxx600',
+                  'MSCI EM': 'pe_msci_em', 'IPSA': 'pe_ipsa'}
+        pe_items = []
+        for label, campo in pe_map.items():
+            v = self._bbg_val(campo)
+            if v is not None:
+                pe_items.append(f"{label}: {v:.1f}x")
+        if pe_items:
+            parts.append(f"PE Fwd: {', '.join(pe_items)}")
+        # CDS key
+        cds_map = {'USA': 'cds_usa', 'Chile': 'cds_chile', 'China': 'cds_china'}
+        cds_items = []
+        for label, campo in cds_map.items():
+            v = self._bbg_val(campo)
+            if v is not None:
+                cds_items.append(f"{label}: {v:.0f}bp")
+        if cds_items:
+            parts.append(f"CDS 5Y: {', '.join(cds_items)}")
+        # SOFR key tenors
+        sofr_map = {'2Y': 'sofr_2y', '5Y': 'sofr_5y', '10Y': 'sofr_10y'}
+        sofr_items = []
+        for label, campo in sofr_map.items():
+            v = self._bbg_val(campo)
+            if v is not None:
+                sofr_items.append(f"{label}: {v:.2f}%")
+        if sofr_items:
+            parts.append(f"SOFR Swap: {', '.join(sofr_items)}")
+        # IG/HY total spread
+        ig = self._bbg_val('oas_ig_total')
+        hy = self._bbg_val('oas_hy_total')
+        if ig is not None:
+            parts.append(f"OAS IG: {ig:.0f}bp")
+        if hy is not None:
+            parts.append(f"OAS HY: {hy:.0f}bp")
+        return ' | '.join(parts)
 
     def _fmt_bp(self, value) -> str:
         """Formatea basis points."""
@@ -148,7 +212,7 @@ class AssetAllocationContentGenerator:
         final = self._final()
 
         if not final:
-            return {'view': 'NEUTRAL', 'sesgo': 'SELECTIVO', 'conviccion': 'MEDIA'}
+            return {'view': 'N/D', 'sesgo': 'N/D', 'conviccion': 'N/D'}
 
         # Parse postura from final recommendation
         text = final.lower()
@@ -318,37 +382,90 @@ class AssetAllocationContentGenerator:
         }
 
     def _generate_economia_global(self) -> Dict[str, Any]:
-        """Economía global desde panel macro."""
+        """Economía global desde panel macro + datos reales."""
         macro = self._panel('macro')
 
         if not macro:
             return self._default_economia_global()
 
-        gdp = self._extract_number(macro, r'GDP\s+(?:US\s+)?(\d+\.?\d*)%', 4.4)
-        cpi = self._extract_number(macro, r'Core\s+CPI\s+(?:bajando\s+de\s+\d+\.?\d*%?\s*a\s+)?(\d+\.?\d*)%', 2.9)
-        retail = self._extract_number(macro, r'retail\s+sales?\s+\+?(\d+\.?\d*)%', 3.1)
-        recession = self._extract_number(macro, r'recesi[oó]n.*?(\d+)%', 15)
+        # Try real data from ChartDataProvider first, then council text, then 'N/D'
+        gdp = self._extract_number(macro, r'GDP\s+(?:US\s+)?(\d+\.?\d*)%', None)
+        cpi = self._extract_number(macro, r'Core\s+CPI\s+(?:bajando\s+de\s+\d+\.?\d*%?\s*a\s+)?(\d+\.?\d*)%', None)
+        retail = self._extract_number(macro, r'retail\s+sales?\s+\+?(\d+\.?\d*)%', None)
+        recession = self._extract_number(macro, r'recesi[oó]n.*?(\d+)%', None)
 
-        narrativa = f"""Los datos macroeconómicos confirman un régimen de EXPANSIÓN con GDP US en {gdp}% QoQ y retail sales firme (+{retail}% YoY). La manufactura alcanzó máximos desde 2022, impulsando la rotación sectorial. Sin embargo, el empleo white-collar muestra deterioro acelerado — búsquedas cualificadas ahora promedian 6 meses, actuando como leading indicator de recesión con 6-9 meses de adelanto.
+        # Enrich with real FRED data if available
+        if self.data:
+            try:
+                usa = self.data.get_usa_latest()
+                if gdp is None and usa.get('gdp_saar') is not None:
+                    gdp = usa['gdp_saar']
+                if cpi is None and usa.get('cpi_core') is not None:
+                    cpi = usa['cpi_core']
+            except Exception:
+                pass
 
-La inflación core se mantiene en {cpi}%, con servicios persistentemente elevados. Wall Street espera CPI +2.5% YoY esta semana vs consenso sell-side de solo 1-2 cortes en 2026. La probabilidad de recesión a 12 meses se estima en {recession}% (modelo cuantitativo dice 4.5%, pero señales cualitativas son más preocupantes)."""
+        # Also try quant_data
+        if gdp is None:
+            gdp = self._q('macro_usa', 'gdp')
+        if cpi is None:
+            cpi = self._q('macro_usa', 'core_cpi')
+
+        gdp_str = f'{gdp}%' if gdp is not None else 'N/D'
+        cpi_str = f'{cpi}%' if cpi is not None else 'N/D'
+        retail_str = f'+{retail}%' if retail is not None else 'N/D'
+        recession_str = f'{int(recession)}%' if recession is not None else 'N/D'
+
+        from narrative_engine import generate_narrative
+        council_ctx = f"MACRO PANEL:\n{macro[:2500]}"
+        quant_ctx = f"GDP US: {gdp_str} | Core CPI: {cpi_str} | Retail Sales: {retail_str} | Prob Recesion: {recession_str}"
+
+        narrativa = generate_narrative(
+            section_name="aa_economia_global",
+            prompt=(
+                f"Escribe 2 parrafos sobre la economia global para {self.month_name} "
+                f"{self.date.year}. Cubrir: GDP, inflacion, empleo, y probabilidad de recesion. "
+                "Integrar datos cuantitativos proporcionados. Maximo 150 palabras. "
+                "Separa parrafos con linea vacia."
+            ),
+            council_context=council_ctx,
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=600,
+        )
+        if not narrativa:
+            narrativa = (
+                f"GDP US en {gdp_str} QoQ. Core CPI en {cpi_str}. "
+                f"Retail sales en {retail_str} YoY. Probabilidad de recesion: {recession_str}."
+            )
 
         datos = [
-            {'indicador': 'GDP US QoQ', 'actual': f'{gdp}%', 'anterior': '2.8%', 'sorpresa': 'Positiva'},
-            {'indicador': 'Core CPI YoY', 'actual': f'{cpi}%', 'anterior': '3.0%', 'sorpresa': 'Neutral'},
-            {'indicador': 'Retail Sales YoY', 'actual': f'+{retail}%', 'anterior': '+2.5%', 'sorpresa': 'Positiva'},
-            {'indicador': 'Prob. Recesión 12M', 'actual': f'{recession}%', 'anterior': '20%', 'sorpresa': 'Mejorando'},
+            {'indicador': 'GDP US QoQ', 'actual': gdp_str, 'anterior': 'N/D', 'sorpresa': 'Ver council'},
+            {'indicador': 'Core CPI YoY', 'actual': cpi_str, 'anterior': 'N/D', 'sorpresa': 'Ver council'},
+            {'indicador': 'Retail Sales YoY', 'actual': retail_str, 'anterior': 'N/D', 'sorpresa': 'Ver council'},
+            {'indicador': 'Prob. Recesión 12M', 'actual': recession_str, 'anterior': 'N/D', 'sorpresa': 'Ver council'},
         ]
 
         return {'titulo': 'Economía Global', 'narrativa': narrativa, 'datos': datos}
 
     def _default_economia_global(self) -> Dict[str, Any]:
+        # Try to get at least CPI from real data
+        cpi_str = 'N/D'
+        if self.data:
+            try:
+                usa = self.data.get_usa_latest()
+                if usa.get('cpi_core') is not None:
+                    cpi_str = f"{usa['cpi_core']}%"
+            except Exception:
+                pass
+        if cpi_str == 'N/D':
+            cpi_str = self._fmt_pct(self._q('macro_usa', 'core_cpi'))
+
         return {
             'titulo': 'Economía Global',
-            'narrativa': 'Los datos macroeconómicos muestran señales mixtas con manufactura sólida pero inflación persistente.',
+            'narrativa': 'Los datos macroeconómicos muestran señales mixtas. Sin datos del council para mayor detalle.',
             'datos': [
-                {'indicador': 'US Manufacturing', 'actual': 'Sólido', 'anterior': 'Débil', 'sorpresa': 'Positiva'},
-                {'indicador': 'US Core CPI', 'actual': '2.9%', 'anterior': '3.0%', 'sorpresa': 'Neutral'},
+                {'indicador': 'US Core CPI', 'actual': cpi_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
             ]
         }
 
@@ -381,13 +498,31 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         return {'titulo': 'Mercados Financieros', 'narrativa': narrativa, 'performance': []}
 
     def _default_mercados(self) -> Dict[str, Any]:
+        performance = []
+        if self.data:
+            try:
+                returns = self.data.get_previous_month_returns(['SPY', 'QQQ', 'EEM'])
+                labels = {'SPY': 'S&P 500', 'QQQ': 'Nasdaq 100', 'EEM': 'MSCI EM'}
+                for ticker, name in labels.items():
+                    ret = returns.get(ticker)
+                    performance.append({
+                        'asset': name,
+                        'retorno': f"{ret:+.1f}%" if ret is not None else 'N/D',
+                        'ytd': 'N/D',
+                    })
+            except Exception:
+                pass
+
+        if not performance:
+            performance = [
+                {'asset': 'S&P 500', 'retorno': 'N/D', 'ytd': 'N/D'},
+                {'asset': 'Nasdaq 100', 'retorno': 'N/D', 'ytd': 'N/D'},
+            ]
+
         return {
             'titulo': 'Mercados Financieros',
-            'narrativa': 'Los mercados mostraron rotación sectorial significativa durante el período.',
-            'performance': [
-                {'asset': 'S&P 500', 'retorno': '+0.2%', 'ytd': '+2.5%'},
-                {'asset': 'Nasdaq', 'retorno': '-1.5%', 'ytd': '+1.8%'},
-            ]
+            'narrativa': 'Sin datos del council para detalle de mercados.',
+            'performance': performance
         }
 
     def _generate_geopolitica(self) -> Dict[str, Any]:
@@ -414,29 +549,42 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         if not narrativa:
             narrativa = "El entorno geopolitico presenta riesgos elevados que requieren monitoreo activo."
 
-        # Extract probabilities from geo panel
-        china_prob = self._extract_number(geo, r'China.*?(\d+)%', 50)
-        tariff_prob = self._extract_number(geo, r'[Tt]ariff.*?(\d+)%', 50)
+        # Try structured data from council parser first
+        geo_risks = self.parser.get_geopolitical_risks()
+        if geo_risks:
+            eventos = [{'evento': r['event'], 'impacto': r['impact'], 'probabilidad': r['probability']}
+                       for r in geo_risks]
+        else:
+            # Fallback: extract probabilities from geo panel text (no hardcoded defaults)
+            china_prob = self._extract_number(geo, r'China.*?(\d+)%', None)
+            tariff_prob = self._extract_number(geo, r'[Tt]ariff.*?(\d+)%', None)
 
-        eventos = [
-            {'evento': 'Tensiones comerciales', 'impacto': 'Alto', 'probabilidad': f'{int(tariff_prob)}%'},
-            {'evento': 'Dinamica US-China', 'impacto': 'Alto', 'probabilidad': f'{int(china_prob)}%'},
-        ]
+            eventos = [
+                {'evento': 'Tensiones comerciales', 'impacto': 'Alto',
+                 'probabilidad': f'{int(tariff_prob)}%' if tariff_prob is not None else 'N/D'},
+                {'evento': 'Dinamica US-China', 'impacto': 'Alto',
+                 'probabilidad': f'{int(china_prob)}%' if china_prob is not None else 'N/D'},
+            ]
 
         return {'titulo': 'Política y Geopolítica', 'narrativa': narrativa, 'eventos': eventos}
 
     def _default_geopolitica(self) -> Dict[str, Any]:
+        geo_risks = self.parser.get_geopolitical_risks()
+        if geo_risks:
+            eventos = [{'evento': r['event'], 'impacto': r['impact'], 'probabilidad': r['probability']}
+                       for r in geo_risks]
+        else:
+            eventos = [
+                {'evento': 'Sin evaluación del comité', 'probabilidad': 'N/D', 'impacto': 'N/D'},
+            ]
         return {
             'titulo': 'Política y Geopolítica',
             'narrativa': 'El entorno geopolítico presenta riesgos elevados que requieren monitoreo activo.',
-            'eventos': [
-                {'evento': 'Tensiones comerciales', 'impacto': 'Alto', 'probabilidad': '70%'},
-                {'evento': 'Política monetaria Fed', 'impacto': 'Alto', 'probabilidad': '100%'},
-            ]
+            'eventos': eventos,
         }
 
     def _generate_chile_review(self) -> Dict[str, Any]:
-        """Chile via Claude desde panel macro."""
+        """Chile via Claude desde panel macro + datos reales."""
         from narrative_engine import generate_narrative
 
         macro = self._panel('macro')
@@ -444,12 +592,36 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         if not macro:
             return self._default_chile()
 
-        tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', 4.5)
-        ipc = self._extract_number(macro, r'(?:IPC|inflaci[oó]n)\s+(\d+\.?\d*)%', 2.7)
-        tpm_real = round(tpm - ipc, 1) if tpm and ipc else 1.8
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', 5.94)
+        # Extract from council text (no hardcoded defaults)
+        tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', None)
+        ipc = self._extract_number(macro, r'(?:IPC|inflaci[oó]n)\s+(\d+\.?\d*)%', None)
+        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
 
-        quant_ctx = f"TPM: {tpm}% | IPC: {ipc}% | Tasa Real: +{tpm_real}% | Cobre: ${cobre}/lb"
+        # Enrich with real BCCh data if available
+        if self.data:
+            try:
+                chile = self.data.get_chile_latest()
+                if tpm is None and chile.get('tpm') is not None:
+                    tpm = chile['tpm']
+                if ipc is None and chile.get('ipc_yoy') is not None:
+                    ipc = chile['ipc_yoy']
+            except Exception:
+                pass
+
+        # Also try quant_data
+        if tpm is None:
+            tpm = self._q('chile', 'tpm')
+        if ipc is None:
+            ipc = self._q('chile', 'ipc_yoy')
+
+        tpm_real = round(tpm - ipc, 1) if tpm is not None and ipc is not None else None
+
+        tpm_str = f'{tpm}%' if tpm is not None else 'N/D'
+        ipc_str = f'{ipc}%' if ipc is not None else 'N/D'
+        tpm_real_str = f'+{tpm_real}%' if tpm_real is not None else 'N/D'
+        cobre_str = f'${cobre}/lb' if cobre is not None else 'N/D'
+
+        quant_ctx = f"TPM: {tpm_str} | IPC: {ipc_str} | Tasa Real: {tpm_real_str} | Cobre: {cobre_str}"
 
         narrativa = generate_narrative(
             section_name="aa_chile_review",
@@ -466,26 +638,46 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         )
         if not narrativa:
             narrativa = (
-                f"Chile mantiene fundamentos solidos con TPM en {tpm}% y tasa real "
-                f"de +{tpm_real}%. Cobre en ${cobre}/lb como soporte estructural."
+                f"Chile mantiene fundamentos solidos con TPM en {tpm_str} y tasa real "
+                f"de {tpm_real_str}. Cobre en {cobre_str} como soporte estructural."
             )
 
         datos = [
-            {'indicador': 'TPM', 'valor': f'{tpm}%', 'tendencia': 'Ver council'},
-            {'indicador': 'IPC YoY', 'valor': f'{ipc}%', 'tendencia': 'Ver council'},
-            {'indicador': 'Tasa Real', 'valor': f'+{tpm_real}%', 'tendencia': 'Positiva'},
-            {'indicador': 'Cobre', 'valor': f'${cobre}/lb', 'tendencia': 'Ver council'},
+            {'indicador': 'TPM', 'valor': tpm_str, 'tendencia': 'Ver council'},
+            {'indicador': 'IPC YoY', 'valor': ipc_str, 'tendencia': 'Ver council'},
+            {'indicador': 'Tasa Real', 'valor': tpm_real_str, 'tendencia': 'Ver council'},
+            {'indicador': 'Cobre', 'valor': cobre_str, 'tendencia': 'Ver council'},
         ]
 
         return {'titulo': 'Chile y Economía Local', 'narrativa': narrativa, 'datos': datos}
 
     def _default_chile(self) -> Dict[str, Any]:
+        tpm_str = 'N/D'
+        ipc_str = 'N/D'
+        if self.data:
+            try:
+                chile = self.data.get_chile_latest()
+                if chile.get('tpm') is not None:
+                    tpm_str = f"{chile['tpm']}%"
+                if chile.get('ipc_yoy') is not None:
+                    ipc_str = f"{chile['ipc_yoy']}%"
+            except Exception:
+                pass
+        if tpm_str == 'N/D':
+            tpm_val = self._q('chile', 'tpm')
+            if tpm_val is not None:
+                tpm_str = f"{tpm_val}%"
+        if ipc_str == 'N/D':
+            ipc_val = self._q('chile', 'ipc_yoy')
+            if ipc_val is not None:
+                ipc_str = f"{ipc_val}%"
+
         return {
             'titulo': 'Chile y Economía Local',
             'narrativa': 'Chile mantiene estabilidad macroeconómica con política monetaria calibrada.',
             'datos': [
-                {'indicador': 'TPM', 'valor': '4.50%', 'tendencia': 'Estable'},
-                {'indicador': 'IPC YoY', 'valor': '3.40%', 'tendencia': 'Contenida'},
+                {'indicador': 'TPM', 'valor': tpm_str, 'tendencia': 'Ver council'},
+                {'indicador': 'IPC YoY', 'valor': ipc_str, 'tendencia': 'Ver council'},
             ]
         }
 
@@ -494,54 +686,88 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
     # =========================================================================
 
     def generate_scenarios(self) -> Dict[str, Any]:
-        """Escenarios basados en council views."""
+        """Escenarios basados en council views — datos del parser o council text."""
         contrarian = self._contrarian()
         riesgo = self._panel('riesgo')
 
-        # Extract alternative scenario probabilities from contrarian
-        bear_prob = self._extract_number(contrarian, r'Fed Pause.*?(\d+)%', 25)
-        bull_prob = self._extract_number(contrarian, r'AI Productivity.*?(\d+)%', 30)
+        # Try structured council parser first
+        scenarios_parsed = self.parser.get_scenario_probs()
+        if scenarios_parsed:
+            escenarios = []
+            for key, info in scenarios_parsed.items():
+                escenarios.append({
+                    'nombre': info['name'],
+                    'probabilidad': int(info['prob'] * 100),
+                    'descripcion': f"Escenario del council: {info['name']}.",
+                    'senales': [],
+                    'implicancias': {},
+                    'que_comprar': 'Ver recomendacion del comite',
+                })
+            # Determine base scenario (highest probability)
+            base = max(scenarios_parsed.values(), key=lambda x: x['prob'])
+            return {
+                'escenario_base': base['name'].upper(),
+                'descripcion_base': f"Escenario base del council con {int(base['prob']*100)}% probabilidad",
+                'escenarios': escenarios,
+            }
 
-        # Extract tail risk probabilities from risk panel
-        tariff_prob = self._extract_number(riesgo, r'[Aa]ranceles.*?(\d+)%', 40)
-        ia_prob = self._extract_number(riesgo, r'[Bb]urbuja\s+IA.*?(\d+)%', 35)
-        china_prob = self._extract_number(riesgo, r'China\s+Hard.*?(\d+)%', 30)
+        # Fallback: extract from council text (no hardcoded defaults)
+        bear_prob = self._extract_number(contrarian, r'Fed Pause.*?(\d+)%', None)
+        bull_prob = self._extract_number(contrarian, r'AI Productivity.*?(\d+)%', None)
+        tariff_prob = self._extract_number(riesgo, r'[Aa]ranceles.*?(\d+)%', None)
+        china_prob = self._extract_number(riesgo, r'China\s+Hard.*?(\d+)%', None)
+
+        # If no council data at all, return empty
+        if not contrarian and not riesgo:
+            return {
+                'escenario_base': 'SIN DATOS',
+                'descripcion_base': 'Sin datos del council para definir escenarios',
+                'escenarios': [],
+            }
+
+        # Build from extracted text data — no numeric literal fallbacks
+        macro = self._panel('macro')
+        gdp = self._extract_number(macro, r'GDP\s+(?:US\s+)?(\d+\.?\d*)%', None)
+        gdp_str = f'{gdp}% QoQ' if gdp is not None else 'N/D'
+        bull_str = f'{int(bull_prob)}%' if bull_prob is not None else 'N/D'
+        tariff_str = f'{int(tariff_prob)}%' if tariff_prob is not None else 'N/D'
+        china_str = f'{int(china_prob)}%' if china_prob is not None else 'N/D'
 
         return {
-            'escenario_base': 'EXPANSION TARDIA',
-            'descripcion_base': 'Crecimiento sólido pero inflación sticky, ciclo tardío con ajustes defensivos',
+            'escenario_base': 'Ver council',
+            'descripcion_base': 'Escenarios extraidos del council — verificar con datos del periodo',
             'escenarios': [
                 {
-                    'nombre': 'Expansión Tardía',
-                    'probabilidad': 45,
-                    'descripcion': 'GDP US sólido (4.4% QoQ), manufactura en máximos, pero inflación core persistente y empleo white-collar deteriorándose. Fed implementa solo 1-2 cortes.',
-                    'senales': ['GDP >3% sostenido', 'Core CPI 2.5-3.0%', 'Fed on hold o 1 corte'],
-                    'implicancias': {'equities': 'SIDEWAYS', 'bonds': 'DOWN', 'usd': 'UP', 'commodities': 'UP'},
-                    'que_comprar': 'Value/Industrials, commodities, Chile carry trade, short duration'
+                    'nombre': 'Expansion Tardia',
+                    'probabilidad': 0,
+                    'descripcion': f'GDP US en {gdp_str}. Ver council para detalle de este escenario.',
+                    'senales': ['Ver council'],
+                    'implicancias': {},
+                    'que_comprar': 'Ver recomendacion del comite'
                 },
                 {
-                    'nombre': 'Goldilocks Extended',
-                    'probabilidad': 25,
-                    'descripcion': f'AI productivity surge permite crecimiento sin inflación. Fed recorta 3-4 veces. Probabilidad bull case: {int(bull_prob)}% según análisis contrarian.',
-                    'senales': ['Core CPI <2.3%', 'Productivity growth >2%', 'Fed cuts 3-4x'],
-                    'implicancias': {'equities': 'UP', 'bonds': 'UP', 'usd': 'DOWN', 'commodities': 'UP'},
-                    'que_comprar': 'Growth/Tech selectivo, duration larga, EM equities'
+                    'nombre': 'Escenario Alcista',
+                    'probabilidad': 0,
+                    'descripcion': f'Probabilidad bull case: {bull_str} segun analisis contrarian.',
+                    'senales': ['Ver council'],
+                    'implicancias': {},
+                    'que_comprar': 'Ver recomendacion del comite'
                 },
                 {
-                    'nombre': 'Stagflation Arancelaria',
-                    'probabilidad': 20,
-                    'descripcion': f'Aranceles Trump generalizados (20% global + 60% China) generan shock inflacionario + desaceleración. Probabilidad aranceles amplificados: {int(tariff_prob)}%.',
-                    'senales': ['Aranceles >25% implementados', 'CPI >3.5%', 'ISM <48'],
-                    'implicancias': {'equities': 'DOWN', 'bonds': 'DOWN', 'usd': 'UP', 'commodities': 'MIXED'},
-                    'que_comprar': 'TIPS, oro, cash, domestic-oriented equities'
+                    'nombre': 'Escenario de Riesgo Comercial',
+                    'probabilidad': 0,
+                    'descripcion': f'Probabilidad aranceles amplificados: {tariff_str}.',
+                    'senales': ['Ver council'],
+                    'implicancias': {},
+                    'que_comprar': 'Ver recomendacion del comite'
                 },
                 {
-                    'nombre': 'Recesión por Crédito',
-                    'probabilidad': 10,
-                    'descripcion': f'Fed hawkish + QT agresivo causa credit freeze. China hard landing ({int(china_prob)}% probabilidad) arrastra commodities y EM.',
-                    'senales': ['Credit spreads +200bp', 'China PMI <45', 'Initial Claims >300K'],
-                    'implicancias': {'equities': 'DOWN', 'bonds': 'UP', 'usd': 'UP', 'commodities': 'DOWN'},
-                    'que_comprar': 'Treasuries largos, USD cash, utilities, oro'
+                    'nombre': 'Recesion / Credito',
+                    'probabilidad': 0,
+                    'descripcion': f'China hard landing probabilidad: {china_str}.',
+                    'senales': ['Ver council'],
+                    'implicancias': {},
+                    'que_comprar': 'Ver recomendacion del comite'
                 }
             ]
         }
@@ -579,7 +805,10 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         if gdp:
             quant_ctx += f"GDP US: {gdp}% QoQ. "
         if cpi:
-            quant_ctx += f"Core CPI: {cpi}%."
+            quant_ctx += f"Core CPI: {cpi}%. "
+        bbg_ctx = self._bbg_quant_summary()
+        if bbg_ctx:
+            quant_ctx += f"Bloomberg: {bbg_ctx}"
 
         tesis = generate_narrative(
             section_name="aa_usa_tesis",
@@ -611,8 +840,8 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
             max_tokens=600,
             temperature=0.2,
         )
-        args_favor = [{'punto': 'GDP solido', 'dato': f'{gdp}% QoQ' if gdp else 'Expansion confirmada'}]
-        args_contra = [{'punto': 'Riesgos a monitorear', 'dato': 'Ver council para detalle'}]
+        args_favor = [{'punto': 'Ver council', 'dato': f'GDP {gdp}% QoQ' if gdp else 'Sin recomendación del comité'}]
+        args_contra = [{'punto': 'Ver council', 'dato': 'Sin recomendación del comité'}]
         if args_raw:
             try:
                 cleaned = args_raw.strip()
@@ -629,10 +858,27 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
             except (_json.JSONDecodeError, KeyError):
                 pass
 
+        # Try to get view/conviction from parser
+        alloc = self.parser.get_regional_allocation()
+        usa_view = 'Sin recomendación'
+        usa_conviccion = 'N/D'
+        if alloc:
+            usa_data = alloc.get('renta variable usa', alloc.get('usa', alloc.get('estados unidos', {})))
+            if usa_data:
+                usa_view = usa_data.get('vs_benchmark', 'Sin recomendación')
+                usa_conviccion = usa_data.get('conviction', usa_data.get('weight', 'MEDIA'))
+
+        eq_views = self.parser.get_equity_views()
+        if eq_views:
+            usa_eq = eq_views.get('usa', eq_views.get('estados unidos', eq_views.get('us', {})))
+            if usa_eq:
+                usa_view = usa_eq.get('view', usa_view)
+                usa_conviccion = usa_eq.get('conviction', usa_conviccion)
+
         return {
             'region': 'Estados Unidos',
-            'view': 'CONSTRUCTIVO',
-            'conviccion': 'MEDIA',
+            'view': usa_view,
+            'conviccion': usa_conviccion,
             'tesis': tesis,
             'argumentos_favor': args_favor,
             'argumentos_contra': args_contra,
@@ -640,12 +886,20 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         }
 
     def _default_usa_view(self) -> Dict[str, Any]:
+        # Try to extract tesis from council parser even in default path
+        tesis = 'Sin tesis del comité.'
+        regional = self.parser.get_regional_allocation() if self.parser else None
+        if regional:
+            usa_data = regional.get('usa', regional.get('estados unidos', {}))
+            if usa_data:
+                tesis = usa_data.get('rationale', tesis)
+
         return {
-            'region': 'Estados Unidos', 'view': 'NEUTRAL', 'conviccion': 'MEDIA',
-            'tesis': 'Economía resiliente pero valuaciones elevadas requieren selectividad.',
-            'argumentos_favor': [{'punto': 'GDP sólido', 'dato': 'Expansión confirmada'}],
-            'argumentos_contra': [{'punto': 'Valuaciones elevadas', 'dato': 'P/E sobre promedios históricos'}],
-            'trigger_cambio': 'Core CPI <2.5% sostenido.'
+            'region': 'Estados Unidos', 'view': 'Sin recomendación', 'conviccion': 'N/D',
+            'tesis': tesis,
+            'argumentos_favor': [{'punto': 'Ver council', 'dato': 'Sin recomendación del comité'}],
+            'argumentos_contra': [{'punto': 'Ver council', 'dato': 'Sin recomendación del comité'}],
+            'trigger_cambio': 'Ver council para triggers de cambio.'
         }
 
     def _generate_europe_view(self) -> Dict[str, Any]:
@@ -668,22 +922,36 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
                 max_tokens=250,
             )
         if not tesis:
-            tesis = "Europa ofrece valuaciones atractivas pero crecimiento estructural debil limita conviccion."
+            tesis = "Sin recomendación del comité para Europa."
+
+        # Try parser for structured view/conviction
+        europe_view = 'Sin recomendación'
+        europe_conviccion = 'N/D'
+        alloc = self.parser.get_regional_allocation()
+        if alloc:
+            eu_data = alloc.get('europa', alloc.get('europe', {}))
+            if eu_data:
+                europe_view = eu_data.get('vs_benchmark', 'Sin recomendación')
+                europe_conviccion = eu_data.get('conviction', eu_data.get('weight', 'MEDIA'))
+        eq_views = self.parser.get_equity_views()
+        if eq_views:
+            eu_eq = eq_views.get('europa', eq_views.get('europe', {}))
+            if eu_eq:
+                europe_view = eu_eq.get('view', europe_view)
+                europe_conviccion = eu_eq.get('conviction', europe_conviccion)
 
         return {
             'region': 'Europa',
-            'view': 'NEUTRAL',
-            'conviccion': 'BAJA',
+            'view': europe_view,
+            'conviccion': europe_conviccion,
             'tesis': tesis,
             'argumentos_favor': [
-                {'punto': 'Valuaciones atractivas vs US', 'dato': 'Descuento historico en P/E'},
-                {'punto': 'BCE en modo dovish', 'dato': 'Potenciales recortes adicionales'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
             'argumentos_contra': [
-                {'punto': 'Crecimiento estructural debil', 'dato': 'GDP bajo esperado'},
-                {'punto': 'Dependencia China', 'dato': 'Vulnerabilidad a desacople'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
-            'trigger_cambio': 'PMI Composite sostenido >52 como senal de upgrade.'
+            'trigger_cambio': 'Ver council para triggers de cambio.'
         }
 
     def _generate_china_view(self) -> Dict[str, Any]:
@@ -718,22 +986,36 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
                 max_tokens=250,
             )
         if not tesis:
-            tesis = "China en territorio de desaceleracion. Postura cautelosa."
+            tesis = "Sin recomendación del comité para China."
+
+        # Try parser for structured view/conviction
+        china_view = 'Sin recomendación'
+        china_conviccion = 'N/D'
+        alloc = self.parser.get_regional_allocation()
+        if alloc:
+            cn_data = alloc.get('china', {})
+            if cn_data:
+                china_view = cn_data.get('vs_benchmark', 'Sin recomendación')
+                china_conviccion = cn_data.get('conviction', cn_data.get('weight', 'MEDIA'))
+        eq_views = self.parser.get_equity_views()
+        if eq_views:
+            cn_eq = eq_views.get('china', {})
+            if cn_eq:
+                china_view = cn_eq.get('view', china_view)
+                china_conviccion = cn_eq.get('conviction', china_conviccion)
 
         return {
             'region': 'China',
-            'view': 'CAUTELOSO',
-            'conviccion': 'ALTA',
+            'view': china_view,
+            'conviccion': china_conviccion,
             'tesis': tesis,
             'argumentos_favor': [
-                {'punto': 'Valuaciones deprimidas', 'dato': 'Indices cerca de minimos'},
-                {'punto': 'Espacio para estimulo', 'dato': 'PBOC y fiscal space disponibles'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
             'argumentos_contra': [
-                {'punto': 'Credit impulse contractivo', 'dato': 'Sin estimulo real aun'},
-                {'punto': 'Desacople US-China', 'dato': 'Riesgo estructural creciente'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
-            'trigger_cambio': 'Estimulo fiscal significativo o PMI sostenido >50 para upgrade.'
+            'trigger_cambio': 'Ver council para triggers de cambio.'
         }
 
     def _generate_chile_view(self) -> Dict[str, Any]:
@@ -772,68 +1054,108 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
                 max_tokens=300,
             )
         if not tesis:
-            tesis = "Chile con fundamentos solidos. Postura constructiva."
-            if tpm and ipc:
-                tesis = f"Chile con TPM {tpm}% y tasa real +{tpm_real}%. Postura constructiva."
+            tesis = "Sin recomendación del comité para Chile."
+            if tpm is not None and ipc is not None:
+                tesis = f"Chile con TPM {tpm}% y tasa real +{tpm_real}%."
+
+        # Try parser for structured view/conviction
+        chile_view = 'Sin recomendación'
+        chile_conviccion = 'N/D'
+        alloc = self.parser.get_regional_allocation()
+        if alloc:
+            cl_data = alloc.get('chile', alloc.get('chile y latam', {}))
+            if cl_data:
+                chile_view = cl_data.get('vs_benchmark', 'Sin recomendación')
+                chile_conviccion = cl_data.get('conviction', cl_data.get('weight', 'MEDIA'))
+        eq_views = self.parser.get_equity_views()
+        if eq_views:
+            cl_eq = eq_views.get('chile', eq_views.get('chile y latam', {}))
+            if cl_eq:
+                chile_view = cl_eq.get('view', chile_view)
+                chile_conviccion = cl_eq.get('conviction', chile_conviccion)
+
+        # Build arguments with real data (no hardcoded numbers)
+        tpm_str = f'{tpm}%' if tpm is not None else 'N/D'
+        ipc_str = f'{ipc}%' if ipc is not None else 'N/D'
+        tpm_real_str = f'+{tpm_real}%' if tpm_real is not None else 'N/D'
+        cobre_str = f'${cobre}/lb' if cobre is not None else 'N/D'
 
         return {
             'region': 'Chile y LatAm',
-            'view': 'CONSTRUCTIVO',
-            'conviccion': 'ALTA',
+            'view': chile_view,
+            'conviccion': chile_conviccion,
             'tesis': tesis,
             'argumentos_favor': [
-                {'punto': 'Diferencial real atractivo', 'dato': f'TPM {tpm}% - IPC {ipc}% = +{tpm_real}% real' if (tpm and ipc) else 'Tasa real positiva'},
-                {'punto': 'Cobre soportado', 'dato': f'${cobre}/lb' if cobre else 'Soporte estructural'},
-                {'punto': 'BCCh con espacio', 'dato': 'Posibilidad de recortes'},
+                {'punto': 'Diferencial real', 'dato': f'TPM {tpm_str} - IPC {ipc_str} = {tpm_real_str} real'},
+                {'punto': 'Cobre', 'dato': cobre_str},
+                {'punto': 'BCCh', 'dato': 'Ver council para direccion de tasas'},
             ],
             'argumentos_contra': [
-                {'punto': 'Dependencia China', 'dato': 'Exportaciones concentradas'},
-                {'punto': 'Liquidez limitada', 'dato': 'Mercado pequeño en contexto global'},
-                {'punto': 'Fed proximity', 'dato': 'BCCh limitado si Fed hawkish'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
-            'trigger_cambio': 'CLP debilitandose >5% o cobre cayendo significativamente como senales de downgrade.'
+            'trigger_cambio': 'Ver council para triggers de cambio.'
         }
 
     def _generate_brazil_view(self) -> Dict[str, Any]:
+        # Try parser for structured view/conviction
+        brazil_view = 'Sin recomendación'
+        brazil_conviccion = 'N/D'
+        alloc = self.parser.get_regional_allocation()
+        if alloc:
+            br_data = alloc.get('brasil', alloc.get('brazil', {}))
+            if br_data:
+                brazil_view = br_data.get('vs_benchmark', 'Sin recomendación')
+                brazil_conviccion = br_data.get('conviction', br_data.get('weight', 'MEDIA'))
+        eq_views = self.parser.get_equity_views()
+        if eq_views:
+            br_eq = eq_views.get('brasil', eq_views.get('brazil', {}))
+            if br_eq:
+                brazil_view = br_eq.get('view', brazil_view)
+                brazil_conviccion = br_eq.get('conviction', brazil_conviccion)
+
         return {
             'region': 'Brasil',
-            'view': 'NEUTRAL',
-            'conviccion': 'MEDIA',
-            'tesis': """Brasil ofrece carry atractivo en renta fija (Selic elevada) pero el riesgo fiscal y la incertidumbre política limitan el upside. La tasa real es inferior a Chile ajustada por riesgo. Preferimos renta fija local sobre equity, con sizing conservador.""",
+            'view': brazil_view,
+            'conviccion': brazil_conviccion,
+            'tesis': 'Sin recomendación del comité',
             'argumentos_favor': [
-                {'punto': 'Carry nominal atractivo', 'dato': 'Selic elevada, tasa real positiva'},
-                {'punto': 'BCB credible', 'dato': 'Inflación contenida cerca de meta'},
-                {'punto': 'Valuaciones equity baratas', 'dato': 'Ibovespa P/E por debajo de promedios'},
-                {'punto': 'Commodities exposure', 'dato': 'Beneficio de precios agrícolas'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
             'argumentos_contra': [
-                {'punto': 'Riesgo fiscal elevado', 'dato': 'Déficit primario >1% GDP'},
-                {'punto': 'Incertidumbre política', 'dato': 'Elecciones 2026 en horizonte'},
-                {'punto': 'BRL volátil', 'dato': 'Sensible a risk appetite global'},
-                {'punto': 'Reformas estancadas', 'dato': 'Tributaria y administrativa pendientes'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
-            'trigger_cambio': 'Subir a CONSTRUCTIVO si: aprobación de reforma fiscal O superávit primario. Bajar a CAUTELOSO si: déficit >2% O desanclaje de expectativas.'
+            'trigger_cambio': 'Ver council para triggers de cambio.'
         }
 
     def _generate_mexico_view(self) -> Dict[str, Any]:
+        # Try parser for structured view/conviction
+        mexico_view = 'Sin recomendación'
+        mexico_conviccion = 'N/D'
+        alloc = self.parser.get_regional_allocation()
+        if alloc:
+            mx_data = alloc.get('mexico', alloc.get('méxico', {}))
+            if mx_data:
+                mexico_view = mx_data.get('vs_benchmark', 'Sin recomendación')
+                mexico_conviccion = mx_data.get('conviction', mx_data.get('weight', 'MEDIA'))
+        eq_views = self.parser.get_equity_views()
+        if eq_views:
+            mx_eq = eq_views.get('mexico', eq_views.get('méxico', {}))
+            if mx_eq:
+                mexico_view = mx_eq.get('view', mexico_view)
+                mexico_conviccion = mx_eq.get('conviction', mexico_conviccion)
+
         return {
             'region': 'México',
-            'view': 'NEUTRAL',
-            'conviccion': 'MEDIA',
-            'tesis': """México es beneficiario natural del nearshoring con flujos de IED record, pero los aranceles Trump (90% probabilidad) representan un riesgo directo significativo dado la interdependencia comercial con US. Banxico mantiene política credible con espacio para recortes. Rebajamos de CONSTRUCTIVO a NEUTRAL por riesgo arancelario.""",
+            'view': mexico_view,
+            'conviccion': mexico_conviccion,
+            'tesis': 'Sin recomendación del comité',
             'argumentos_favor': [
-                {'punto': 'Nearshoring en curso', 'dato': 'IED record >$35B, anuncios industriales'},
-                {'punto': 'Banxico credible', 'dato': 'Espacio para recortes graduales'},
-                {'punto': 'T-MEC protege parcialmente', 'dato': 'Acceso preferencial a US market'},
-                {'punto': 'Remesas sólidas', 'dato': '>$60B anuales, soporte a consumo'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
             'argumentos_contra': [
-                {'punto': 'Aranceles Trump directos', 'dato': '90% probabilidad, México es target prioritario'},
-                {'punto': 'PEMEX carga fiscal', 'dato': 'Deuda elevada, necesita reforma'},
-                {'punto': 'Reforma judicial', 'dato': 'Incertidumbre legal para inversión'},
-                {'punto': 'Dependencia US extrema', 'dato': '>80% exportaciones a un solo destino'},
+                {'punto': 'Ver council', 'dato': 'Sin recomendación del comité'},
             ],
-            'trigger_cambio': 'Subir a CONSTRUCTIVO si: aranceles <5% O exención T-MEC confirmada. Bajar a CAUTELOSO si: aranceles >10% O crisis PEMEX.'
+            'trigger_cambio': 'Ver council para triggers de cambio.'
         }
 
     # =========================================================================
@@ -885,15 +1207,42 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         elif 'value' in rv.lower():
             factor = 'VALUE con toque QUALITY'
 
+        # Get structured equity views from parser
+        eq_views = self.parser.get_equity_views()
+        por_region = []
+        if eq_views:
+            region_map = {
+                'usa': 'US Large Cap', 'us': 'US Large Cap', 'estados unidos': 'US Large Cap',
+                'europa': 'Europa', 'europe': 'Europa',
+                'chile': 'Chile',
+                'em ex-china': 'EM ex-China', 'em': 'EM ex-China',
+                'china': 'China',
+            }
+            for key, info in eq_views.items():
+                label = region_map.get(key.lower(), key)
+                por_region.append({
+                    'region': label,
+                    'view': info.get('view', 'N'),
+                    'rationale': info.get('rationale', 'Ver council'),
+                })
+
+        if not por_region:
+            # Fallback: minimal without hardcoded views
+            por_region = [
+                {'region': 'US Large Cap', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'region': 'Europa', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'region': 'Chile', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'region': 'EM ex-China', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'region': 'China', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+            ]
+
+        # View global from macro stance
+        macro_stance = self.parser.get_macro_stance()
+        view_global = macro_stance if macro_stance else 'Ver council'
+
         return {
-            'view_global': 'CONSTRUCTIVO',
-            'por_region': [
-                {'region': 'US Large Cap', 'view': 'OW', 'rationale': 'GDP sólido, tech selectivo, rotación hacia industrials'},
-                {'region': 'Europa', 'view': 'N', 'rationale': 'Valuaciones atractivas pero crecimiento débil'},
-                {'region': 'Chile', 'view': 'OW', 'rationale': 'Momentum + peso + commodity play + carry'},
-                {'region': 'EM ex-China', 'view': 'N', 'rationale': 'Selectivo — aranceles y Fed limitan upside'},
-                {'region': 'China', 'view': 'UW', 'rationale': 'Credit impulse contractivo, EPU máximos, evitar'},
-            ],
+            'view_global': view_global,
+            'por_region': por_region,
             'sectores_preferidos': sectores_ow,
             'sectores_evitar': sectores_uw,
             'factor_tilt': factor
@@ -901,14 +1250,14 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
 
     def _default_equity_view(self) -> Dict[str, Any]:
         return {
-            'view_global': 'NEUTRAL',
+            'view_global': 'N/D',
             'por_region': [
-                {'region': 'US', 'view': 'N', 'rationale': 'Valuaciones altas, selectividad requerida'},
-                {'region': 'Chile', 'view': 'OW', 'rationale': 'Carry + momentum'},
+                {'region': 'US', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'region': 'Chile', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
             ],
-            'sectores_preferidos': ['Energy', 'Financials', 'Materials'],
-            'sectores_evitar': ['Software', 'Consumer Discretionary'],
-            'factor_tilt': 'VALUE con toque QUALITY'
+            'sectores_preferidos': [],
+            'sectores_evitar': [],
+            'factor_tilt': 'N/D'
         }
 
     def _generate_fixed_income_view(self) -> Dict[str, Any]:
@@ -936,27 +1285,31 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
                 stance = stance_map.get(vs_bm, vs_bm)
                 view_duration = f'{stance} ({target:.1f} años, {confidence})'
 
-        # Extract rate view
-        view_tasas = 'HIGHER FOR LONGER'
+        # Extract rate view from council
+        view_tasas = 'N/D'
         if 'higher' in rf.lower():
             months = self._extract_number(rf, r'HIGHER\s*\(?(\d+)-', 6)
             view_tasas = f'HIGHER ({int(months)}-9 meses)'
+        elif 'lower' in rf.lower() or 'recorte' in rf.lower():
+            view_tasas = 'LOWER — recortes esperados'
+        elif 'neutral' in rf.lower() or 'estable' in rf.lower():
+            view_tasas = 'ESTABLE'
 
-        # Credit view: enrich with real spread data
-        view_credito = 'IG sobre HY — spreads HY no compensan riesgo late-cycle'
+        # Credit view: data-only, no hardcoded opinion
         ig_bps = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
         hy_bps = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
         if ig_bps and hy_bps:
-            view_credito = (
-                f'IG ({self._fmt_bp(ig_bps)}) sobre HY ({self._fmt_bp(hy_bps)}) — '
-                f'spreads HY no compensan riesgo late-cycle'
-            )
+            view_credito = f'IG: {self._fmt_bp(ig_bps)}, HY: {self._fmt_bp(hy_bps)}. Ver council.'
+        elif ig_bps:
+            view_credito = f'IG: {self._fmt_bp(ig_bps)}. Ver council.'
+        else:
+            view_credito = 'N/D — ver council'
 
-        # Chile: enrich with real TPM expectations
+        # Chile: enrich with real TPM expectations — no hardcoded rates
         chile = {
-            'tpm_path': 'BCCh pausado en 4.5%, esperar confirmación Fed pause antes de extender duration',
-            'carry_trade': 'ATRACTIVO — SPC 5Y 4.85% vs UST 3.8% = 105bp carry, TPM real +1.8%',
-            'recomendacion': 'Curve flattener: largo BCU-10 vs corto BCU-2 (target 2s10s de 84bp a 60bp)',
+            'tpm_path': 'Ver council para trayectoria TPM',
+            'carry_trade': 'Ver council para evaluacion de carry trade',
+            'recomendacion': 'Ver council para recomendacion de curva Chile',
         }
         tpm = self._q('tpm_expectations')
         if tpm and 'summary' in tpm:
@@ -971,195 +1324,196 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
                 )
                 chile['_real'] = True
 
+        # Build curva from council parser FI views
+        fi_views = self.parser.get_fi_views() if self.parser else None
+        curva = []
+        tramo_keys = [
+            ('0-2Y', ['0-2y', 'short', 'corto', 'treasury bills', 't-bills']),
+            ('2-5Y', ['2-5y', 'medium', 'medio', 'intermedio']),
+            ('5-10Y', ['5-10y', 'long', 'largo']),
+            ('10Y+', ['10y+', '10+', 'ultra long', 'ultra largo']),
+        ]
+        for tramo_label, search_keys in tramo_keys:
+            tramo_view = 'N/D'
+            tramo_rationale = 'Sin recomendación del comité'
+            if fi_views:
+                for key in search_keys:
+                    if key in fi_views:
+                        tramo_view = fi_views[key].get('view', 'N/D')
+                        tramo_rationale = fi_views[key].get('rationale', 'Ver council')
+                        break
+            curva.append({'tramo': tramo_label, 'view': tramo_view, 'rationale': tramo_rationale})
+
         return {
             'view_tasas': view_tasas,
             'view_duration': view_duration,
             'view_credito': view_credito,
-            'curva': [
-                {'tramo': '0-2Y', 'view': 'OW', 'rationale': 'Carry atractivo, Fed pausa cercana. Preferir T-Bills'},
-                {'tramo': '2-5Y', 'view': 'N', 'rationale': 'Sweet spot Chile (SPC 5Y 4.85%). Fair value US'},
-                {'tramo': '5-10Y', 'view': 'UW', 'rationale': 'Term premium comprimido, steepener 2s10s en curso'},
-                {'tramo': '10Y+', 'view': 'UW', 'rationale': 'Riesgo duration elevado — Fed hawkish + déficit fiscal'},
-            ],
+            'curva': curva,
             'chile_especifico': chile,
         }
 
     def _default_rf_view(self) -> Dict[str, Any]:
         return {
-            'view_tasas': 'HIGHER (3-6M)', 'view_duration': 'SHORT', 'view_credito': 'NEUTRAL',
+            'view_tasas': 'N/D', 'view_duration': 'N/D', 'view_credito': 'N/D',
             'curva': [
-                {'tramo': '0-2Y', 'view': 'OW', 'rationale': 'Carry atractivo'},
-                {'tramo': '5-10Y', 'view': 'UW', 'rationale': 'Term premium bajo'},
+                {'tramo': '0-2Y', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'tramo': '2-5Y', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'tramo': '5-10Y', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'tramo': '10Y+', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
             ],
             'chile_especifico': {
-                'tpm_path': 'Neutral', 'carry_trade': 'Atractivo',
-                'recomendacion': 'BCU 2-3Y'
+                'tpm_path': 'N/D', 'carry_trade': 'N/D',
+                'recomendacion': 'N/D'
             }
         }
 
     def _generate_fx_view(self) -> Dict[str, Any]:
-        geo = self._panel('geo')
-        rf = self._panel('rf')
+        # Try parser for structured FX views
+        fx_views = self.parser.get_fx_views()
 
+        # Get real USD/CLP if available
+        usdclp_str = 'N/D'
+        if self.data:
+            try:
+                chile = self.data.get_chile_latest()
+                if chile.get('usd_clp') is not None:
+                    usdclp_str = f"{chile['usd_clp']:.0f}"
+            except Exception:
+                pass
+
+        if fx_views:
+            pares = []
+            for pair, info in fx_views.items():
+                pares.append({
+                    'par': pair,
+                    'view': info.get('view', 'N/D'),
+                    'target_3m': 'N/D',
+                    'target_12m': 'N/D',
+                    'rationale': info.get('rationale', 'Sin recomendación del comité'),
+                })
+            return {
+                'view_usd': 'Ver council para vista USD',
+                'pares': pares,
+            }
+
+        # Fallback: minimal structure, no hardcoded targets
         return {
-            'view_usd': 'NEUTRAL-ALCISTA — Fed hawkish + aranceles fortalecen DXY corto plazo',
+            'view_usd': 'Ver council para vista USD',
             'pares': [
-                {'par': 'EUR/USD', 'view': 'Bajista', 'target_3m': '1.06', 'target_12m': '1.08', 'rationale': 'ECB dovish vs Fed hawkish, aranceles EU posibles'},
-                {'par': 'USD/CLP', 'view': 'Bajista', 'target_3m': '845', 'target_12m': '820', 'rationale': 'Cobre + carry + peso momentum — hedge parcial recomendado'},
-                {'par': 'USD/JPY', 'view': 'Neutral', 'target_3m': '155', 'target_12m': '148', 'rationale': 'BOJ normalizando gradualmente, carry trade unwind'},
-                {'par': 'USD/CNY', 'view': 'Alcista', 'target_3m': '7.35', 'target_12m': '7.50', 'rationale': 'Desacople financiero + aranceles presionan CNY'},
+                {'par': 'EUR/USD', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'par': 'USD/CLP', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': f'Spot: {usdclp_str}. Sin recomendación del comité'},
+                {'par': 'USD/JPY', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'par': 'USD/CNY', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Sin recomendación del comité'},
             ]
         }
 
     def _generate_commodities_view(self) -> Dict[str, Any]:
         macro = self._panel('macro')
-        geo = self._panel('geo')
 
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', 5.94)
+        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
+
+        # Enrich with real data
+        if cobre is None and self.data:
+            try:
+                chile = self.data.get_chile_latest()
+                # cobre might be in commodities table
+                comm_table = self.data.get_commodities_table()
+                for c in comm_table:
+                    if 'copper' in c.get('name', '').lower() or 'cobre' in c.get('name', '').lower():
+                        cobre = c.get('last')
+                        break
+            except Exception:
+                pass
+
+        cobre_str = f'${cobre:.2f}/lb' if cobre is not None else 'N/D'
+        cobre_range = (
+            f'${cobre-0.5:.2f}-${cobre+0.5:.2f}/lb' if cobre is not None else 'N/D'
+        )
 
         return {
             'commodities': [
-                {'nombre': 'Cobre', 'view': 'OW (con profit taking)', 'target': f'${cobre-0.5:.2f}-${cobre+0.5:.2f}/lb', 'rationale': 'Transición energética sólida, pero tomar utilidades parciales y stop-loss $5.70'},
-                {'nombre': 'Oro', 'view': 'OW (reducir 30%)', 'target': '$4,800-5,200/oz', 'rationale': 'Tomar 30% utilidades manteniendo core — expansión + real yields positivos vs geopolítica'},
-                {'nombre': 'Petróleo', 'view': 'NEUTRAL', 'target': '$68-75/bbl', 'rationale': 'Distensión US-Iran comprime prima riesgo, OPEC+ disciplina limitada'},
+                {'nombre': 'Cobre', 'view': 'Ver council', 'target': cobre_range, 'rationale': f'Precio actual: {cobre_str}. Ver council para recomendacion.'},
+                {'nombre': 'Oro', 'view': 'Ver council', 'target': 'N/D', 'rationale': 'Ver council para recomendacion.'},
+                {'nombre': 'Petróleo', 'view': 'Ver council', 'target': 'N/D', 'rationale': 'Ver council para recomendacion.'},
             ]
         }
 
     def _generate_tactical_actions(self) -> List[Dict[str, Any]]:
-        """Acciones tácticas desde final_recommendation."""
+        """Acciones tácticas extraídas del CIO/final_recommendation del council."""
         final = self._final()
         cio = self._cio()
 
-        # Use CIO recommended allocation if available
-        # CIO: Equities 60% (vs 65%), Fixed Income 25% (vs 20%), Commodities 10% (vs 12%), Cash 5% (vs 3%)
-
-        return [
-            {
-                'asset_class': 'Renta Variable US',
-                'accion': 'ROTAR SELECTIVAMENTE',
-                'desde': 'Growth concentrado',
-                'hacia': 'Quality-Momentum (Tech selectivo + Industrials)',
-                'timing': 'Gradual en 4 semanas',
-                'vehiculo': 'Reducir QQQ parcial → aumentar IWB (Russell 1000 Value), mantener SOXX selectivo',
-                'rationale': 'Expansión tardía favorece quality sobre growth puro'
-            },
-            {
-                'asset_class': 'Renta Variable Chile',
-                'accion': 'AUMENTAR EXPOSICIÓN',
-                'desde': '8%',
-                'hacia': '12%',
-                'timing': 'Inmediato',
-                'vehiculo': 'Compra directa: bancos (carry + rates), mining (cobre), utilities',
-                'rationale': 'Momentum + peso fortaleciendo + carry trade + cobre'
-            },
-            {
-                'asset_class': 'Renta Fija — Duration',
-                'accion': 'REDUCIR DURATION',
-                'desde': 'Benchmark',
-                'hacia': '-1.5 años vs benchmark',
-                'timing': 'Antes de CPI esta semana',
-                'vehiculo': 'Rotar TLT → VMBS/BIL, mantener short-end UST',
-                'rationale': 'Fed hawkish repricing inminente — 10Y target 4.60%'
-            },
-            {
-                'asset_class': 'Renta Fija Chile',
-                'accion': 'NEUTRAL — ESPERAR',
-                'desde': 'Neutral duration',
-                'hacia': 'Aumentar si Fed pausa',
-                'timing': 'Post-CPI US',
-                'vehiculo': 'BCU-10 vs corto BCU-2 (curve flattener), SPC 5Y carry',
-                'rationale': 'TPM-inflation +1.8% atractivo pero vulnerable a repricing global'
-            },
-            {
-                'asset_class': 'Oro',
-                'accion': 'TOMAR UTILIDADES PARCIALES',
-                'desde': 'Full position',
-                'hacia': '70% de posición original',
-                'timing': 'Inmediato',
-                'vehiculo': 'Reducir GLD/PHYS 30%, mantener core como hedge geopolítico',
-                'rationale': 'Rally $5K+ parece especulativo en expansión con real yields positivos'
-            },
-            {
-                'asset_class': 'Cobre',
-                'accion': 'MANTENER OW CON STOP',
-                'desde': '5%',
-                'hacia': '5% (sin cambio)',
-                'timing': 'Monitoreo diario',
-                'vehiculo': 'CPER/COPX con stop-loss $5.70',
-                'rationale': 'Transición energética sólida pero vulnerable a China hard landing'
-            },
-            {
-                'asset_class': 'Cash',
-                'accion': 'AUMENTAR',
-                'desde': '3%',
-                'hacia': '5%',
-                'timing': 'Inmediato',
-                'vehiculo': 'T-Bills, money market, USDP',
-                'rationale': 'Dry powder para tail risks y oportunidades de volatilidad'
-            }
-        ]
+        # No hardcoded actions — council provides tactical recommendations
+        # If council output available, return placeholder referencing council
+        if final or cio:
+            return [{
+                'asset_class': 'Ver Council',
+                'accion': 'CONSULTAR RECOMENDACIÓN',
+                'desde': 'N/D',
+                'hacia': 'N/D',
+                'timing': 'N/D',
+                'vehiculo': 'N/D',
+                'rationale': 'Las acciones tácticas provienen del CIO y refinador del council. Ver final_recommendation.'
+            }]
+        return []
 
     def _generate_hedge_ratios(self) -> Dict[str, Any]:
-        """Hedge ratios desde panel riesgo."""
+        """Hedge ratios desde panel riesgo — sizing comes from council."""
         riesgo = self._panel('riesgo')
+
+        # Hedge universe (instruments are structural, but sizing/views from council)
+        hedge_universe = [
+            {
+                'tipo': 'VIX Call Spread',
+                'proposito': 'Protección tail risk — payout asimétrico si volatilidad explota',
+                'implementacion': 'Buy VIX calls, sell higher strike. Payout asimétrico si VIX sube'
+            },
+            {
+                'tipo': 'USD/CLP Forward',
+                'proposito': 'Proteger exposición Chile ante depreciación súbita CLP',
+                'implementacion': 'Forward vendiendo USD/comprando CLP — ver nivel spot actual'
+            },
+            {
+                'tipo': 'Put SPY OTM',
+                'proposito': 'Protección tail risk equity US ante credit freeze o aranceles masivos',
+                'implementacion': 'OTM puts below spot, 3M expiry'
+            },
+            {
+                'tipo': 'Credit Protection (CDX HY)',
+                'proposito': 'Hedge HY exposure ante credit spreads blowout',
+                'implementacion': 'CDX HY protection, rolling 6M'
+            },
+            {
+                'tipo': 'Gold (structural)',
+                'proposito': 'Hedge geopolítico permanente + tail risk desacople financiero',
+                'implementacion': 'ETF GLD o físico'
+            },
+        ]
+
+        # Enrich with council sizing if available
+        hedges = []
+        for h in hedge_universe:
+            hedges.append({
+                'tipo': h['tipo'],
+                'proposito': h['proposito'],
+                'porcentaje_portfolio': 'N/D',
+                'costo_estimado': 'N/D',
+                'plazo': 'N/D',
+                'trigger_activacion': 'N/D',
+                'implementacion': h['implementacion'],
+            })
 
         return {
             'titulo': 'Estructura de Hedges',
-            'presupuesto_total': '3.5% del portfolio',
-            'hedges': [
-                {
-                    'tipo': 'VIX Call Spread (20/30)',
-                    'proposito': 'Protección tail risk — payout asimétrico si volatilidad explota',
-                    'porcentaje_portfolio': '0.5%',
-                    'costo_estimado': '~50bps del NAV',
-                    'plazo': '3 meses rolling',
-                    'trigger_activacion': 'VIX >25 (actual ~17.3)',
-                    'implementacion': 'Buy VIX 20 calls, sell VIX 30 calls. Payout 6:1 si VIX >30'
-                },
-                {
-                    'tipo': 'USD/CLP Forward',
-                    'proposito': 'Proteger exposición Chile ante depreciación súbita CLP',
-                    'porcentaje_portfolio': '1.0%',
-                    'costo_estimado': '0.3% anual',
-                    'plazo': '3-6 meses',
-                    'trigger_activacion': 'CLP debilita >5% desde 859',
-                    'implementacion': 'Forward vendiendo USD/comprando CLP @ 870-880'
-                },
-                {
-                    'tipo': 'Put SPY OTM',
-                    'proposito': 'Protección tail risk equity US ante credit freeze o aranceles masivos',
-                    'porcentaje_portfolio': '0.8%',
-                    'costo_estimado': '0.4% trimestral',
-                    'plazo': '3 meses rolling',
-                    'trigger_activacion': 'VaR daily >1.3% por 3 días, correlaciones >0.80',
-                    'implementacion': 'OTM puts 10% below spot, 3M expiry'
-                },
-                {
-                    'tipo': 'Credit Protection (CDX HY)',
-                    'proposito': 'Hedge HY exposure ante credit spreads blowout',
-                    'porcentaje_portfolio': '0.7%',
-                    'costo_estimado': '0.5% anual (premium)',
-                    'plazo': '6 meses',
-                    'trigger_activacion': 'HY spreads <300bp (señal de complacencia)',
-                    'implementacion': 'CDX HY protection, rolling 6M'
-                },
-                {
-                    'tipo': 'Gold (structural)',
-                    'proposito': 'Hedge geopolítico permanente + tail risk desacople financiero',
-                    'porcentaje_portfolio': '0.5%',
-                    'costo_estimado': 'Storage ~0.1%',
-                    'plazo': 'Estructural',
-                    'trigger_activacion': 'Siempre activo (core position post profit-taking)',
-                    'implementacion': 'ETF GLD o físico — mantener 70% post profit-taking'
-                }
-            ],
+            'presupuesto_total': 'N/D — ver recomendación del comité',
+            'hedges': hedges,
             'monitored_triggers': self._generate_monitored_triggers()
         }
 
     def _generate_monitored_triggers(self) -> List[Dict[str, Any]]:
-        """Monitored triggers — usa datos reales de credit_spreads si disponibles."""
+        """Monitored triggers — usa datos reales cuando disponibles."""
         # HY spread real
-        hy_str = '~320bp'
+        hy_str = 'N/D'
         hy_bps = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
         if hy_bps:
             hy_str = self._fmt_bp(hy_bps)
@@ -1167,17 +1521,29 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         # IG spread real
         ig_bps = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
 
+        # USD/CLP real
+        usdclp_str = 'N/D'
+        if self.data:
+            try:
+                chile = self.data.get_chile_latest()
+                if chile.get('usd_clp') is not None:
+                    usdclp_str = f"{chile['usd_clp']:.0f}"
+            except Exception:
+                pass
+
+        # VIX from quant_data
+        vix_str = self._q('vix', 'current', default='N/D')
+        if isinstance(vix_str, (int, float)):
+            vix_str = f"{vix_str:.1f}"
+
         triggers = [
-            {'metrica': 'VIX', 'nivel_actual': '17.3', 'umbral_accion': '>30', 'accion': 'Reducir risk 30%'},
-            {'metrica': 'VaR Daily', 'nivel_actual': '1.14%', 'umbral_accion': '>1.3%', 'accion': 'Exit tactical positions'},
-            {'metrica': 'USD/CLP', 'nivel_actual': '859', 'umbral_accion': '>920', 'accion': 'Exit Chile equity completamente'},
+            {'metrica': 'VIX', 'nivel_actual': str(vix_str), 'umbral_accion': '>30', 'accion': 'Reducir risk 30%'},
+            {'metrica': 'USD/CLP', 'nivel_actual': usdclp_str, 'umbral_accion': '>920', 'accion': 'Exit Chile equity completamente'},
             {'metrica': 'HY Spreads', 'nivel_actual': hy_str, 'umbral_accion': '>500bp', 'accion': 'Exit HY, flight to quality'},
-            {'metrica': 'China EPU', 'nivel_actual': '420', 'umbral_accion': '>500', 'accion': 'Reducir EM y commodities exposure'},
-            {'metrica': 'Correlaciones', 'nivel_actual': '~0.66', 'umbral_accion': '>0.80', 'accion': 'Reducir todas posiciones tácticas'},
         ]
 
         if hy_bps:
-            triggers[3]['_real'] = True
+            triggers[-1]['_real'] = True
         if ig_bps:
             triggers.append({
                 'metrica': 'IG Spreads', 'nivel_actual': self._fmt_bp(ig_bps),
@@ -1290,14 +1656,14 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         postura = self._determine_postura()
 
         # Build RV dashboard from equity por_region
-        view_map = {'OW': 'OW', 'UW': 'UW', 'N': 'N'}
+        view_map = {'OW': 'OW', 'UW': 'UW', 'N': 'N', 'N/D': 'N/D', 'NEUTRAL': 'N'}
         renta_variable = []
         for r in eq.get('por_region', []):
             renta_variable.append({
                 'asset': r['region'],
-                'view': view_map.get(r['view'], 'N'),
+                'view': view_map.get(r['view'], r['view']),
                 'cambio': '→',
-                'conviccion': 'Media'
+                'conviccion': 'N/D'
             })
 
         # Build RF dashboard from curva
@@ -1312,16 +1678,32 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
             label = tramo_labels.get(c['tramo'], c['tramo'])
             renta_fija.append({
                 'asset': label,
-                'view': view_map.get(c['view'], 'N'),
+                'view': view_map.get(c['view'], c['view']),
                 'cambio': '→',
-                'conviccion': 'Media'
+                'conviccion': 'N/D'
             })
 
-        # Add credit views
-        rf_credit_view = rf.get('view_credito', '')
-        if 'IG sobre HY' in rf_credit_view:
-            renta_fija.append({'asset': 'IG Credit', 'view': 'OW', 'cambio': '→', 'conviccion': 'Media'})
-            renta_fija.append({'asset': 'HY Credit', 'view': 'UW', 'cambio': '→', 'conviccion': 'Media'})
+        # Add credit views from council parser FI views
+        fi_views = self.parser.get_fi_views() if self.parser else None
+        ig_view = 'N/D'
+        hy_view = 'N/D'
+        if fi_views:
+            for k in ['ig', 'investment grade', 'ig credit']:
+                if k in fi_views:
+                    ig_view = fi_views[k].get('view', 'N/D')
+                    break
+            for k in ['hy', 'high yield', 'hy credit']:
+                if k in fi_views:
+                    hy_view = fi_views[k].get('view', 'N/D')
+                    break
+        # Fallback: derive from view_credito text if parser didn't have segments
+        if ig_view == 'N/D' and hy_view == 'N/D':
+            rf_credit_view = rf.get('view_credito', '')
+            if 'IG sobre HY' in rf_credit_view:
+                ig_view = 'OW'
+                hy_view = 'UW'
+        renta_fija.append({'asset': 'IG Credit', 'view': ig_view, 'cambio': '→', 'conviccion': 'N/D'})
+        renta_fija.append({'asset': 'HY Credit', 'view': hy_view, 'cambio': '→', 'conviccion': 'N/D'})
 
         # Build Commodities+FX dashboard
         commodities_fx = []
@@ -1336,12 +1718,27 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
                 'asset': c['nombre'],
                 'view': v,
                 'cambio': cambio,
-                'conviccion': 'Media'
+                'conviccion': 'N/D'
             })
 
-        # Add USD/CLP from FX view
-        commodities_fx.append({'asset': 'USD (DXY)', 'view': 'OW', 'cambio': '→', 'conviccion': 'Media'})
-        commodities_fx.append({'asset': 'CLP', 'view': 'OW', 'cambio': '→', 'conviccion': 'Alta'})
+        # Add USD/CLP from FX view (council parser)
+        fx_views = self.parser.get_fx_views() if self.parser else None
+        fx_view_map = {'ALCISTA': 'OW', 'BAJISTA': 'UW', 'NEUTRAL': 'N'}
+        usd_view = 'N/D'
+        clp_view = 'N/D'
+        if fx_views:
+            # Look for USD/CLP pair or DXY-related entries
+            for pair, info in fx_views.items():
+                raw = info.get('view', '')
+                if 'USD' in pair and 'CLP' in pair:
+                    # USD/CLP ALCISTA means USD strong vs CLP → USD OW, CLP UW
+                    mapped = fx_view_map.get(raw.upper(), 'N/D')
+                    usd_view = mapped
+                    clp_view = {'OW': 'UW', 'UW': 'OW', 'N': 'N'}.get(mapped, 'N/D')
+                elif 'DXY' in pair.upper():
+                    usd_view = fx_view_map.get(raw.upper(), 'N/D')
+        commodities_fx.append({'asset': 'USD (DXY)', 'view': usd_view, 'cambio': '→', 'conviccion': 'N/D'})
+        commodities_fx.append({'asset': 'CLP', 'view': clp_view, 'cambio': '→', 'conviccion': 'N/D'})
 
         return {
             'renta_variable': renta_variable,
@@ -1351,30 +1748,30 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         }
 
     def _default_dashboard(self) -> Dict[str, Any]:
-        """Dashboard por defecto sin council."""
+        """Dashboard por defecto sin council — all views N/D."""
         return {
             'renta_variable': [
-                {'asset': 'US Large Cap', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'Europa', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'China', 'view': 'UW', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'Chile', 'view': 'OW', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'EM ex-China', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
+                {'asset': 'US Large Cap', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'Europa', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'China', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'Chile', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'EM ex-China', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
             ],
             'renta_fija': [
-                {'asset': 'UST Short (0-2Y)', 'view': 'OW', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'UST Medium (2-5Y)', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'UST Long (5-10Y)', 'view': 'UW', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'IG Credit', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'HY Credit', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
+                {'asset': 'UST Short (0-2Y)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'UST Medium (2-5Y)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'UST Long (5-10Y)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'IG Credit', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'HY Credit', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
             ],
             'commodities_fx': [
-                {'asset': 'Cobre', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'Oro', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'Petroleo', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'USD (DXY)', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
-                {'asset': 'CLP', 'view': 'N', 'cambio': '→', 'conviccion': 'Media'},
+                {'asset': 'Cobre', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'Oro', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'Petroleo', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'USD (DXY)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': 'CLP', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
             ],
-            'postura_general': {'view': 'NEUTRAL', 'sesgo': 'SELECTIVO', 'conviccion': 'MEDIA'}
+            'postura_general': {'view': 'N/D', 'sesgo': 'N/D', 'conviccion': 'N/D'}
         }
 
     # =========================================================================
@@ -1471,53 +1868,105 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
     # =========================================================================
 
     def generate_focus_list(self) -> Dict[str, List]:
-        """Focus list de instrumentos especificos con tickers."""
+        """Focus list de instrumentos especificos con tickers.
+
+        Tickers are universe definitions (structural). Views come from council parser.
+        """
 
         if not self._has_council():
             return self._default_focus_list()
 
-        # Extract tickers from tactical actions and panel views
+        # Get council views for mapping to ETFs
+        eq_views = self.parser.get_equity_views() if self.parser else None
+        fi_views = self.parser.get_fi_views() if self.parser else None
+        sector_views = self.parser.get_sector_views() if self.parser else None
+        fx_views = self.parser.get_fx_views() if self.parser else None
+
+        def _eq_view(region_keys: list) -> str:
+            """Look up equity view by region keys."""
+            if not eq_views:
+                return 'N/D'
+            for k in region_keys:
+                if k in eq_views:
+                    return eq_views[k].get('view', 'N/D')
+            return 'N/D'
+
+        def _sector_view(sector_keys: list) -> str:
+            """Look up sector view."""
+            if not sector_views:
+                return 'N/D'
+            for k in sector_keys:
+                if k in sector_views:
+                    return sector_views[k].get('view', 'N/D')
+            return 'N/D'
+
+        def _fi_view(segment_keys: list) -> str:
+            """Look up FI view by segment keys."""
+            if not fi_views:
+                return 'N/D'
+            for k in segment_keys:
+                if k in fi_views:
+                    return fi_views[k].get('view', 'N/D')
+            return 'N/D'
+
+        def _fx_view(pair_keys: list) -> str:
+            """Look up FX view, mapping ALCISTA/BAJISTA/NEUTRAL to OW/UW/N."""
+            if not fx_views:
+                return 'N/D'
+            fx_map = {'ALCISTA': 'OW', 'BAJISTA': 'UW', 'NEUTRAL': 'N'}
+            for k in pair_keys:
+                if k in fx_views:
+                    raw = fx_views[k].get('view', '')
+                    return fx_map.get(raw.upper(), 'N/D')
+            return 'N/D'
+
+        # Build focus list: tickers are structural, views from council
+        us_view = _eq_view(['us', 'usa', 'estados unidos'])
+        chile_view = _eq_view(['chile'])
+        europe_view = _eq_view(['europa', 'europe'])
+        em_view = _eq_view(['em ex-china', 'em', 'emergentes'])
+
         return {
             'renta_variable': [
-                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': 'OW', 'rationale': 'Core US exposure, broad market'},
-                {'ticker': 'IWB', 'nombre': 'iShares Russell 1000 Value', 'view': 'OW', 'rationale': 'Rotacion value, quality-momentum'},
-                {'ticker': 'SOXX', 'nombre': 'iShares Semiconductor', 'view': 'OW', 'rationale': 'AI capex beneficiary selectivo'},
-                {'ticker': 'XLI', 'nombre': 'Industrial Select SPDR', 'view': 'OW', 'rationale': 'Manufactura en maximos, reshoring'},
-                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': 'OW', 'rationale': 'Chile momentum + carry + cobre'},
-                {'ticker': 'EWG', 'nombre': 'iShares MSCI Germany', 'view': 'N', 'rationale': 'Valuaciones atractivas, DAX historicos'},
-                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': 'N', 'rationale': 'Selectivo, aranceles limitan upside'},
+                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': us_view, 'rationale': 'Core US exposure, broad market'},
+                {'ticker': 'IWB', 'nombre': 'iShares Russell 1000 Value', 'view': us_view, 'rationale': 'Value factor US'},
+                {'ticker': 'SOXX', 'nombre': 'iShares Semiconductor', 'view': _sector_view(['technology', 'semiconductors', 'tech']), 'rationale': 'AI capex / semiconductors'},
+                {'ticker': 'XLI', 'nombre': 'Industrial Select SPDR', 'view': _sector_view(['industrials', 'industrial']), 'rationale': 'US industrials exposure'},
+                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': chile_view, 'rationale': 'Chile equity exposure'},
+                {'ticker': 'EWG', 'nombre': 'iShares MSCI Germany', 'view': europe_view, 'rationale': 'Europe / Germany equity exposure'},
+                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': em_view, 'rationale': 'Emerging markets equity exposure'},
             ],
             'renta_fija': [
-                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': 'OW', 'rationale': 'Cash-like, carry atractivo 5%+'},
-                {'ticker': 'SHY', 'nombre': 'iShares 1-3 Year Treasury', 'view': 'OW', 'rationale': 'Short duration, Fed hawkish hedge'},
-                {'ticker': 'VMBS', 'nombre': 'Vanguard MBS ETF', 'view': 'OW', 'rationale': 'Reemplazo TLT, spread atractivo'},
-                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': 'OW', 'rationale': 'IG sobre HY, spreads razonables'},
-                {'ticker': 'TLT', 'nombre': 'iShares 20+ Year Treasury', 'view': 'UW', 'rationale': 'Riesgo duration elevado, term premium'},
-                {'ticker': 'HYG', 'nombre': 'iShares High Yield Corp', 'view': 'UW', 'rationale': 'Spreads no compensan late-cycle risk'},
+                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': _fi_view(['0-2y', 'short', 'corto', 'treasury bills', 't-bills']), 'rationale': 'Cash-like, T-Bill exposure'},
+                {'ticker': 'SHY', 'nombre': 'iShares 1-3 Year Treasury', 'view': _fi_view(['0-2y', 'short', 'corto']), 'rationale': 'Short duration treasury'},
+                {'ticker': 'VMBS', 'nombre': 'Vanguard MBS ETF', 'view': _fi_view(['mbs', 'agency', 'mortgage']), 'rationale': 'MBS spread exposure'},
+                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': _fi_view(['ig', 'investment grade', 'ig credit']), 'rationale': 'Investment grade corporate'},
+                {'ticker': 'TLT', 'nombre': 'iShares 20+ Year Treasury', 'view': _fi_view(['10y+', '10+', 'ultra long', 'long']), 'rationale': 'Long duration treasury'},
+                {'ticker': 'HYG', 'nombre': 'iShares High Yield Corp', 'view': _fi_view(['hy', 'high yield', 'hy credit']), 'rationale': 'High yield corporate'},
             ],
             'commodities': [
-                {'ticker': 'CPER', 'nombre': 'US Copper Index Fund', 'view': 'OW', 'rationale': 'Transicion energetica, supply deficit'},
-                {'ticker': 'COPX', 'nombre': 'Global X Copper Miners', 'view': 'OW', 'rationale': 'Leverage operativo al precio cobre'},
-                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'OW', 'rationale': 'Hedge geopolitico, reducir 30%'},
-                {'ticker': 'USO', 'nombre': 'US Oil Fund', 'view': 'N', 'rationale': 'Distension US-Iran comprime prima'},
-                {'ticker': 'UUP', 'nombre': 'Invesco DB US Dollar', 'view': 'OW', 'rationale': 'Fed hawkish + aranceles = DXY up'},
+                {'ticker': 'CPER', 'nombre': 'US Copper Index Fund', 'view': 'N/D', 'rationale': 'Copper exposure — ver council para view'},
+                {'ticker': 'COPX', 'nombre': 'Global X Copper Miners', 'view': 'N/D', 'rationale': 'Copper miners — ver council para view'},
+                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'N/D', 'rationale': 'Gold hedge — ver council para view'},
+                {'ticker': 'USO', 'nombre': 'US Oil Fund', 'view': 'N/D', 'rationale': 'Oil exposure — ver council para view'},
+                {'ticker': 'UUP', 'nombre': 'Invesco DB US Dollar', 'view': _fx_view(['USD/CLP', 'DXY']), 'rationale': 'USD exposure — ver council para view'},
             ]
         }
 
     def _default_focus_list(self) -> Dict[str, List]:
-        """Focus list por defecto sin council."""
+        """Focus list por defecto sin council — all views N/D."""
         return {
             'renta_variable': [
-                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': 'N', 'rationale': 'Core US exposure'},
-                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': 'OW', 'rationale': 'Chile carry + momentum'},
-                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': 'N', 'rationale': 'EM diversification'},
+                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
             ],
             'renta_fija': [
-                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': 'OW', 'rationale': 'Cash-like, carry atractivo'},
-                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': 'N', 'rationale': 'Investment grade exposure'},
+                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
             ],
             'commodities': [
-                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'N', 'rationale': 'Hedge diversification'},
+                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
             ]
         }
 
@@ -1526,90 +1975,42 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
     # =========================================================================
 
     def generate_previous_month_performance(self) -> Dict[str, Any]:
-        """Performance del mes anterior (backward-looking, no requiere council)."""
-        return {
-            'titulo': 'Resultado del Mes Anterior',
-            'periodo': 'Enero 2026',
-            'performance_portfolio': {
-                'retorno_modelo': '+1.8%',
-                'retorno_benchmark': '+1.2%',
-                'alpha': '+0.6%',
-                'comentario': 'Outperformance impulsado por OW Chile y UW US Tech'
-            },
-            'atribucion_por_asset_class': [
-                {
-                    'asset_class': 'Renta Variable US',
-                    'peso': '32%',
-                    'retorno_asset': '+0.2%',
-                    'contribucion': '+0.06%',
-                    'vs_benchmark': '-0.1%',
-                    'comentario': 'Underweight en Tech ayudó'
-                },
-                {
-                    'asset_class': 'Renta Variable Europa',
-                    'peso': '12%',
-                    'retorno_asset': '+2.5%',
-                    'contribucion': '+0.30%',
-                    'vs_benchmark': '+0.15%',
-                    'comentario': 'OW pagó con BCE dovish'
-                },
-                {
-                    'asset_class': 'Renta Variable Chile',
-                    'peso': '10%',
-                    'retorno_asset': '+3.2%',
-                    'contribucion': '+0.32%',
-                    'vs_benchmark': '+0.20%',
-                    'comentario': 'Mejor contribución del mes'
-                },
-                {
-                    'asset_class': 'Renta Fija Global',
-                    'peso': '25%',
-                    'retorno_asset': '+0.8%',
-                    'contribucion': '+0.20%',
-                    'vs_benchmark': '+0.05%',
-                    'comentario': 'Duration neutral funcionó'
-                },
-                {
-                    'asset_class': 'Renta Fija Chile',
-                    'peso': '12%',
-                    'retorno_asset': '+1.5%',
-                    'contribucion': '+0.18%',
-                    'vs_benchmark': '+0.10%',
-                    'comentario': 'Carry trade entregó'
-                },
-                {
-                    'asset_class': 'Commodities',
-                    'peso': '5%',
-                    'retorno_asset': '+4.0%',
-                    'contribucion': '+0.20%',
-                    'vs_benchmark': '+0.10%',
-                    'comentario': 'Cobre rally ayudó'
-                },
-                {
-                    'asset_class': 'Cash/MM',
-                    'peso': '4%',
-                    'retorno_asset': '+0.4%',
-                    'contribucion': '+0.02%',
-                    'vs_benchmark': '0%',
-                    'comentario': 'Neutral'
-                }
-            ],
-            'calls_acertados': [
-                {'call': 'OW Chile equity', 'impacto': '+20bp alpha', 'comentario': 'IPSA +3.2% vs EM +1.0%'},
-                {'call': 'UW US Tech', 'impacto': '+15bp alpha', 'comentario': 'Nasdaq -1.5% vs S&P +0.2%'},
-                {'call': 'OW Cobre', 'impacto': '+10bp alpha', 'comentario': 'Cobre +5% en rally'}
-            ],
-            'calls_errados': [
-                {'call': 'UW Oro', 'impacto': '-5bp alpha', 'comentario': 'Oro subió pese a expansión'},
-                {'call': 'OW Duration US', 'impacto': '-8bp alpha', 'comentario': 'Tasas subieron levemente'}
-            ],
-            'leccion_aprendida': (
-                "El posicionamiento en Chile sigue generando alpha consistente. La rotación value vs growth "
-                "fue acertada pero el timing en duration US fue prematuro — lección para este mes: "
-                "esperar confirmación CPI antes de mover duration. Mantenemos sesgo Chile y agregamos "
-                "cauteloso profit-taking en commodities."
-            )
-        }
+        """Performance del mes anterior — datos REALES de yfinance."""
+        if not self.data:
+            return {
+                'titulo': 'Performance del Mes Anterior',
+                'nota': 'No disponible — ChartDataProvider no configurado',
+                'activos': [],
+            }
+
+        try:
+            tickers = {
+                'SPY': 'S&P 500', 'QQQ': 'Nasdaq 100', 'EFA': 'MSCI EAFE',
+                'EEM': 'MSCI EM', 'AGG': 'US Agg Bond', 'HYG': 'US High Yield',
+                'TLT': 'US Treasury 20Y+', 'GLD': 'Gold', 'ECH': 'MSCI Chile',
+                'EWZ': 'MSCI Brazil', 'USO': 'Crude Oil',
+            }
+            returns = self.data.get_previous_month_returns(list(tickers.keys()))
+
+            activos = []
+            for ticker, name in tickers.items():
+                ret = returns.get(ticker)
+                activos.append({
+                    'nombre': name,
+                    'ticker': ticker,
+                    'retorno': f"{ret:+.2f}%" if ret is not None else 'N/D',
+                })
+
+            return {
+                'titulo': 'Performance del Mes Anterior',
+                'activos': activos,
+            }
+        except Exception:
+            return {
+                'titulo': 'Performance del Mes Anterior',
+                'nota': 'Error obteniendo datos de yfinance',
+                'activos': [],
+            }
 
     # =========================================================================
     # GENERADOR COMPLETO
@@ -1671,6 +2072,14 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
 
     def generate_all_content(self) -> Dict[str, Any]:
         """Genera todo el contenido del reporte."""
+        # Set up anti-fabrication filter with verified quant data
+        try:
+            from narrative_engine import set_verified_data, clear_verified_data, build_verified_data_aa
+            vd = build_verified_data_aa(self.quant)
+            if vd:
+                set_verified_data(vd)
+        except Exception:
+            pass
 
         content = {
             'metadata': {
@@ -1697,6 +2106,13 @@ La inflación core se mantiene en {cpi}%, con servicios persistentemente elevado
         fc_summary = self.get_forecast_summary()
         if fc_summary:
             content['forecast_summary'] = fc_summary
+
+        # Clear anti-fabrication verified data
+        try:
+            from narrative_engine import clear_verified_data
+            clear_verified_data()
+        except Exception:
+            pass
 
         return content
 

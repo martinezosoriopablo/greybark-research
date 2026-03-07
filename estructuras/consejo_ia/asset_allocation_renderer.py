@@ -53,6 +53,15 @@ class AssetAllocationRenderer:
             company_name=self.branding.get('company_name', '')
         )
 
+        # Inject Bloomberg data if available
+        try:
+            from bloomberg_reader import BloombergData
+            bbg = BloombergData()
+            if bbg.available:
+                self.content_generator.bloomberg = bbg
+        except Exception:
+            pass
+
     def _print(self, msg: str):
         if self.verbose:
             print(msg)
@@ -88,12 +97,37 @@ class AssetAllocationRenderer:
         if output_filename is None:
             output_filename = f"asset_allocation_{datetime.now().strftime('%Y-%m-%d')}_professional.html"
 
+        # Append data provenance div (hidden, for audit)
+        html = self._append_provenance(html)
+
         output_path = self.output_dir / output_filename
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html)
 
         self._print(f"\n[OK] Reporte generado: {output_path}")
         return str(output_path)
+
+    def _append_provenance(self, html: str) -> str:
+        """Append hidden data provenance div to HTML for audit trail."""
+        try:
+            from narrative_engine import get_provenance_records, clear_provenance_records
+            import json as _json
+            records = get_provenance_records()
+            if records:
+                provenance_json = _json.dumps(records, ensure_ascii=False, indent=2)
+                div = (
+                    f'\n<div id="data-provenance" style="display:none" '
+                    f'data-report="aa" data-generated="{datetime.now().isoformat()}">'
+                    f'\n{provenance_json}\n</div>\n'
+                )
+                if '</body>' in html:
+                    html = html.replace('</body>', div + '</body>')
+                else:
+                    html += div
+                clear_provenance_records()
+        except Exception:
+            pass
+        return html
 
     def _render_template(self, template, content: Dict) -> str:
         """Renderiza el template con el contenido."""
@@ -219,13 +253,17 @@ class AssetAllocationRenderer:
         esc_table = ''
         for e in esc['escenarios']:
             impl = e['implicancias']
+            eq_val = impl.get('equities', 'N/D')
+            bd_val = impl.get('bonds', 'N/D')
+            usd_val = impl.get('usd', 'N/D')
+            cm_val = impl.get('commodities', 'N/D')
             esc_table += f'''<tr>
                 <td>{e['nombre']}</td>
                 <td><strong>{e['probabilidad']}%</strong></td>
-                <td>{impl_map.get(impl['equities'], impl['equities'])}</td>
-                <td>{impl_map.get(impl['bonds'], impl['bonds'])}</td>
-                <td>{impl_map.get(impl['usd'], impl['usd'])}</td>
-                <td>{impl_map.get(impl['commodities'], impl['commodities'])}</td>
+                <td>{impl_map.get(eq_val, eq_val)}</td>
+                <td>{impl_map.get(bd_val, bd_val)}</td>
+                <td>{impl_map.get(usd_val, usd_val)}</td>
+                <td>{impl_map.get(cm_val, cm_val)}</td>
             </tr>'''
         replacements['{{scenarios_table}}'] = esc_table
 

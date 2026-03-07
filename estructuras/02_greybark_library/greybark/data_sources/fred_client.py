@@ -57,7 +57,7 @@ class FREDClient:
         if end_date is None:
             end_date = date.today()
         if start_date is None:
-            start_date = end_date - timedelta(days=365*5)
+            start_date = end_date - timedelta(days=365*10)
         
         try:
             data = self._client.get_series(
@@ -397,3 +397,130 @@ class FREDClient:
 
         print(f"[FRED] ✓ US Macro Dashboard complete")
         return dashboard
+
+    def get_leading_indicators(self) -> Dict:
+        """
+        Fetch leading economic indicators for USA and Eurozone.
+
+        Series:
+        - USALOLITOAASTSAM: OECD CLI USA Amplitude Adjusted (monthly)
+        - BSCICP02EZM460S: OECD Business Confidence Euro Area (monthly, leading proxy)
+        - CSCICP02EZM460S: Consumer Confidence Euro Area (monthly)
+        - CFNAI: Chicago Fed National Activity Index (monthly)
+        - UMCSENT: U Michigan Consumer Sentiment (monthly)
+
+        Returns:
+            Dict with leading indicators, levels, and trends
+        """
+        print("[FRED] Fetching Leading Indicators...")
+
+        result = {
+            'lei_usa': None,
+            'lei_eurozone': None,
+            'consumer_confidence_ez': None,
+            'cfnai': None,
+            'umich_sentiment': None,
+            'timestamp': None,
+        }
+
+        from datetime import datetime
+        result['timestamp'] = datetime.now().isoformat()
+
+        # OECD CLI USA Amplitude Adjusted
+        try:
+            cli = self.get_series(FREDSeries.LEADING_INDEX_OECD)
+            if cli is not None and len(cli) >= 2:
+                current = cli.iloc[-1]
+                prev = cli.iloc[-2]
+                last_date = cli.index[-1]
+                trend = 'expanding' if current > 100 else 'contracting'
+                result['lei_usa'] = {
+                    'value': round(current, 2),
+                    'prev': round(prev, 2),
+                    'change': round(current - prev, 2),
+                    'trend': trend,
+                    'period': last_date.strftime('%Y-%m'),
+                    'source': 'FRED:USALOLITOAASTSAM',
+                }
+                print(f"  ✓ LEI USA (OECD CLI): {current:.2f} ({trend})")
+        except Exception as e:
+            print(f"  ✗ LEI USA error: {e}")
+
+        # OECD Business Confidence Euro Area (leading proxy)
+        try:
+            bci = self.get_series(FREDSeries.LEADING_INDEX_EZ)
+            if bci is not None and len(bci) >= 2:
+                current = bci.iloc[-1]
+                prev = bci.iloc[-2]
+                last_date = bci.index[-1]
+                trend = 'expanding' if current > 100 else 'contracting'
+                result['lei_eurozone'] = {
+                    'value': round(current, 2),
+                    'prev': round(prev, 2),
+                    'change': round(current - prev, 2),
+                    'trend': trend,
+                    'period': last_date.strftime('%Y-%m'),
+                    'source': 'FRED:BSCICP02EZM460S',
+                }
+                print(f"  ✓ LEI Eurozone (Biz Conf): {current:.2f} ({trend})")
+        except Exception as e:
+            print(f"  ✗ LEI Eurozone error: {e}")
+
+        # Consumer Confidence Euro Area
+        try:
+            cci = self.get_series(FREDSeries.CONSUMER_CONFIDENCE_EZ)
+            if cci is not None and len(cci) >= 2:
+                current = cci.iloc[-1]
+                prev = cci.iloc[-2]
+                last_date = cci.index[-1]
+                result['consumer_confidence_ez'] = {
+                    'value': round(current, 1),
+                    'prev': round(prev, 1),
+                    'change': round(current - prev, 1),
+                    'period': last_date.strftime('%Y-%m'),
+                    'source': 'FRED:CSCICP02EZM460S',
+                }
+                print(f"  ✓ Consumer Conf EZ: {current:.1f}")
+        except Exception as e:
+            print(f"  ✗ Consumer Conf EZ error: {e}")
+
+        # Chicago Fed National Activity Index
+        try:
+            cfnai = self.get_series('CFNAI')
+            if cfnai is not None and len(cfnai) >= 2:
+                current = cfnai.iloc[-1]
+                prev = cfnai.iloc[-2]
+                last_date = cfnai.index[-1]
+                # CFNAI: 0 = trend growth, negative = below trend
+                trend = 'above_trend' if current > 0 else 'below_trend'
+                result['cfnai'] = {
+                    'value': round(current, 2),
+                    'prev': round(prev, 2),
+                    'trend': trend,
+                    'period': last_date.strftime('%Y-%m'),
+                    'source': 'FRED:CFNAI',
+                }
+                print(f"  ✓ CFNAI: {current:.2f} ({trend})")
+        except Exception as e:
+            print(f"  ✗ CFNAI error: {e}")
+
+        # U Michigan Consumer Sentiment
+        try:
+            umich = self.get_series(FREDSeries.UMICH_SENTIMENT)
+            if umich is not None and len(umich) >= 2:
+                current = umich.iloc[-1]
+                prev = umich.iloc[-2]
+                last_date = umich.index[-1]
+                result['umich_sentiment'] = {
+                    'value': round(current, 1),
+                    'prev': round(prev, 1),
+                    'change': round(current - prev, 1),
+                    'period': last_date.strftime('%Y-%m'),
+                    'source': 'FRED:UMCSENT',
+                }
+                print(f"  ✓ U.Mich Sentiment: {current:.1f}")
+        except Exception as e:
+            print(f"  ✗ U.Mich error: {e}")
+
+        print("[FRED] ✓ Leading Indicators complete")
+        return result

@@ -60,9 +60,14 @@ FIELD_ROW = 4
 DATA_START_ROW = 5
 
 DATA_SHEETS = [
+    # Template sheets (create_bloomberg_template.py)
     "PMI", "China", "CDS", "Credit_Spreads", "EM_Spreads",
     "Real_Yields", "CPI_Componentes", "EPFR_Flows", "Positioning",
     "Valuaciones", "Volatility", "Macro_Conditions", "Chile",
+    "Factor_Returns", "Intl_Curves",
+    # Actual file sheets (bloomberg_data.xlsx manual)
+    "RF_Diaria", "Macro_Mensual", "RISK_DIARIA", "RV_Semanal",
+    "Factors", "SOFR", "Indicators",
 ]
 
 
@@ -234,6 +239,27 @@ class BloombergData:
                 df = df.sort_index()
                 self._sheets[sheet_name] = df
 
+    @staticmethod
+    def _detect_row_layout(ws) -> dict:
+        """Detect header row mapping for a sheet.
+
+        Standard layout (create_bloomberg_template.py):
+          Row 1: Description, Row 2: Campo ID, Row 3: Ticker, Row 4: Field
+
+        Alternate layout (manual bloomberg_data.xlsx):
+          Row 1: Section (or empty), Row 2: Campo ID / Short Name,
+          Row 3: Description, Row 4: Bloomberg Ticker
+          (No BDH field row — defaults to PX_LAST)
+        """
+        r4a = str(ws.cell(row=4, column=1).value or '').strip().lower()
+
+        # If row 4 col A says "Bloomberg Ticker" → alternate layout
+        if 'ticker' in r4a or 'bloomberg' in r4a:
+            return {'desc': 3, 'campo': 2, 'ticker': 4, 'field': None}
+
+        # Standard layout
+        return {'desc': DESC_ROW, 'campo': CAMPO_ROW, 'ticker': TICKER_ROW, 'field': FIELD_ROW}
+
     def _load_columnar(self, wb):
         """Load v2 columnar format: headers in rows 1-4, data in columns."""
         for sheet_name in DATA_SHEETS:
@@ -245,29 +271,43 @@ class BloombergData:
             if max_col < 2:
                 continue
 
+            layout = self._detect_row_layout(ws)
+            campo_row = layout['campo']
+            desc_row = layout['desc']
+            ticker_row = layout['ticker']
+            field_row = layout['field']
+
             campo_ids = []
             descriptions = []
             tickers = []
             fields = []
 
             for col in range(2, max_col + 1):
-                cid = ws.cell(row=CAMPO_ROW, column=col).value
+                cid = ws.cell(row=campo_row, column=col).value
                 if not cid:
                     break
                 campo_ids.append(str(cid).strip())
-                descriptions.append(str(ws.cell(row=DESC_ROW, column=col).value or ''))
-                tickers.append(str(ws.cell(row=TICKER_ROW, column=col).value or ''))
-                fields.append(str(ws.cell(row=FIELD_ROW, column=col).value or ''))
+                descriptions.append(str(ws.cell(row=desc_row, column=col).value or ''))
+                tickers.append(str(ws.cell(row=ticker_row, column=col).value or ''))
+                if field_row:
+                    fields.append(str(ws.cell(row=field_row, column=col).value or ''))
+                else:
+                    fields.append('PX_LAST')
 
             if not campo_ids:
                 continue
 
             dates = []
             data_rows = []
+            empty_streak = 0
             for row_num in range(DATA_START_ROW, ws.max_row + 1):
                 date_val = ws.cell(row=row_num, column=1).value
                 if not date_val:
-                    break
+                    empty_streak += 1
+                    if empty_streak > 5:
+                        break
+                    continue
+                empty_streak = 0
 
                 dt = self._parse_date(date_val)
                 if dt is None:
@@ -524,14 +564,34 @@ class BloombergData:
         return {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
 
     def get_sector_spreads(self) -> Dict[str, float]:
-        """Sector spreads for RF report (v1 compatible)."""
+        """Sector spreads for RF report — IG and HY separated."""
         mapping = {
+            # IG
+            'Financiero IG': 'oas_ig_financiero', 'Industrial IG': 'oas_ig_industrial',
+            'Utilities IG': 'oas_ig_utilities', 'Tecnologia IG': 'oas_ig_tecnologia',
+            'Salud IG': 'oas_ig_salud', 'Energia IG': 'oas_ig_energia',
+            'Total IG': 'oas_ig_total',
+            # HY
+            'Financiero HY': 'oas_hy_financiero', 'Industrial HY': 'oas_hy_industrial',
+            'Utilities HY': 'oas_hy_utilities', 'Tecnologia HY': 'oas_hy_tecnologia',
+            'Salud HY': 'oas_hy_salud', 'Energia HY': 'oas_hy_energia',
+            'Total HY': 'oas_hy_total',
+            # Legacy (template-generated)
+            'Consumo': 'oas_consumo', 'Telecom': 'oas_telecom',
+            'BBB': 'oas_bbb', 'BB': 'oas_bb',
+            'IG Total': 'oas_ig_total_legacy', 'HY Total': 'oas_hy_total_legacy',
+        }
+        # Also try legacy campo_ids for backward compat
+        legacy = {
             'Financiero': 'oas_financiero', 'Industrial': 'oas_industrial',
             'Utilities': 'oas_utilities', 'Tecnologia': 'oas_tecnologia',
             'Salud': 'oas_salud', 'Energia': 'oas_energia',
-            'Consumo': 'oas_consumo', 'Telecom': 'oas_telecom',
         }
-        return {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
+        result = {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
+        for k, v in legacy.items():
+            if k not in result and self.has(v):
+                result[k] = self.get_latest(v)
+        return result
 
     def get_pmi_latest(self) -> Dict[str, float]:
         """Latest PMIs for Macro report (v1 compatible)."""
@@ -540,6 +600,7 @@ class BloombergData:
             'euro_mfg': 'pmi_euro_mfg', 'euro_svc': 'pmi_euro_svc',
             'euro_comp': 'pmi_euro_comp', 'china_mfg': 'pmi_china_mfg',
             'china_caixin': 'pmi_china_caixin', 'japan': 'pmi_japan',
+            'japan_comp': 'pmi_japan_comp',
             'global': 'pmi_global',
         }
         return {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
@@ -549,6 +610,7 @@ class BloombergData:
         mapping = {
             'equity_usa': 'flujo_equity_usa', 'equity_europa': 'flujo_equity_europa',
             'equity_em': 'flujo_equity_em', 'equity_japan': 'flujo_equity_japan',
+            'equity_latam': 'flujo_equity_latam',
             'bond_ig': 'flujo_bond_ig', 'bond_hy': 'flujo_bond_hy',
             'bond_em': 'flujo_bond_em',
         }
@@ -564,6 +626,84 @@ class BloombergData:
             'CEMBI': 'cembi_total',
         }
         return {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
+
+    def get_china_extended(self) -> Dict[str, Any]:
+        """China extended data including property, credit, trade."""
+        mapping = {
+            'property_sales_yoy': 'china_property_sales_yoy',
+            'tsf_yoy': 'china_tsf_yoy',
+            'm2_yoy': 'china_m2_yoy',
+            'new_loans': 'china_new_loans',
+            'exports_yoy': 'china_exp_yoy',
+            'imports_yoy': 'china_imp_yoy',
+            'trade_balance': 'china_trade_bal',
+            'ppi_yoy': 'china_ppi_yoy',
+            'cpi_yoy': 'china_cpi_yoy',
+            'caixin_mfg': 'china_caixin_mfg',
+        }
+        return {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
+
+    def get_valuations_extended(self) -> Dict[str, Dict[str, Any]]:
+        """Extended valuations: PE fwd, PE 10Y avg, EV/EBITDA, Div Yield by region."""
+        regions = {
+            'spx': {'pe': 'pe_spx', 'pe_10y': 'pe_10y_spx', 'ev': 'ev_ebitda_spx', 'dy': 'dy_spx'},
+            'stoxx600': {'pe': 'pe_stoxx600', 'pe_10y': 'pe_10y_stoxx600', 'ev': 'ev_ebitda_stoxx600', 'dy': 'dy_stoxx600'},
+            'msci_em': {'pe': 'pe_msci_em', 'pe_10y': 'pe_10y_msci_em', 'ev': 'ev_ebitda_msci_em', 'dy': 'dy_msci_em'},
+            'topix': {'pe': 'pe_topix', 'pe_10y': 'pe_10y_topix', 'ev': 'ev_ebitda_topix', 'dy': 'dy_topix'},
+            'ipsa': {'pe': 'pe_ipsa', 'pe_10y': 'pe_10y_ipsa', 'ev': 'ev_ebitda_ipsa', 'dy': 'dy_ipsa'},
+        }
+        result = {}
+        for region, campos in regions.items():
+            data = {}
+            for key, campo_id in campos.items():
+                val = self.get_latest(campo_id)
+                if val is not None:
+                    data[key] = val
+            if data:
+                result[region] = data
+        return result
+
+    def get_factor_returns(self) -> Dict[str, float]:
+        """Factor returns YTD for RV report."""
+        mapping = {
+            'quality': 'factor_quality',
+            'momentum': 'factor_momentum',
+            'value': 'factor_value',
+            'growth': 'factor_growth',
+            'size': 'factor_size',
+        }
+        return {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
+
+    def get_sofr_curve(self) -> Dict[str, float]:
+        """SOFR swap curve for RF report."""
+        mapping = {
+            'rate': 'sofr_rate', '1w': 'sofr_1w', '1m': 'sofr_1m',
+            '3m': 'sofr_3m', '6m': 'sofr_6m', '1y': 'sofr_1y',
+            '2y': 'sofr_2y', '3y': 'sofr_3y', '4y': 'sofr_4y',
+            '5y': 'sofr_5y', '6y': 'sofr_6y', '7y': 'sofr_7y',
+            '8y': 'sofr_8y', '9y': 'sofr_9y', '10y': 'sofr_10y',
+            '15y': 'sofr_15y', '20y': 'sofr_20y', '25y': 'sofr_25y',
+            '30y': 'sofr_30y',
+        }
+        return {k: self.get_latest(v) for k, v in mapping.items() if self.has(v)}
+
+    def get_intl_curves(self) -> Dict[str, Dict[str, float]]:
+        """International sovereign yield curves (Bund, Gilt, JGB)."""
+        curves = {
+            'bund': {'2y': 'bund_2y', '5y': 'bund_5y', '30y': 'bund_30y'},
+            'gilt': {'2y': 'gilt_2y', '5y': 'gilt_5y', '30y': 'gilt_30y'},
+            'jgb': {'2y': 'jgb_2y', '5y': 'jgb_5y', '30y': 'jgb_30y'},
+        }
+        result = {}
+        for curve_name, tenors in curves.items():
+            data = {}
+            for tenor, campo_id in tenors.items():
+                val = self.get_latest(campo_id)
+                if val is not None:
+                    data[tenor] = val
+            if data:
+                result[curve_name] = data
+        return result
 
     # ── Agent Formatters ────────────────────────────────────────────────
 
@@ -669,9 +809,33 @@ class BloombergData:
 
         sections = []
 
-        # Valuaciones
-        val_campos = [f for f in self.campos if f.startswith('pe_')]
-        s = self._fmt_section('Valuaciones (PE Forward):', val_campos)
+        # Valuaciones (PE Forward)
+        pe_fwd_campos = [f for f in self.campos if f.startswith('pe_') and '_10y_' not in f]
+        s = self._fmt_section('Valuaciones (PE Forward):', pe_fwd_campos)
+        if s:
+            sections.append(s)
+
+        # Valuaciones (PE 10Y Average)
+        pe_10y_campos = [f for f in self.campos if f.startswith('pe_10y_')]
+        s = self._fmt_section('PE Promedio 10Y:', pe_10y_campos)
+        if s:
+            sections.append(s)
+
+        # EV/EBITDA
+        ev_campos = [f for f in self.campos if f.startswith('ev_ebitda_')]
+        s = self._fmt_section('EV/EBITDA:', ev_campos)
+        if s:
+            sections.append(s)
+
+        # Dividend Yields
+        dy_campos = [f for f in self.campos if f.startswith('dy_')]
+        s = self._fmt_section('Dividend Yield:', dy_campos)
+        if s:
+            sections.append(s)
+
+        # Factor Returns
+        factor_campos = [f for f in self.campos if f.startswith('factor_')]
+        s = self._fmt_section('Factor Returns YTD:', factor_campos)
         if s:
             sections.append(s)
 
@@ -706,15 +870,51 @@ class BloombergData:
 
         sections = []
 
+        # SOFR Swap Curve
+        sofr_campos = ['sofr_rate', 'sofr_1y', 'sofr_2y', 'sofr_3y',
+                        'sofr_5y', 'sofr_7y', 'sofr_10y', 'sofr_20y', 'sofr_30y']
+        s = self._fmt_section('SOFR Swap Curve:', sofr_campos)
+        if s:
+            sections.append(s)
+
+        # International Sovereign Curves (Bund, Gilt, JGB)
+        bund_campos = ['bund_2y', 'bund_5y', 'bund_30y']
+        s = self._fmt_section('German Bund:', bund_campos)
+        if s:
+            sections.append(s)
+
+        gilt_campos = ['gilt_2y', 'gilt_5y', 'gilt_30y']
+        s = self._fmt_section('UK Gilt:', gilt_campos)
+        if s:
+            sections.append(s)
+
+        jgb_campos = ['jgb_2y', 'jgb_5y', 'jgb_30y']
+        s = self._fmt_section('JGB:', jgb_campos)
+        if s:
+            sections.append(s)
+
         # CDS
         cds_campos = [f for f in self.campos if f.startswith('cds_')]
         s = self._fmt_section('CDS Soberanos 5Y:', cds_campos)
         if s:
             sections.append(s)
 
-        # Credit Spreads
-        oas_campos = [f for f in self.campos if f.startswith('oas_')]
-        s = self._fmt_section('Spreads Credito:', oas_campos)
+        # Credit Spreads IG
+        oas_ig = [f for f in self.campos if f.startswith('oas_ig_')]
+        s = self._fmt_section('OAS Investment Grade:', oas_ig)
+        if s:
+            sections.append(s)
+
+        # Credit Spreads HY
+        oas_hy = [f for f in self.campos if f.startswith('oas_hy_')]
+        s = self._fmt_section('OAS High Yield:', oas_hy)
+        if s:
+            sections.append(s)
+
+        # Legacy OAS (template-generated, no IG/HY prefix)
+        oas_legacy = [f for f in self.campos if f.startswith('oas_')
+                      and not f.startswith('oas_ig_') and not f.startswith('oas_hy_')]
+        s = self._fmt_section('Spreads Credito:', oas_legacy)
         if s:
             sections.append(s)
 
@@ -844,6 +1044,7 @@ if __name__ == "__main__":
         print("CDS:", bbg.get_cds_data())
         print("PMI:", bbg.get_pmi_latest())
         print("Sectores:", bbg.get_sector_spreads())
+        print("SOFR:", bbg.get_sofr_curve())
         print("EPFR:", bbg.get_epfr_flows())
         print("EMBI:", bbg.get_embi_spreads())
 

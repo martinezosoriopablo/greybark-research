@@ -318,6 +318,7 @@ class BCChExtendedClient:
             'epu_china': BCChSeries.EPU_CHINA,
             'epu_europa': BCChSeries.EPU_EUROPA,
             'epu_global': BCChSeries.EPU_GLOBAL,
+            'epu_uk': BCChSeries.EPU_UK,
         }
         return self._fetch_multiple(series)
 
@@ -479,6 +480,103 @@ class BCChExtendedClient:
         return self._fetch_multiple(series)
 
     # =========================================================================
+    # EXPECTATIVAS EEE (Encuesta de Expectativas Economicas)
+    # =========================================================================
+
+    def get_eee_expectations(self) -> Dict[str, Optional[float]]:
+        """
+        Encuesta de Expectativas Economicas - horizontes y largo plazo.
+
+        Returns:
+            Dict con expectativas de inflacion, TPM, PIB, tipo de cambio
+        """
+        series = {
+            # Inflacion
+            'ipc_12m': BCChSeries.EEE_IPC_12M,
+            'ipc_24m': BCChSeries.EEE_IPC_24M,
+            'ipc_lp': BCChSeries.EEE_IPC_LP,
+            # TPM
+            'tpm_prox_reunion': BCChSeries.EEE_TPM_PROX_REUNION,
+            'tpm_11m': BCChSeries.EEE_TPM_11M,
+            'tpm_23m': BCChSeries.EEE_TPM_23M,
+            'tpm_lp': BCChSeries.EEE_TPM_LP,
+            # PIB
+            'pib_actual': BCChSeries.EEE_PIB_ACTUAL,
+            'pib_siguiente': BCChSeries.EEE_PIB_SIGUIENTE,
+            'pib_lp': BCChSeries.EEE_PIB_LP,
+            # Tipo de cambio
+            'tcn_12m': BCChSeries.EEE_TCN_12M,
+            'tcn_11m': BCChSeries.EEE_TCN_11M,
+            'tcn_lp': BCChSeries.EEE_TCN_LP,
+        }
+        return self._fetch_multiple(series)
+
+    # =========================================================================
+    # EOF (Encuesta Operadores Financieros)
+    # =========================================================================
+
+    def get_eof_expectations(self) -> Dict[str, Optional[float]]:
+        """
+        Encuesta de Operadores Financieros - alta frecuencia.
+
+        Returns:
+            Dict con exp TPM, inflacion, bonos, tipo de cambio (operadores)
+        """
+        series = {
+            # TPM
+            'tpm_12m': BCChSeries.EOF_TPM_12M,
+            'tpm_24m': BCChSeries.EOF_TPM_24M,
+            # Inflacion
+            'ipc_12m': BCChSeries.EOF_IPC_12M,
+            # Renta Fija
+            'btp_5y': BCChSeries.EOF_BTP_5Y,
+            'btp_10y': BCChSeries.EOF_BTP_10Y,
+            'btu_5y': BCChSeries.EOF_BTU_5Y,
+            'btu_10y': BCChSeries.EOF_BTU_10Y,
+            # Tipo de cambio
+            'tc_28d': BCChSeries.EOF_TC_28D,
+            'tc_3m': BCChSeries.EOF_TC_3M,
+        }
+        return self._fetch_multiple(series)
+
+    # =========================================================================
+    # CONFIANZA EMPRESARIAL (IMCE)
+    # =========================================================================
+
+    def get_imce(self) -> Dict[str, Optional[float]]:
+        """
+        Indice Mensual de Confianza Empresarial (IMCE).
+        Equivalente a PMI para Chile.
+
+        Returns:
+            Dict con IMCE total y sin mineria
+        """
+        series = {
+            'imce_total': BCChSeries.IMCE_TOTAL,
+            'imce_sin_mineria': BCChSeries.IMCE_SIN_MINERIA,
+        }
+        return self._fetch_multiple(series)
+
+    # =========================================================================
+    # IPC DETALLE CHILE
+    # =========================================================================
+
+    def get_ipc_detail(self) -> Dict[str, Optional[float]]:
+        """
+        Componentes del IPC Chile (variacion mensual).
+
+        Returns:
+            Dict con IPC SAE (core), servicios, bienes, energia
+        """
+        series = {
+            'ipc_sae': BCChSeries.IPC_SAE,
+            'ipc_servicios': BCChSeries.IPC_SERVICIOS,
+            'ipc_bienes': BCChSeries.IPC_BIENES,
+            'ipc_energia': BCChSeries.IPC_ENERGIA,
+        }
+        return self._fetch_multiple(series)
+
+    # =========================================================================
     # DASHBOARDS CONSOLIDADOS
     # =========================================================================
 
@@ -497,6 +595,10 @@ class BCChExtendedClient:
             'spc_curve': self.get_spc_curve(),
             'banking_rates': self.get_banking_rates(),
             'credit': self.get_credit(),
+            'eee_expectations': self.get_eee_expectations(),
+            'eof_expectations': self.get_eof_expectations(),
+            'imce': self.get_imce(),
+            'ipc_detail': self.get_ipc_detail(),
         }
 
     def get_full_international_dashboard(self) -> Dict[str, Any]:

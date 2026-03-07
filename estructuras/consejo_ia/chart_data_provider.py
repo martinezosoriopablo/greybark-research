@@ -914,6 +914,158 @@ class ChartDataProvider:
 
         return result
 
+    # =========================================================================
+    # USA CPI COMPONENTS (FRED)
+    # =========================================================================
+
+    def get_usa_cpi_components(self) -> Dict[str, Optional[float]]:
+        """Latest CPI component YoY values for detailed inflation breakdown."""
+        result = {}
+        components = [
+            ('shelter', FREDSeries.CPI_SHELTER),
+            ('services_ex_energy', FREDSeries.CPI_SERVICES_EX_ENERGY),
+            ('goods_ex_food_energy', FREDSeries.CPI_COMMODITIES_EX_FOOD_ENERGY),
+            ('food', FREDSeries.CPI_FOOD),
+            ('energy', FREDSeries.CPI_ENERGY),
+        ]
+        for key, sid in components:
+            s = self.get_fred_series(sid)
+            if s is not None and len(s) >= 13:
+                yoy = float(s.iloc[-1] / s.iloc[-13] - 1) * 100
+                result[key] = round(yoy, 1)
+            else:
+                result[key] = None
+        return result
+
+    # =========================================================================
+    # USA FISCAL (FRED)
+    # =========================================================================
+
+    def get_usa_fiscal(self) -> Dict[str, Optional[float]]:
+        """Latest US fiscal indicators: deficit/GDP, debt/GDP, interest/GDP."""
+        result = {}
+        for key, sid in [('deficit_gdp', FREDSeries.DEFICIT_GDP),
+                         ('debt_gdp', FREDSeries.DEBT_GDP),
+                         ('interest_gdp', FREDSeries.INTEREST_GDP)]:
+            s = self.get_fred_series(sid, resample=None)
+            if s is not None and len(s) > 0:
+                result[key] = round(float(s.dropna().iloc[-1]), 1)
+            else:
+                result[key] = None
+        return result
+
+    # =========================================================================
+    # USA GDP NOWCAST (FRED)
+    # =========================================================================
+
+    def get_usa_gdpnow(self) -> Optional[float]:
+        """Atlanta Fed GDPNow real-time estimate."""
+        s = self.get_fred_series(FREDSeries.GDPNOW, resample=None)
+        if s is not None and len(s) > 0:
+            return round(float(s.dropna().iloc[-1]), 1)
+        return None
+
+    # =========================================================================
+    # LATAM MACRO (BCCh)
+    # =========================================================================
+
+    def get_latam_macro(self) -> Dict[str, Dict[str, Optional[float]]]:
+        """Latest macro data for Brasil, Mexico, Colombia, Peru from BCCh."""
+        countries = {
+            'Brasil': {
+                'gdp': None, 'cpi': BCChSeries.IPC_INTL_BRASIL,
+                'tasa': BCChSeries.TPM_BRASIL, 'bond10y': BCChSeries.BOND10_BRASIL,
+            },
+            'Mexico': {
+                'gdp': None, 'cpi': BCChSeries.IPC_INTL_MEXICO,
+                'tasa': BCChSeries.TPM_MEXICO, 'bond10y': BCChSeries.BOND10_MEXICO,
+            },
+            'Colombia': {
+                'gdp': None, 'cpi': BCChSeries.IPC_INTL_COLOMBIA,
+                'tasa': BCChSeries.TPM_COLOMBIA, 'bond10y': BCChSeries.BOND10_COLOMBIA,
+            },
+            'Peru': {
+                'gdp': None, 'cpi': BCChSeries.IPC_INTL_PERU,
+                'tasa': BCChSeries.TPM_PERU, 'bond10y': BCChSeries.BOND10_PERU,
+            },
+        }
+        result = {}
+        for country, sids in countries.items():
+            data = {}
+            data['gdp'] = None  # BCCh doesn't have LatAm GDP series
+            for key in ['cpi', 'tasa', 'bond10y']:
+                sid = sids[key]
+                if sid:
+                    s = self.get_series(sid, resample='M')
+                    if s is not None and len(s) > 0:
+                        data[key] = round(float(s.iloc[-1]), 2)
+                    else:
+                        data[key] = None
+                else:
+                    data[key] = None
+            result[country] = data
+        return result
+
+    # =========================================================================
+    # PREVIOUS MONTH RETURNS (yfinance)
+    # =========================================================================
+
+    def get_previous_month_returns(self, tickers: List[str] = None) -> Dict[str, Optional[float]]:
+        """Real previous month returns from yfinance.
+
+        Args:
+            tickers: List of ticker symbols. Defaults to major indices/ETFs.
+
+        Returns:
+            Dict[ticker -> return_pct] for the previous calendar month.
+        """
+        if tickers is None:
+            tickers = [
+                'SPY', 'QQQ', 'EFA', 'EEM', 'AGG', 'HYG',
+                'TLT', 'GLD', 'USO', 'ECH', 'EWZ',
+            ]
+
+        result = {}
+        try:
+            import yfinance as yf
+            from datetime import date
+
+            today = date.today()
+            # Previous month
+            if today.month == 1:
+                prev_month = 12
+                prev_year = today.year - 1
+            else:
+                prev_month = today.month - 1
+                prev_year = today.year
+
+            # Start = first day of prev month, end = first day of current month
+            start = date(prev_year, prev_month, 1)
+            end = date(today.year, today.month, 1)
+
+            for ticker in tickers:
+                try:
+                    data = yf.download(ticker, start=start, end=end,
+                                       progress=False, auto_adjust=True)
+                    if data is not None and len(data) >= 2:
+                        first_close = float(data['Close'].iloc[0])
+                        last_close = float(data['Close'].iloc[-1])
+                        if first_close > 0:
+                            ret = round((last_close / first_close - 1) * 100, 2)
+                            result[ticker] = ret
+                        else:
+                            result[ticker] = None
+                    else:
+                        result[ticker] = None
+                except Exception:
+                    result[ticker] = None
+        except ImportError:
+            # yfinance not installed
+            for t in tickers:
+                result[t] = None
+
+        return result
+
     def get_epu_intl(self) -> Dict[str, Optional['pd.Series']]:
         """EPU time series: USA, China, Europa, Global (BCCh + FRED)."""
         result = {}

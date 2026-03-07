@@ -43,6 +43,19 @@ class RFContentGenerator:
         self.date = datetime.now()
         self.month_name = self._get_spanish_month(self.date.month)
         self.year = self.date.year
+        self._parser = None
+        self.bloomberg = None  # BloombergReader, injected externally
+
+    @property
+    def parser(self):
+        if self._parser is None:
+            try:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser(self.council)
+            except Exception:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser({})
+        return self._parser
 
     # =========================================================================
     # HELPERS — acceso a datos reales
@@ -138,8 +151,8 @@ class RFContentGenerator:
         boj = self._val('chile_rates', 'policy_rates', 'boj')
         boe = self._val('chile_rates', 'policy_rates', 'boe')
 
-        # Determine view - default CONSTRUCTIVO, override from council
-        view = 'CONSTRUCTIVO'
+        # Determine view from council — NO hardcoded default
+        view = 'N/D'
         final = self.council.get('final_recommendation', '')
         if final:
             text = final.lower()
@@ -151,6 +164,10 @@ class RFContentGenerator:
             elif 'risk-off' in text or 'postura defensiva' in text:
                 view = 'CAUTELOSO'
             elif 'neutral' in text and 'renta fija' in text:
+                view = 'NEUTRAL'
+            elif 'constructiv' in text:
+                view = 'CONSTRUCTIVO'
+            else:
                 view = 'NEUTRAL'
 
         # Generate narrative via Claude if council available
@@ -194,11 +211,16 @@ class RFContentGenerator:
                 parts.append(f"Chile (TPM {self._fmt_pct(tpm)}) mantiene dinamica propia. ")
             narrativa = ''.join(parts)
 
+        # Get duration and credit stances from council parser
+        dur_stance = self.parser.get_duration_stance()
+        fi_views = self.parser.get_fi_views()
+        ig_v = fi_views.get('ig corporate', {}) if fi_views else {}
+
         result = {
             'view': view,
-            'duration_stance': 'NEUTRAL A LARGA',
-            'credit_stance': 'OW SELECTIVO',
-            'conviccion': 'MEDIA-ALTA',
+            'duration_stance': dur_stance.get('stance', 'Sin vista') if dur_stance else 'Sin vista',
+            'credit_stance': ig_v.get('view', 'Sin vista') if ig_v else 'Sin vista',
+            'conviccion': 'N/D',
             'narrativa': narrativa,
         }
 
@@ -246,40 +268,79 @@ class RFContentGenerator:
         if br_10y and usa_10y_for_spread:
             em_spread = round((br_10y - usa_10y_for_spread) * 100, 0)
 
+        # Get council FI views for positioning
+        fi_views = self.parser.get_fi_views()
+
+        def _fi_view(segment_key, fallback='Sin vista'):
+            """Extract view from council FI positioning."""
+            if fi_views:
+                v = fi_views.get(segment_key, {})
+                return v.get('view', fallback)
+            return fallback
+
+        def _fi_duration(segment_key, fallback='N/D'):
+            """Extract duration stance from council FI positioning."""
+            if fi_views:
+                v = fi_views.get(segment_key, {})
+                dur_map = {'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga'}
+                return dur_map.get(v.get('duration', ''), fallback)
+            return fallback
+
+        def _fi_rationale(segment_key, fallback='Sin vista'):
+            """Extract rationale from council FI positioning."""
+            if fi_views:
+                v = fi_views.get(segment_key, {})
+                return v.get('rationale', fallback)
+            return fallback
+
         return [
             {
-                'segmento': 'US Treasuries', 'view': 'OW', 'duration': 'Neutral-Larga',
+                'segmento': 'US Treasuries',
+                'view': _fi_view('us treasuries'),
+                'duration': _fi_duration('us treasuries', 'N/D'),
                 'yield': self._fmt_pct(ust_10y) if ust_10y else 'N/D',
-                'spread': '-', 'driver': 'Fed en pausa, carry atractivo'
+                'spread': '-',
+                'driver': _fi_rationale('us treasuries', 'Sin vista')
             },
             {
-                'segmento': 'Euro Sovereigns', 'view': 'OW', 'duration': 'Neutral',
+                'segmento': 'Euro Sovereigns',
+                'view': _fi_view('euro sovereigns'),
+                'duration': _fi_duration('euro sovereigns', 'N/D'),
                 'yield': self._fmt_pct(euro_10y) if euro_10y else 'N/D',
-                'spread': '-', 'driver': 'BCE cerca de terminal'
+                'spread': '-',
+                'driver': _fi_rationale('euro sovereigns', 'Sin vista')
             },
             {
-                'segmento': 'IG Corporate', 'view': 'OW', 'duration': 'Neutral',
+                'segmento': 'IG Corporate',
+                'view': _fi_view('ig corporate'),
+                'duration': _fi_duration('ig corporate', 'N/D'),
                 'yield': self._fmt_pct(float(ust_10y) + float(ig_spread)/100) if (ust_10y and ig_spread) else 'N/D',
                 'spread': self._fmt_bp(ig_spread) if ig_spread else 'N/D',
-                'driver': 'Carry atractivo, fundamentales OK'
+                'driver': _fi_rationale('ig corporate', 'Sin vista')
             },
             {
-                'segmento': 'HY Corporate', 'view': 'NEUTRAL', 'duration': 'Corta',
+                'segmento': 'HY Corporate',
+                'view': _fi_view('hy corporate'),
+                'duration': _fi_duration('hy corporate', 'N/D'),
                 'yield': self._fmt_pct(float(ust_10y) + float(hy_spread)/100) if (ust_10y and hy_spread) else 'N/D',
                 'spread': self._fmt_bp(hy_spread) if hy_spread else 'N/D',
-                'driver': 'Spreads tight, selectivo'
+                'driver': _fi_rationale('hy corporate', 'Sin vista')
             },
             {
-                'segmento': 'EM USD Debt', 'view': 'OW', 'duration': 'Neutral',
+                'segmento': 'EM USD Debt',
+                'view': _fi_view('em usd debt', _fi_view('em hard currency')),
+                'duration': _fi_duration('em usd debt', _fi_duration('em hard currency', 'N/D')),
                 'yield': self._fmt_pct(br_10y) if br_10y else 'N/D',
                 'spread': self._fmt_bp(em_spread) if em_spread else 'N/D',
-                'driver': 'Yield pickup, selectivo por país'
+                'driver': _fi_rationale('em usd debt', _fi_rationale('em hard currency', 'Sin vista'))
             },
             {
-                'segmento': 'Chile Soberanos', 'view': 'OW', 'duration': 'Larga',
+                'segmento': 'Chile Soberanos',
+                'view': _fi_view('chile soberanos', _fi_view('chile')),
+                'duration': _fi_duration('chile soberanos', _fi_duration('chile', 'N/D')),
                 'yield': self._fmt_pct(chile_10y) if chile_10y else 'N/D',
                 'spread': self._fmt_bp(chile_spread) if chile_spread else 'N/D',
-                'driver': 'BCCh dovish, carry excelente'
+                'driver': _fi_rationale('chile soberanos', _fi_rationale('chile', 'Sin vista'))
             },
         ]
 
@@ -294,12 +355,18 @@ class RFContentGenerator:
             ig_yield_str = self._fmt_pct(float(ust_10y) + float(ig_spread)/100)
         hy_spread_str = self._fmt_bp(hy_spread) if hy_spread else 'N/D'
 
+        # Build key calls from council parser data
+        fi_views = self.parser.get_fi_views()
+        dur_stance = self.parser.get_duration_stance()
+
+        dur_call = f"Duration: {dur_stance.get('stance', 'N/D')}" if dur_stance else "Duration: Ver análisis del comité"
+        ig_v = fi_views.get('ig corporate', {}).get('view', 'N/D') if fi_views else 'N/D'
+        hy_v = fi_views.get('hy corporate', {}).get('view', 'N/D') if fi_views else 'N/D'
+
         return [
-            "Duration: Neutral a Larga globalmente; preferimos Chile y Europa sobre US",
-            "Curva US: Posicion steepener 2s10s - normalizacion gradual",
-            f"Credito IG: Overweight - carry de {ig_yield_str} atractivo con fundamentales solidos",
-            f"Credito HY: Neutral - spreads en {hy_spread_str} son tight historicamente, selectivo",
-            "Chile: Larga duration en BCP/BCU, BCCh tiene espacio para seguir recortando"
+            dur_call,
+            f"Credito IG: {ig_v} - carry de {ig_yield_str}",
+            f"Credito HY: {hy_v} - spreads en {hy_spread_str}",
         ]
 
     # =========================================================================
@@ -508,37 +575,57 @@ class RFContentGenerator:
         else:
             us_row = {'mercado': 'US Treasury', 'y2': 'N/D', 'y5': 'N/D', 'y10': 'N/D', 'y30': 'N/D', 'curva_2_10': 'N/D'}
 
-        # --- German Bund (BCCh international_yields) ---
+        # --- Bloomberg international curves (Bund, Gilt, JGB) ---
+        bbg_curves = {}
+        if self.bloomberg:
+            try:
+                bbg_curves = self.bloomberg.get_intl_curves()
+            except Exception:
+                pass
+
+        # --- German Bund (BCCh 10Y + Bloomberg 2Y/5Y/30Y) ---
         de_10y = self._intl_yield('germany')
         de_vs1m = self._intl_vs1m('germany')
+        bund_bbg = bbg_curves.get('bund', {})
         bund_row = {
             'mercado': 'German Bund',
-            'y10': self._fmt_pct(de_10y) if de_10y else 'N/D',
+            'y2': self._fmt_pct(bund_bbg.get('2y')) if bund_bbg.get('2y') is not None else 'N/D',
+            'y5': self._fmt_pct(bund_bbg.get('5y')) if bund_bbg.get('5y') is not None else 'N/D',
+            'y10': self._fmt_pct(de_10y) if de_10y else (self._fmt_pct(bund_bbg.get('10y')) if bund_bbg.get('10y') else 'N/D'),
+            'y30': self._fmt_pct(bund_bbg.get('30y')) if bund_bbg.get('30y') is not None else 'N/D',
             'vs_1m': de_vs1m if de_vs1m else '-',
         }
-        if de_10y:
+        if de_10y or bund_bbg:
             bund_row['_real'] = True
 
-        # --- UK Gilt (BCCh) ---
+        # --- UK Gilt (BCCh 10Y + Bloomberg 2Y/5Y/30Y) ---
         uk_10y = self._intl_yield('uk')
         uk_vs1m = self._intl_vs1m('uk')
+        gilt_bbg = bbg_curves.get('gilt', {})
         gilt_row = {
             'mercado': 'UK Gilt',
-            'y10': self._fmt_pct(uk_10y) if uk_10y else 'N/D',
+            'y2': self._fmt_pct(gilt_bbg.get('2y')) if gilt_bbg.get('2y') is not None else 'N/D',
+            'y5': self._fmt_pct(gilt_bbg.get('5y')) if gilt_bbg.get('5y') is not None else 'N/D',
+            'y10': self._fmt_pct(uk_10y) if uk_10y else (self._fmt_pct(gilt_bbg.get('10y')) if gilt_bbg.get('10y') else 'N/D'),
+            'y30': self._fmt_pct(gilt_bbg.get('30y')) if gilt_bbg.get('30y') is not None else 'N/D',
             'vs_1m': uk_vs1m if uk_vs1m else '-',
         }
-        if uk_10y:
+        if uk_10y or gilt_bbg:
             gilt_row['_real'] = True
 
-        # --- JGB (BCCh) ---
+        # --- JGB (BCCh 10Y + Bloomberg 2Y/5Y/30Y) ---
         jp_10y = self._intl_yield('japan')
         jp_vs1m = self._intl_vs1m('japan')
+        jgb_bbg = bbg_curves.get('jgb', {})
         jgb_row = {
             'mercado': 'JGB',
-            'y10': self._fmt_pct(jp_10y) if jp_10y else 'N/D',
+            'y2': self._fmt_pct(jgb_bbg.get('2y')) if jgb_bbg.get('2y') is not None else 'N/D',
+            'y5': self._fmt_pct(jgb_bbg.get('5y')) if jgb_bbg.get('5y') is not None else 'N/D',
+            'y10': self._fmt_pct(jp_10y) if jp_10y else (self._fmt_pct(jgb_bbg.get('10y')) if jgb_bbg.get('10y') else 'N/D'),
+            'y30': self._fmt_pct(jgb_bbg.get('30y')) if jgb_bbg.get('30y') is not None else 'N/D',
             'vs_1m': jp_vs1m if jp_vs1m else '-',
         }
-        if jp_10y:
+        if jp_10y or jgb_bbg:
             jgb_row['_real'] = True
 
         # --- Chile BCP (BCCh chile_yields) ---
@@ -557,7 +644,28 @@ class RFContentGenerator:
         if bcp_2 or bcp_5 or bcp_10:
             chile_row['_real'] = True
 
-        return [us_row, bund_row, gilt_row, jgb_row, chile_row]
+        # --- SOFR Swap Curve (Bloomberg) ---
+        sofr_row = {'mercado': 'SOFR Swaps', 'y2': 'N/D', 'y5': 'N/D', 'y10': 'N/D', 'y30': 'N/D'}
+        if self.bloomberg:
+            try:
+                sofr = self.bloomberg.get_sofr_curve()
+                if sofr:
+                    sofr_row = {
+                        'mercado': 'SOFR Swaps',
+                        'y2': self._fmt_pct(sofr.get('2y')) if sofr.get('2y') is not None else 'N/D',
+                        'y5': self._fmt_pct(sofr.get('5y')) if sofr.get('5y') is not None else 'N/D',
+                        'y10': self._fmt_pct(sofr.get('10y')) if sofr.get('10y') is not None else 'N/D',
+                        'y30': self._fmt_pct(sofr.get('30y')) if sofr.get('30y') is not None else 'N/D',
+                        '_real': True,
+                    }
+                    # SOFR slope 2s10s
+                    if sofr.get('2y') is not None and sofr.get('10y') is not None:
+                        sofr_slope = (sofr['10y'] - sofr['2y']) * 100  # to bps
+                        sofr_row['curva_2_10'] = self._fmt_bp(sofr_slope)
+            except Exception:
+                pass
+
+        return [us_row, sofr_row, bund_row, gilt_row, jgb_row, chile_row]
 
     def _generate_curves_analysis(self) -> Dict[str, Any]:
         """Genera análisis de curvas (slopes reales si disponibles)."""
@@ -580,13 +688,21 @@ class RFContentGenerator:
             if shape:
                 narrativa += f"Forma de curva: {shape}. "
         else:
-            narrativa += (
-                "La curva US se ha empinado +15bp en el tramo 2-10 años, reflejando expectativas de "
-                "soft landing y Fed menos agresiva. "
-            )
-        narrativa += (
-            "Chile muestra la curva más empinada por ciclo de recortes del BCCh aún en desarrollo."
-        )
+            narrativa += "Datos detallados de curva US no disponibles. "
+
+        # Chile curve narrative based on actual slope data
+        cl_slope_val = self._val('chile_yields', 'slopes', '2s10s')
+        if cl_slope_val is not None:
+            if cl_slope_val > 80:
+                narrativa += f"Chile muestra curva muy empinada ({int(cl_slope_val)}bp 2s10s)."
+            elif cl_slope_val > 30:
+                narrativa += f"Chile muestra curva empinada ({int(cl_slope_val)}bp 2s10s)."
+            elif cl_slope_val > -30:
+                narrativa += f"Chile muestra curva plana ({int(cl_slope_val)}bp 2s10s)."
+            else:
+                narrativa += f"Chile muestra curva invertida ({int(cl_slope_val)}bp 2s10s)."
+        else:
+            narrativa += "Datos de curva Chile no disponibles."
 
         # Chile slope
         cl_slope = self._val('chile_yields', 'slopes', '2s10s')
@@ -601,13 +717,35 @@ class RFContentGenerator:
             else:
                 cl_forma = f'Invertida ({int(cl_slope)}bp)'
 
-        # Slopes detallados
+        # Calculate US curve shape from real yield data
+        curve = self.market_data.get('yield_curve', {})
+        us_spread_2s10s = None
+        if curve and 'current_curve' in curve:
+            cc = curve['current_curve']
+            y2_us = cc.get('2Y') or cc.get('DGS2')
+            y10_us = cc.get('10Y') or cc.get('DGS10')
+            if y2_us is not None and y10_us is not None:
+                try:
+                    us_spread_2s10s = float(y10_us) - float(y2_us)
+                except (ValueError, TypeError):
+                    pass
+        if us_spread_2s10s is not None:
+            if us_spread_2s10s > 0.1:
+                us_forma = f'Empinada ({int(round(us_spread_2s10s * 100))}bp)'
+            elif us_spread_2s10s < -0.1:
+                us_forma = f'Invertida ({int(round(us_spread_2s10s * 100))}bp)'
+            else:
+                us_forma = f'Flat ({int(round(us_spread_2s10s * 100))}bp)'
+        else:
+            us_forma = 'N/D'
+
+        # Slopes detallados — computed from data, not hardcoded
         por_mercado = [
-            {'mercado': 'US', 'forma': 'Ligeramente empinada', 'tendencia': 'Empinando', 'view': 'Steepener 2s10s'},
-            {'mercado': 'Europa', 'forma': 'Flat', 'tendencia': 'Estable', 'view': 'Neutral curva'},
-            {'mercado': 'UK', 'forma': 'Empinada', 'tendencia': 'Estable', 'view': 'Flattener táctico'},
-            {'mercado': 'Japón', 'forma': 'Muy empinada', 'tendencia': 'Empinando', 'view': 'Neutral, BOJ risk'},
-            {'mercado': 'Chile', 'forma': cl_forma, 'tendencia': 'Empinando', 'view': 'Bullet 5Y preferido'},
+            {'mercado': 'US', 'forma': us_forma, 'tendencia': 'N/D', 'view': 'N/D'},
+            {'mercado': 'Europa', 'forma': 'N/D', 'tendencia': 'N/D', 'view': 'N/D'},
+            {'mercado': 'UK', 'forma': 'N/D', 'tendencia': 'N/D', 'view': 'N/D'},
+            {'mercado': 'Japón', 'forma': 'N/D', 'tendencia': 'N/D', 'view': 'N/D'},
+            {'mercado': 'Chile', 'forma': cl_forma, 'tendencia': 'N/D', 'view': 'N/D'},
         ]
 
         # Enriquecer US con forma real
@@ -777,128 +915,144 @@ class RFContentGenerator:
                 'benchmark_duration': f"{dr[0]:.1f} años" if isinstance(dr, (list, tuple)) else '6.5 años',
                 'recomendacion': f"{target:.1f} años",
                 'confianza': confidence,
-                'rationale': rationale if rationale else (
-                    "Favorecemos duration ligeramente larga dado que los bancos centrales están en modo "
-                    "de recorte o pausa."
-                ),
-                'riesgos': [
-                    'Reflación por estímulos fiscales',
-                    'Cambio de liderazgo en Fed',
-                    'Term premium sube por oferta de Treasuries'
-                ],
+                'rationale': rationale if rationale else 'Ver council para rationale de duration.',
+                'riesgos': [],
                 '_real': True
             }
 
         # Intentar curve_recommendation
         if dur and 'curve_recommendation' in dur:
             cr = dur['curve_recommendation']
+            # Use council parser for stance if available
+            council_dur = self.parser.get_duration_stance()
+            cr_stance = council_dur.get('stance', 'N/D') if council_dur else 'N/D'
+            cr_bench = f"{council_dur['benchmark']:.1f} años" if (council_dur and council_dur.get('benchmark')) else 'N/D'
+            cr_rec = f"{council_dur['recommendation']:.1f} años" if (council_dur and council_dur.get('recommendation')) else 'N/D'
             return {
-                'stance': 'NEUTRAL A LARGA',
-                'benchmark_duration': '6.5 años',
-                'recomendacion': '7.0 años (+0.5)',
+                'stance': cr_stance,
+                'benchmark_duration': cr_bench,
+                'recomendacion': cr_rec,
                 'posicion_curva': cr.get('trade_expression', ''),
                 'confianza': cr.get('confidence', 'MEDIUM'),
-                'rationale': cr.get('rationale', (
-                    "Favorecemos duration ligeramente larga dado que los bancos centrales están en modo "
-                    "de recorte o pausa."
-                )),
+                'rationale': cr.get('rationale', 'Ver análisis del comité para fundamento de duration.'),
                 'riesgos': [
                     'Reflación por estímulos fiscales',
-                    'Cambio de liderazgo en Fed',
                     'Term premium sube por oferta de Treasuries'
                 ],
                 '_real': True
             }
 
+        # Use council parser for duration stance
+        stance_data = self.parser.get_duration_stance()
+        if stance_data:
+            duration_text = stance_data.get('stance', 'Sin recomendación')
+            benchmark = stance_data.get('benchmark')
+            recommendation = stance_data.get('recommendation')
+        else:
+            duration_text = 'Sin recomendación del comité'
+            benchmark = None
+            recommendation = None
+
         return {
-            'stance': 'NEUTRAL A LARGA',
-            'benchmark_duration': '6.5 años',
-            'recomendacion': '7.0 años (+0.5)',
-            'rationale': (
-                "Favorecemos duration ligeramente larga dado que los bancos centrales están en modo "
-                "de recorte o pausa. El riesgo de tasas más altas es limitado con inflación convergiendo "
-                "a metas. El carry en bonos largos compensa el riesgo de duration."
-            ),
+            'stance': duration_text,
+            'benchmark_duration': f"{benchmark:.1f} años" if benchmark else 'N/D',
+            'recomendacion': f"{recommendation:.1f} años" if recommendation else 'N/D',
+            'rationale': 'Ver análisis del comité para fundamento de duration.',
             'riesgos': [
                 'Reflación por estímulos fiscales',
-                'Cambio de liderazgo en Fed (Warsh más hawkish)',
                 'Term premium sube por oferta de Treasuries'
             ]
         }
 
     def _generate_duration_by_market(self) -> List[Dict[str, Any]]:
-        """Genera posicionamiento de duration por mercado."""
+        """Genera posicionamiento de duration por mercado (from council or N/D)."""
+        fi_views = self.parser.get_fi_views()
+
+        def _dur_view(segment_key):
+            """Get duration view from council for a segment."""
+            if fi_views:
+                v = fi_views.get(segment_key, {})
+                dur_map = {'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga'}
+                return dur_map.get(v.get('duration', ''), 'N/D')
+            return 'N/D'
+
+        def _dur_rationale(segment_key):
+            """Get rationale from council for a segment."""
+            if fi_views:
+                v = fi_views.get(segment_key, {})
+                return v.get('rationale', 'N/D')
+            return 'N/D'
+
         return [
             {
                 'mercado': 'Estados Unidos',
-                'duration_view': 'Neutral-Larga',
-                'benchmark': '6.0Y',
-                'recomendacion': '6.5Y',
-                'posicion_curva': 'Steepener 2s10s',
-                'rationale': 'Fed en pausa, curva normalizando'
+                'duration_view': _dur_view('us treasuries'),
+                'benchmark': 'N/D',
+                'recomendacion': 'N/D',
+                'posicion_curva': 'N/D',
+                'rationale': _dur_rationale('us treasuries')
             },
             {
                 'mercado': 'Europa',
-                'duration_view': 'Neutral',
-                'benchmark': '7.0Y',
-                'recomendacion': '7.0Y',
-                'posicion_curva': 'Neutral',
-                'rationale': 'BCE cerca de terminal, crecimiento debil'
+                'duration_view': _dur_view('euro sovereigns'),
+                'benchmark': 'N/D',
+                'recomendacion': 'N/D',
+                'posicion_curva': 'N/D',
+                'rationale': _dur_rationale('euro sovereigns')
             },
             {
                 'mercado': 'UK',
-                'duration_view': 'Corta',
-                'benchmark': '8.0Y',
-                'recomendacion': '7.0Y',
-                'posicion_curva': 'Flattener',
-                'rationale': 'Inflacion sticky, BOE cautious'
+                'duration_view': 'N/D',
+                'benchmark': 'N/D',
+                'recomendacion': 'N/D',
+                'posicion_curva': 'N/D',
+                'rationale': 'N/D'
             },
             {
                 'mercado': 'Japon',
-                'duration_view': 'Underweight',
-                'benchmark': '9.0Y',
-                'recomendacion': '7.0Y',
-                'posicion_curva': 'Neutral',
-                'rationale': 'BOJ normalizando, riesgo de subas'
+                'duration_view': 'N/D',
+                'benchmark': 'N/D',
+                'recomendacion': 'N/D',
+                'posicion_curva': 'N/D',
+                'rationale': 'N/D'
             },
             {
                 'mercado': 'Chile',
-                'duration_view': 'Larga',
-                'benchmark': '5.0Y',
-                'recomendacion': '6.0Y',
-                'posicion_curva': 'Bullet 5Y',
-                'rationale': 'BCCh dovish, carry excelente, inflacion en meta'
+                'duration_view': _dur_view('chile soberanos') if _dur_view('chile soberanos') != 'N/D' else _dur_view('chile'),
+                'benchmark': 'N/D',
+                'recomendacion': 'N/D',
+                'posicion_curva': 'N/D',
+                'rationale': _dur_rationale('chile soberanos') if _dur_rationale('chile soberanos') != 'N/D' else _dur_rationale('chile')
             },
         ]
 
     def _generate_duration_trades(self) -> List[Dict[str, Any]]:
-        """Genera trades de duration recomendados."""
-        return [
-            {
-                'trade': 'US 2s10s Steepener',
-                'instrumento': 'Long 10Y, Short 2Y',
-                'carry': '+0.15% (3m)',
-                'target': '+30bp',
-                'stop': '-15bp',
-                'rationale': 'Normalizacion de curva, Fed terminando'
-            },
-            {
-                'trade': 'Long Chile BCP 5Y',
-                'instrumento': 'BCP-5 Bullet',
-                'carry': '+1.25% (3m)',
-                'target': '4.75% yield',
-                'stop': '5.50% yield',
-                'rationale': 'BCCh recortando, carry atractivo'
-            },
-            {
-                'trade': 'Short JGB 10Y',
-                'instrumento': 'JGB Futures',
-                'carry': '-0.25% (3m)',
-                'target': '1.20% yield',
-                'stop': '0.85% yield',
-                'rationale': 'BOJ normalizando politica'
-            },
-        ]
+        """Genera trades de duration recomendados (from council if available)."""
+        fi_views = self.parser.get_fi_views()
+        # Only show trades if council specifically recommends them
+        trades = []
+        if fi_views:
+            for segment, view in fi_views.items():
+                rationale = view.get('rationale', '')
+                if rationale and 'trade' in rationale.lower():
+                    trades.append({
+                        'trade': segment.title(),
+                        'instrumento': 'N/D',
+                        'carry': 'N/D',
+                        'target': 'N/D',
+                        'stop': 'N/D',
+                        'rationale': rationale
+                    })
+        if not trades:
+            trades.append({
+                'trade': 'Ver análisis del comité',
+                'instrumento': 'N/D',
+                'carry': 'N/D',
+                'target': 'N/D',
+                'stop': 'N/D',
+                'rationale': 'Consultar recomendaciones del período.'
+            })
+        return trades
 
     # =========================================================================
     # SECCION 4: CREDITO
@@ -932,12 +1086,26 @@ class RFContentGenerator:
         return result
 
     def _generate_cds_table(self) -> Dict[str, Any]:
-        """Genera tabla de CDS 5Y por pais (proprietary data — no public API)."""
+        """Genera tabla de CDS 5Y por pais (Bloomberg data)."""
+        datos = []
+        # Try Bloomberg structured data first
+        bbg_cds = self.market_data.get('bbg_cds', {})
+        if not bbg_cds and self.bloomberg:
+            try:
+                bbg_cds = self.bloomberg.get_cds_data()
+            except Exception:
+                pass
+
+        if bbg_cds:
+            for pais, val in bbg_cds.items():
+                if val is not None:
+                    datos.append({'pais': pais, 'cds_5y_bps': round(float(val), 1)})
+
         return {
             'titulo': 'CDS Soberanos 5Y',
             'fecha': self.date.strftime('%Y-%m-%d'),
-            'nota': 'Datos CDS requieren suscripción Bloomberg/Refinitiv — no disponible via API pública.',
-            'datos': [],
+            'nota': '' if datos else 'Sin datos CDS disponibles.',
+            'datos': datos,
         }
 
     def _generate_liquidity_analysis(self) -> Dict[str, Any]:
@@ -996,14 +1164,10 @@ class RFContentGenerator:
         spread_str = self._fmt_bp(ig_total_bps) if ig_total_bps else 'N/D'
         vs_hist = f"Percentil {int(ig_pctile)}%" if ig_pctile else 'N/D'
 
-        narrativa = f"Investment Grade ofrece carry atractivo con spreads en {spread_str}"
+        narrativa = f"Investment Grade: spread en {spread_str}"
         if ig_signal:
             narrativa += f" (señal: {ig_signal})"
-        narrativa += (
-            ". Las empresas IG tienen leverage bajo, "
-            "cobertura de intereses fuerte y acceso a mercados de capital. Preferimos sectores "
-            "defensivos y financieros sobre cíclicos."
-        )
+        narrativa += ". Ver council para recomendación de sectores."
 
         # Compute yield_total from UST 10Y + IG spread (real data)
         ust_10y = self._val('yield_curve', 'current_curve', '10Y') or self._val('yield_curve', 'current_curve', 'DGS10')
@@ -1011,8 +1175,13 @@ class RFContentGenerator:
         if ust_10y and ig_total_bps:
             ig_yield_total = self._fmt_pct(float(ust_10y) + float(ig_total_bps) / 100)
 
+        # Get IG view from council parser
+        fi_views = self.parser.get_fi_views()
+        ig_view = fi_views.get('ig corporate', {}) if fi_views else {}
+        ig_council_view = ig_view.get('view', 'Sin vista')
+
         result = {
-            'view': 'OVERWEIGHT',
+            'view': ig_council_view,
             'spread_actual': spread_str,
             'spread_vs_historia': vs_hist,
             'yield_total': ig_yield_total,
@@ -1070,15 +1239,44 @@ class RFContentGenerator:
         vs_hist = f"Percentil {int(hy_pctile)}%" if hy_pctile else 'N/D'
 
         narrativa = f"High Yield ofrece yield atractivo pero spreads en {spread_str} están {vs_hist.lower()} vs historia. "
-        narrativa += (
-            "El refinanciamiento de deuda 2025-2026 es un riesgo para emisores más débiles. "
-            "Preferimos BB sobre CCC y somos muy selectivos."
-        )
 
+        # Get HY sub-rating views from council parser
+        hy_rating_views = {}
+        if self.parser:
+            fi = self.parser.get_fi_views()
+            if fi:
+                for key in ['hy bb', 'hy_bb', 'hy b', 'hy_b', 'hy ccc', 'hy_ccc']:
+                    if key in fi:
+                        normalized = key.replace('_', ' ').split()[-1].upper()  # BB, B, CCC
+                        hy_rating_views[normalized] = fi[key]
+
+        # Build preference narrative from council data
+        if hy_rating_views:
+            prefs = [f"{r}: {v.get('view', 'N/D')}" for r, v in hy_rating_views.items()]
+            narrativa += f"Preferencias por rating: {', '.join(prefs)}."
+        else:
+            narrativa += "Sin preferencia definida por el comité a nivel sub-rating."
+
+        # HY by rating — use council views if available
         por_rating = [
-            {'rating': 'BB', 'spread': self._fmt_bp(hy_bb) if hy_bb else 'N/D', 'view': 'OW', 'comentario': 'Calidad decente'},
-            {'rating': 'B', 'spread': self._fmt_bp(hy_b) if hy_b else 'N/D', 'view': 'Neutral', 'comentario': 'Selectivo'},
-            {'rating': 'CCC', 'spread': self._fmt_bp(hy_ccc) if hy_ccc else 'N/D', 'view': 'UW', 'comentario': 'Default risk'},
+            {
+                'rating': 'BB',
+                'spread': self._fmt_bp(hy_bb) if hy_bb else 'N/D',
+                'view': hy_rating_views.get('BB', {}).get('view', 'N/D'),
+                'comentario': hy_rating_views.get('BB', {}).get('rationale', 'N/D'),
+            },
+            {
+                'rating': 'B',
+                'spread': self._fmt_bp(hy_b) if hy_b else 'N/D',
+                'view': hy_rating_views.get('B', {}).get('view', 'N/D'),
+                'comentario': hy_rating_views.get('B', {}).get('rationale', 'N/D'),
+            },
+            {
+                'rating': 'CCC',
+                'spread': self._fmt_bp(hy_ccc) if hy_ccc else 'N/D',
+                'view': hy_rating_views.get('CCC', {}).get('view', 'N/D'),
+                'comentario': hy_rating_views.get('CCC', {}).get('rationale', 'N/D'),
+            },
         ]
 
         # Compute yield_total from UST 10Y + HY spread (real data)
@@ -1087,8 +1285,13 @@ class RFContentGenerator:
         if ust_10y and hy_total_bps:
             hy_yield_total = self._fmt_pct(float(ust_10y) + float(hy_total_bps) / 100)
 
+        # Get HY view from council parser
+        fi_views = self.parser.get_fi_views()
+        hy_view = fi_views.get('hy corporate', {}) if fi_views else {}
+        hy_council_view = hy_view.get('view', 'Sin vista')
+
         result = {
-            'view': 'NEUTRAL',
+            'view': hy_council_view,
             'spread_actual': spread_str,
             'spread_vs_historia': vs_hist,
             'yield_total': hy_yield_total,
@@ -1104,17 +1307,93 @@ class RFContentGenerator:
 
         return result
 
+    def _get_bbg_sector_oas(self) -> Dict[str, Dict[str, str]]:
+        """Get Bloomberg sector OAS data as {sector: {ig: str, hy: str}}."""
+        bbg_cs = self.market_data.get('bbg_credit_spreads', {})
+        if not bbg_cs and self.bloomberg:
+            try:
+                bbg_cs = self.bloomberg.get_sector_spreads()
+            except Exception:
+                pass
+        if not bbg_cs:
+            return {}
+        # Map Bloomberg keys → standard sector names
+        sector_map = {
+            'financiero': 'Financials', 'industrial': 'Industrials',
+            'utilities': 'Utilities', 'tecnologia': 'Technology',
+            'salud': 'Healthcare', 'energia': 'Energy',
+        }
+        result = {}
+        for bbg_key, val in bbg_cs.items():
+            # Parse "Financiero IG" / "Financiero HY" / "Total IG" etc.
+            parts = bbg_key.lower().split()
+            if len(parts) >= 2:
+                sector_raw = parts[0]
+                quality = parts[-1]  # ig or hy
+                sector_name = sector_map.get(sector_raw, sector_raw.title())
+                if sector_name not in result:
+                    result[sector_name] = {}
+                if quality == 'ig':
+                    result[sector_name]['ig'] = self._fmt_bp(val)
+                elif quality == 'hy':
+                    result[sector_name]['hy'] = self._fmt_bp(val)
+        return result
+
     def _generate_credit_by_sector(self) -> List[Dict[str, Any]]:
-        """Genera analisis de credito por sector (views cualitativas — spreads por sector no disponibles via API)."""
+        """Genera analisis de credito por sector desde council parser + Bloomberg OAS."""
+        # Try to get sector views from council
+        sector_views = self.parser.get_sector_views() if self.parser else None
+
+        # Get Bloomberg OAS data
+        bbg_oas = self._get_bbg_sector_oas()
+
+        # Standard sector list for credit analysis
+        standard_sectors = [
+            'Financials', 'Technology', 'Healthcare', 'Industrials',
+            'Consumer', 'Energy', 'Utilities', 'Real Estate',
+        ]
+
+        if sector_views or bbg_oas:
+            sectors = []
+            seen = set()
+            for std in standard_sectors:
+                key = std.lower()
+                sv = (sector_views or {}).get(key, {})
+                oas = bbg_oas.get(std, {})
+                ig_str = oas.get('ig', 'N/D')
+                hy_str = oas.get('hy', 'N/D')
+                spread_str = ig_str
+                if ig_str != 'N/D' and hy_str != 'N/D':
+                    spread_str = f"IG: {ig_str} / HY: {hy_str}"
+
+                if sv or oas:
+                    sectors.append({
+                        'sector': std,
+                        'view': sv.get('view', 'N/D'),
+                        'spread_ig': spread_str,
+                        'fundamentales': sv.get('rationale', 'N/D'),
+                        'driver': 'N/D',
+                    })
+                    seen.add(key)
+            # Extra sectors from council not in standard list
+            if sector_views:
+                for key, sv in sector_views.items():
+                    if key not in seen:
+                        sectors.append({
+                            'sector': key.title(),
+                            'view': sv.get('view', 'N/D'),
+                            'spread_ig': 'N/D',
+                            'fundamentales': sv.get('rationale', 'N/D'),
+                            'driver': 'N/D',
+                        })
+            if sectors:
+                return sectors
+
+        # No council sector views and no Bloomberg — return minimal placeholder
         return [
-            {'sector': 'Financials', 'view': 'OW', 'spread_ig': 'N/D', 'fundamentales': 'Fuertes', 'driver': 'Capital solido, NIM estable'},
-            {'sector': 'Technology', 'view': 'OW', 'spread_ig': 'N/D', 'fundamentales': 'Solidos', 'driver': 'Cash rich, bajo leverage'},
-            {'sector': 'Healthcare', 'view': 'OW', 'spread_ig': 'N/D', 'fundamentales': 'Estables', 'driver': 'Defensivo, M&A funding'},
-            {'sector': 'Industrials', 'view': 'NEUTRAL', 'spread_ig': 'N/D', 'fundamentales': 'Mixtos', 'driver': 'Ciclico, capex'},
-            {'sector': 'Consumer', 'view': 'NEUTRAL', 'spread_ig': 'N/D', 'fundamentales': 'Mixtos', 'driver': 'Consumo moderando'},
-            {'sector': 'Energy', 'view': 'NEUTRAL', 'spread_ig': 'N/D', 'fundamentales': 'Ciclicos', 'driver': 'Oil price sensitive'},
-            {'sector': 'Utilities', 'view': 'UW', 'spread_ig': 'N/D', 'fundamentales': 'Presion', 'driver': 'Capex elevado, regulacion'},
-            {'sector': 'Real Estate', 'view': 'UW', 'spread_ig': 'N/D', 'fundamentales': 'Debiles', 'driver': 'Oficinas, refinanciamiento'},
+            {'sector': 'Sin recomendacion sectorial', 'view': 'N/D',
+             'spread_ig': 'N/D', 'fundamentales': 'Council no emitio vistas sectoriales de credito',
+             'driver': 'N/D'},
         ]
 
     def _generate_credit_narrative(self) -> str:
@@ -1129,12 +1408,27 @@ class RFContentGenerator:
         ig_spread_str = self._fmt_bp(ig_spread) if ig_spread else 'N/D'
         hy_spread_str = self._fmt_bp(hy_spread) if hy_spread else 'N/D'
 
+        # Dynamic narrative via Claude
+        from narrative_engine import generate_narrative
+        narrative = generate_narrative(
+            section_name="rf_credit_narrative",
+            prompt=(
+                "Escribe un parrafo de 2-3 oraciones sobre el mercado de credito corporativo. "
+                "Incluye IG spread, HY spread, y vista sectorial. "
+                "Usa SOLO los datos proporcionados. NO inventes preferencias sectoriales."
+            ),
+            council_context=self.council.get('panel_outputs', {}).get('rf', '')[:1500],
+            quant_context=f"IG spread: {ig_spread_str}, HY spread: {hy_spread_str}, IG yield: {ig_yield_str}",
+            company_name=self.company_name,
+            max_tokens=200,
+        )
+        if narrative:
+            return narrative
+        # Minimal fallback — data only, no opinions
         return (
-            f"El mercado de credito ofrece oportunidades selectivas. Investment Grade es nuestro segmento "
-            f"preferido con carry de {ig_yield_str} (spread {ig_spread_str}) y fundamentales solidos. "
-            f"High Yield (spread {hy_spread_str}) requiere mayor selectividad "
-            "dado riesgo de refinanciamiento. Por sector, preferimos Financials y "
-            "Technology sobre Utilities y Real Estate. En HY, favorecemos BB sobre CCC."
+            f"Investment Grade: carry {ig_yield_str} (spread {ig_spread_str}). "
+            f"High Yield: spread {hy_spread_str}. "
+            "Ver recomendaciones sectoriales del comité."
         )
 
     # =========================================================================
@@ -1165,23 +1459,30 @@ class RFContentGenerator:
         spread_str = self._fmt_bp(em_spread) if em_spread else 'N/D'
         yield_str = self._fmt_pct(em_yield) if em_yield else 'N/D'
 
+        # Get EM view from council parser
+        fi_views = self.parser.get_fi_views()
+        em_v = 'Sin vista'
+        if fi_views:
+            em_data = fi_views.get('em usd debt', fi_views.get('em hard currency', {}))
+            em_v = em_data.get('view', 'Sin vista')
+
         return {
-            'view': 'OVERWEIGHT',
+            'view': em_v,
             'indice': 'EMBIG Diversified',
             'spread': spread_str,
             'yield': yield_str,
-            'duration': '7.0Y',
+            'duration': 'N/D',
             'narrativa': (
-                f"Deuda EM en dolares ofrece yield pickup atractivo de {spread_str} sobre Treasuries. "
-                "Preferimos soberanos IG (Chile, Mexico, Peru) sobre HY (Argentina, Ecuador). "
-                "El riesgo principal es fortaleza del USD y desaceleracion China."
+                f"Deuda EM en dólares: spread de {spread_str} sobre Treasuries"
+                + (f", yield de {yield_str}" if yield_str != 'N/D' else '')
+                + ". Ver council para recomendación."
             ),
             'soberanos_vs_corporativos': {
-                'soberanos_view': 'OW',
+                'soberanos_view': 'N/D',
                 'soberanos_spread': spread_str,
-                'corporativos_view': 'Neutral',
+                'corporativos_view': 'N/D',
                 'corporativos_spread': 'N/D',
-                'preferencia': 'Soberanos por liquidez y spread pickup'
+                'preferencia': 'N/D'
             },
             '_real': bool(em_yield),
         }
@@ -1195,20 +1496,22 @@ class RFContentGenerator:
         br_10y = self._intl_yield('brazil')
         mx_10y = self._intl_yield('mexico')
 
+        # Get EM local currency view from council parser
+        fi_views = self.parser.get_fi_views()
+        em_lc_v = 'Sin vista'
+        if fi_views:
+            em_lc_data = fi_views.get('em local currency', fi_views.get('em lc', {}))
+            em_lc_v = em_lc_data.get('view', 'Sin vista')
+
         return {
-            'view': 'NEUTRAL A OW',
+            'view': em_lc_v,
             'yield_promedio': 'N/D',
-            'fx_view': 'Selectivo',
-            'narrativa': (
-                "Deuda EM en moneda local ofrece yields atractivos con oportunidades "
-                "de carry. El riesgo FX es el principal factor. Preferimos paises con bancos centrales "
-                "credibles y cuentas externas saludables: Chile, Mexico, Indonesia."
-            ),
+            'fx_view': 'N/D',
+            'narrativa': "Deuda EM en moneda local. Ver council para recomendación.",
             'carry_trades': [
-                {'pais': 'Brasil', 'yield': self._fmt_pct(br_10y) if br_10y else 'N/D', 'fx_view': 'Neutral', 'carry_ajustado': 'Alto pero fiscal preocupa'},
-                {'pais': 'Mexico', 'yield': self._fmt_pct(mx_10y) if mx_10y else 'N/D', 'fx_view': 'Positivo', 'carry_ajustado': 'Atractivo, nearshoring'},
-                {'pais': 'Chile', 'yield': chile_str, 'fx_view': 'Positivo', 'carry_ajustado': 'Moderado, cobre soporte'},
-                {'pais': 'Indonesia', 'yield': 'N/D', 'fx_view': 'Positivo', 'carry_ajustado': 'Atractivo, BI credible'},
+                {'pais': 'Brasil', 'yield': self._fmt_pct(br_10y) if br_10y else 'N/D', 'fx_view': 'N/D', 'carry_ajustado': 'N/D'},
+                {'pais': 'Mexico', 'yield': self._fmt_pct(mx_10y) if mx_10y else 'N/D', 'fx_view': 'N/D', 'carry_ajustado': 'N/D'},
+                {'pais': 'Chile', 'yield': chile_str, 'fx_view': 'N/D', 'carry_ajustado': 'N/D'},
             ]
         }
 
@@ -1237,81 +1540,99 @@ class RFContentGenerator:
         return [
             {
                 'pais': 'Chile',
-                'hc_view': 'OW', 'lc_view': 'OW',
+                'hc_view': 'N/D', 'lc_view': 'N/D',
                 'yield_hc': self._fmt_pct(chile_lc) if chile_lc else 'N/D',
                 'yield_lc': self._fmt_pct(chile_lc) if chile_lc else 'N/D',
                 'spread': self._fmt_bp(chile_spread) if chile_spread else 'N/D',
                 'rating': 'A',
-                'driver': 'Macro estable, BCCh credible, cobre soporte',
-                'riesgo': 'Politica, liquidez',
+                'driver': 'N/D',
+                'riesgo': 'N/D',
                 '_real': bool(chile_lc),
             },
             {
                 'pais': 'Mexico',
-                'hc_view': 'OW', 'lc_view': 'OW',
+                'hc_view': 'N/D', 'lc_view': 'N/D',
                 'yield_hc': self._fmt_pct(mx_10y) if mx_10y else 'N/D',
                 'yield_lc': 'N/D',
                 'spread': self._fmt_bp(_spread('mexico')) if _spread('mexico') else 'N/D',
                 'rating': 'BBB',
-                'driver': 'Nearshoring, Banxico credible',
-                'riesgo': 'PEMEX, politica US',
+                'driver': 'N/D',
+                'riesgo': 'N/D',
                 '_real': bool(mx_10y),
             },
             {
                 'pais': 'Brasil',
-                'hc_view': 'NEUTRAL', 'lc_view': 'OW',
+                'hc_view': 'N/D', 'lc_view': 'N/D',
                 'yield_hc': self._fmt_pct(br_10y) if br_10y else 'N/D',
                 'yield_lc': 'N/D',
                 'spread': self._fmt_bp(_spread('brazil')) if _spread('brazil') else 'N/D',
                 'rating': 'BB',
-                'driver': 'Carry atractivo, BCB credible',
-                'riesgo': 'Fiscal, politica',
+                'driver': 'N/D',
+                'riesgo': 'N/D',
                 '_real': bool(br_10y),
             },
             {
                 'pais': 'Peru',
-                'hc_view': 'OW', 'lc_view': 'NEUTRAL',
+                'hc_view': 'N/D', 'lc_view': 'N/D',
                 'yield_hc': self._fmt_pct(pe_10y) if pe_10y else 'N/D',
                 'yield_lc': 'N/D',
                 'spread': self._fmt_bp(_spread('peru')) if _spread('peru') else 'N/D',
                 'rating': 'BBB',
-                'driver': 'Bajo debt/GDP, cobre',
-                'riesgo': 'Politica',
+                'driver': 'N/D',
+                'riesgo': 'N/D',
                 '_real': bool(pe_10y),
             },
             {
                 'pais': 'Colombia',
-                'hc_view': 'NEUTRAL', 'lc_view': 'NEUTRAL',
+                'hc_view': 'N/D', 'lc_view': 'N/D',
                 'yield_hc': self._fmt_pct(co_10y) if co_10y else 'N/D',
                 'yield_lc': 'N/D',
                 'spread': self._fmt_bp(_spread('colombia')) if _spread('colombia') else 'N/D',
                 'rating': 'BB+',
-                'driver': 'Yield atractivo',
-                'riesgo': 'Fiscal, politica, oil',
+                'driver': 'N/D',
+                'riesgo': 'N/D',
                 '_real': bool(co_10y),
             },
         ]
 
     def _generate_em_narrative(self) -> str:
-        """Genera narrativa de EM debt (dinámica)."""
+        """Genera narrativa de EM debt — datos reales + council view."""
         chile_10y = self._chile_bcp('10Y')
         mx_10y = self._intl_yield('mexico')
         br_10y = self._intl_yield('brazil')
 
-        parts = ["La deuda emergente ofrece yield pickup atractivo en un mundo de tasas estables. "]
-        parts.append("Preferimos hard currency soberanos IG sobre HY por mejor perfil riesgo-retorno. ")
-        if chile_10y and mx_10y:
-            parts.append(
-                f"En moneda local, Chile ({self._fmt_pct(chile_10y)}) y Mexico ({self._fmt_pct(mx_10y)}) "
-                "ofrecen la mejor combinacion de carry y estabilidad FX. "
-            )
-        else:
-            parts.append("En moneda local, Chile y Mexico ofrecen la mejor combinacion de carry y estabilidad FX. ")
+        # Build data-only narrative, no positioning opinions
+        parts = []
+        if chile_10y:
+            parts.append(f"Chile 10Y: {self._fmt_pct(chile_10y)}.")
+        if mx_10y:
+            parts.append(f"Mexico 10Y: {self._fmt_pct(mx_10y)}.")
         if br_10y:
-            parts.append(f"Brasil ({self._fmt_pct(br_10y)}) tiene carry alto pero el riesgo fiscal limita la posicion.")
-        else:
-            parts.append("Brasil tiene carry alto pero el riesgo fiscal limita la posicion.")
-        return ''.join(parts)
+            parts.append(f"Brasil 10Y: {self._fmt_pct(br_10y)}.")
+
+        if not parts:
+            return "Datos de deuda EM no disponibles. Ver council para recomendación."
+
+        # Use narrative engine if council available
+        rf_panel = self.council.get('panel_outputs', {}).get('rf', '')
+        if rf_panel:
+            from narrative_engine import generate_narrative
+            narrative = generate_narrative(
+                section_name="rf_em_debt",
+                prompt=(
+                    "Escribe 2-3 oraciones sobre deuda emergente basándote en el council. "
+                    "Incluye view sobre hard vs local currency, países preferidos, y riesgos. "
+                    "Usa los datos cuantitativos proporcionados."
+                ),
+                council_context=rf_panel[:1500],
+                quant_context=' '.join(parts),
+                company_name=self.company_name,
+                max_tokens=250
+            )
+            if narrative:
+                return narrative
+
+        return ' '.join(parts) + " Ver council para recomendación."
 
     # =========================================================================
     # SECCION 6: CHILE RENTA FIJA
@@ -1367,10 +1688,8 @@ class RFContentGenerator:
         bcp10_str = self._fmt_pct(bcp_10) if bcp_10 else 'N/D'
 
         narrativa = (
-            f"Bonos soberanos chilenos ofrecen una combinacion atractiva de yield ({bcp10_str} BCP10), "
-            f"carry excelente y upside de capital por recortes del BCCh. La TPM en {tpm_str} tiene "
-            "espacio para bajar 25-50bp adicionales en 2026. Preferimos BCP 5Y para el bullet "
-            "de la curva y BCU 10Y para proteccion de inflacion."
+            f"Bonos soberanos Chile: BCP-10 en {bcp10_str}, TPM en {tpm_str}. "
+            "Ver council para recomendación de posicionamiento en curva."
         )
 
         curva_bcp = [
@@ -1378,19 +1697,19 @@ class RFContentGenerator:
                 'plazo': 'BCP-2',
                 'yield': self._fmt_pct(bcp_2) if bcp_2 else 'N/D',
                 'vs_1m': self._chile_bcp_vs1m('2Y') or '-',
-                'view': 'Neutral',
+                'view': 'N/D',
             },
             {
                 'plazo': 'BCP-5',
                 'yield': self._fmt_pct(bcp_5) if bcp_5 else 'N/D',
                 'vs_1m': self._chile_bcp_vs1m('5Y') or '-',
-                'view': 'OW - Sweet spot',
+                'view': 'N/D',
             },
             {
                 'plazo': 'BCP-10',
                 'yield': self._fmt_pct(bcp_10) if bcp_10 else 'N/D',
                 'vs_1m': self._chile_bcp_vs1m('10Y') or '-',
-                'view': 'OW',
+                'view': 'N/D',
             },
         ]
 
@@ -1399,25 +1718,35 @@ class RFContentGenerator:
                 'plazo': 'BCU-5',
                 'yield': self._fmt_pct(bcu_5) if bcu_5 else 'N/D',
                 'vs_1m': self._chile_bcu_vs1m('5Y') or '-',
-                'view': 'OW',
+                'view': 'N/D',
             },
             {
                 'plazo': 'BCU-10',
                 'yield': self._fmt_pct(bcu_10) if bcu_10 else 'N/D',
                 'vs_1m': self._chile_bcu_vs1m('10Y') or '-',
-                'view': 'OW',
+                'view': 'N/D',
             },
             {
                 'plazo': 'BCU-20',
                 'yield': self._fmt_pct(bcu_20) if bcu_20 else 'N/D',
                 'vs_1m': self._chile_bcu_vs1m('20Y') or '-',
-                'view': 'Neutral',
+                'view': 'N/D',
             },
         ]
 
+        # Get Chile sovereign view from council parser
+        fi_views = self.parser.get_fi_views()
+        chile_sv = 'Sin vista'
+        chile_dur_v = 'N/D'
+        if fi_views:
+            cv = fi_views.get('chile soberanos', fi_views.get('chile', {}))
+            chile_sv = cv.get('view', 'Sin vista')
+            dur_map = {'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga'}
+            chile_dur_v = dur_map.get(cv.get('duration', ''), 'N/D')
+
         result = {
-            'view': 'OVERWEIGHT',
-            'duration_view': 'Larga',
+            'view': chile_sv,
+            'duration_view': chile_dur_v,
             'narrativa': narrativa,
             'curva_bcp': curva_bcp,
             'curva_bcu': curva_bcu,
@@ -1446,28 +1775,25 @@ class RFContentGenerator:
             )
         if lending_mortgage:
             narrativa += f"Hipotecario en UF+{self._fmt_pct(lending_mortgage)}. "
-        narrativa += (
-            "Preferimos emisores con grado de inversion y liquidez razonable. "
-            "Sectores favoritos: Utilities reguladas, Retail grado de inversion, Bancos."
-        )
+        narrativa += "Ver council para recomendación de emisores y sectores."
 
         result = {
-            'view': 'OVERWEIGHT SELECTIVO',
+            'view': 'N/D',
             'spread_promedio': 'N/D',
             'narrativa': narrativa,
             'emisores_preferidos': [
-                {'emisor': 'Enel Chile', 'rating': 'A-', 'spread': 'N/D', 'yield': 'N/D', 'view': 'OW'},
-                {'emisor': 'Falabella', 'rating': 'BBB', 'spread': 'N/D', 'yield': 'N/D', 'view': 'OW'},
-                {'emisor': 'Banco Chile', 'rating': 'A', 'spread': 'N/D', 'yield': 'N/D', 'view': 'OW'},
-                {'emisor': 'CMPC', 'rating': 'BBB+', 'spread': 'N/D', 'yield': 'N/D', 'view': 'Neutral'},
-                {'emisor': 'Cencosud', 'rating': 'BBB-', 'spread': 'N/D', 'yield': 'N/D', 'view': 'Neutral'},
+                {'emisor': 'Enel Chile', 'rating': 'A-', 'spread': 'N/D', 'yield': 'N/D', 'view': 'N/D'},
+                {'emisor': 'Falabella', 'rating': 'BBB', 'spread': 'N/D', 'yield': 'N/D', 'view': 'N/D'},
+                {'emisor': 'Banco Chile', 'rating': 'A', 'spread': 'N/D', 'yield': 'N/D', 'view': 'N/D'},
+                {'emisor': 'CMPC', 'rating': 'BBB+', 'spread': 'N/D', 'yield': 'N/D', 'view': 'N/D'},
+                {'emisor': 'Cencosud', 'rating': 'BBB-', 'spread': 'N/D', 'yield': 'N/D', 'view': 'N/D'},
             ],
             'sectores': [
-                {'sector': 'Utilities', 'view': 'OW', 'spread': 'N/D', 'rationale': 'Regulado, predecible'},
-                {'sector': 'Bancos', 'view': 'OW', 'spread': 'N/D', 'rationale': 'Capitalizado, liquido'},
-                {'sector': 'Retail', 'view': 'Neutral', 'spread': 'N/D', 'rationale': 'Recovery, selectivo'},
-                {'sector': 'Forestal', 'view': 'Neutral', 'spread': 'N/D', 'rationale': 'Ciclico'},
-                {'sector': 'Inmobiliario', 'view': 'UW', 'spread': 'N/D', 'rationale': 'Presion'},
+                {'sector': 'Utilities', 'view': 'N/D', 'spread': 'N/D', 'rationale': 'N/D'},
+                {'sector': 'Bancos', 'view': 'N/D', 'spread': 'N/D', 'rationale': 'N/D'},
+                {'sector': 'Retail', 'view': 'N/D', 'spread': 'N/D', 'rationale': 'N/D'},
+                {'sector': 'Forestal', 'view': 'N/D', 'spread': 'N/D', 'rationale': 'N/D'},
+                {'sector': 'Inmobiliario', 'view': 'N/D', 'spread': 'N/D', 'rationale': 'N/D'},
             ],
         }
 
@@ -1631,9 +1957,9 @@ class RFContentGenerator:
                 }
             ],
             'recomendacion': {
-                'usa': 'Neutral - preferir nominal sobre TIPS',
-                'uk': 'OW Linkers - oportunidad',
-                'chile': 'Leve OW BCU - Real yield atractivo y proteccion'
+                'usa': 'N/D — ver council',
+                'uk': 'N/D — ver council',
+                'chile': 'N/D — ver council'
             }
         }
 
@@ -1655,8 +1981,8 @@ class RFContentGenerator:
             'be_2y': 'N/D',
             'be_5y': self._fmt_pct(be_5y) if be_5y else 'N/D',
             'be_10y': self._fmt_pct(be_10y) if be_10y else 'N/D',
-            'vs_target': 'Ligeramente sobre',
-            'view': 'Fair'
+            'vs_target': 'N/D',
+            'view': 'N/D'
         }
         if be_5y or be_10y:
             us_row['_real'] = True
@@ -1732,14 +2058,14 @@ class RFContentGenerator:
                 '_real': bool(tips_10y)
             },
             'euro_linkers': {
-                'view': 'NEUTRAL',
+                'view': 'N/D',
                 'yield_real_10y': 'N/D',
-                'rationale': 'Real yield bajo, breakevens fair'
+                'rationale': 'N/D'
             },
             'chile_bcu': {
-                'view': 'OVERWEIGHT',
+                'view': 'N/D',
                 'yield_real_10y': self._fmt_pct(self._chile_bcu('10Y')) if self._chile_bcu('10Y') else 'N/D',
-                'rationale': 'Real yield muy atractivo, protección natural',
+                'rationale': 'N/D',
                 '_real': bool(self._chile_bcu('10Y'))
             }
         }
@@ -1869,41 +2195,35 @@ class RFContentGenerator:
         return ops
 
     def _generate_recommended_trades(self) -> List[Dict[str, Any]]:
-        """Genera trades recomendados (niveles basados en datos reales)."""
-        bcp_5y = self._chile_bcp('5Y')
-        ig_spread = self._val('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
-        hy_spread = self._val('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
-        mx_10y = self._intl_yield('mexico')
+        """Genera trades recomendados desde council parser (sin hardcoded)."""
+        # Get trades from council FI positioning
+        fi_views = self.parser.get_fi_views() if self.parser else None
+        trades = []
+        if fi_views:
+            for seg, data in fi_views.items():
+                view = data.get('view', '')
+                if view in ('OW', 'UW'):  # Only actionable positions
+                    direction = 'Long' if view == 'OW' else 'Short'
+                    trades.append({
+                        'trade': f'{direction} {seg.title()}',
+                        'entry': 'N/D',
+                        'target': 'N/D',
+                        'stop': 'N/D',
+                        'horizonte': 'N/D',
+                        'carry': 'N/D',
+                        'rationale': data.get('rationale', 'N/D'),
+                    })
 
-        trades = [
-            {
-                'trade': 'Long Chile BCP 5Y',
-                'entry': self._fmt_pct(bcp_5y) if bcp_5y else 'N/D',
-                'target': self._fmt_pct(bcp_5y - 0.40) if bcp_5y else 'N/D',
-                'stop': self._fmt_pct(bcp_5y + 0.30) if bcp_5y else 'N/D',
-                'horizonte': '6 meses',
+        if not trades:
+            trades.append({
+                'trade': 'Sin trades recomendados',
+                'entry': 'N/D',
+                'target': 'N/D',
+                'stop': 'N/D',
+                'horizonte': 'N/D',
                 'carry': 'N/D',
-                'rationale': 'BCCh dovish, curva empinada'
-            },
-            {
-                'trade': 'OW IG vs HY',
-                'entry': f'IG spread {self._fmt_bp(ig_spread)}, HY {self._fmt_bp(hy_spread)}' if (ig_spread and hy_spread) else 'N/D',
-                'target': 'Spread compression IG, widening HY',
-                'stop': 'HY outperform 2%',
-                'horizonte': '3-6 meses',
-                'carry': 'N/D',
-                'rationale': 'HY spreads tight, default risk'
-            },
-            {
-                'trade': 'Long Mexico 10Y USD',
-                'entry': self._fmt_pct(mx_10y) if mx_10y else 'N/D',
-                'target': self._fmt_pct(mx_10y - 0.50) if mx_10y else 'N/D',
-                'stop': self._fmt_pct(mx_10y + 0.30) if mx_10y else 'N/D',
-                'horizonte': '6 meses',
-                'carry': 'N/D',
-                'rationale': 'Nearshoring, Banxico credible'
-            },
-        ]
+                'rationale': 'Council no emitió recomendaciones de trade específicas',
+            })
         return trades
 
     # =========================================================================
@@ -1924,7 +2244,19 @@ class RFContentGenerator:
         bcp5_str = self._fmt_pct(bcp_5y) if bcp_5y else ''
         bcu10_str = self._fmt_pct(bcu_10y) if bcu_10y else ''
 
-        chile_rec = 'OW - BCP5Y'
+        # Build positioning summary from council parser
+        fi_views = self.parser.get_fi_views()
+        dur_stance = self.parser.get_duration_stance()
+
+        dur_rec = dur_stance.get('stance', 'N/D') if dur_stance else 'N/D'
+        ig_v = fi_views.get('ig corporate', {}).get('view', 'N/D') if fi_views else 'N/D'
+        hy_v = fi_views.get('hy corporate', {}).get('view', 'N/D') if fi_views else 'N/D'
+        chile_v = 'N/D'
+        if fi_views:
+            cv = fi_views.get('chile soberanos', fi_views.get('chile', {}))
+            chile_v = cv.get('view', 'N/D')
+
+        chile_rec = f'{chile_v} - BCP5Y'
         if bcp5_str:
             chile_rec += f' ({bcp5_str})'
         if bcu10_str:
@@ -1934,14 +2266,14 @@ class RFContentGenerator:
 
         return {
             'tabla_final': [
-                {'dimension': 'Duration Global', 'recomendacion': 'Neutral a Larga'},
-                {'dimension': 'Mercado Preferido', 'recomendacion': 'Chile, Europa'},
-                {'dimension': 'Curva US', 'recomendacion': 'Steepener 2s10s'},
-                {'dimension': 'IG Credit', 'recomendacion': f'OW - carry {ig_yield_str}'},
-                {'dimension': 'HY Credit', 'recomendacion': 'Neutral - selectivo BB'},
-                {'dimension': 'EM Hard Currency', 'recomendacion': 'OW - Chile, Mexico, Peru'},
-                {'dimension': 'EM Local Currency', 'recomendacion': 'OW selectivo - Chile, Mexico'},
-                {'dimension': 'Inflacion/TIPS', 'recomendacion': 'Neutral US, OW Chile BCU'},
+                {'dimension': 'Duration Global', 'recomendacion': dur_rec},
+                {'dimension': 'Mercado Preferido', 'recomendacion': 'N/D'},
+                {'dimension': 'Curva US', 'recomendacion': 'N/D'},
+                {'dimension': 'IG Credit', 'recomendacion': f'{ig_v} - carry {ig_yield_str}'},
+                {'dimension': 'HY Credit', 'recomendacion': hy_v},
+                {'dimension': 'EM Hard Currency', 'recomendacion': 'N/D'},
+                {'dimension': 'EM Local Currency', 'recomendacion': 'N/D'},
+                {'dimension': 'Inflacion/TIPS', 'recomendacion': 'N/D'},
                 {'dimension': 'Chile Soberanos', 'recomendacion': chile_rec},
             ],
             'mensaje_clave': self._generate_rf_positioning_message()
@@ -2031,6 +2363,14 @@ class RFContentGenerator:
 
     def generate_all_content(self) -> Dict[str, Any]:
         """Genera todo el contenido del reporte RF."""
+        # Set up anti-fabrication filter with verified market data
+        try:
+            from narrative_engine import set_verified_data, clear_verified_data, build_verified_data_rf
+            vd = build_verified_data_rf(self.market_data)
+            if vd:
+                set_verified_data(vd)
+        except Exception:
+            pass
 
         content = {
             'metadata': {
@@ -2054,6 +2394,13 @@ class RFContentGenerator:
         rate_fc = self.generate_rate_forecasts()
         if rate_fc.get('available'):
             content['rate_forecasts'] = rate_fc
+
+        # Clear anti-fabrication verified data
+        try:
+            from narrative_engine import clear_verified_data
+            clear_verified_data()
+        except Exception:
+            pass
 
         return content
 

@@ -155,7 +155,10 @@ class FREDSeries:
     # Extended US Macro
     BUILDING_PERMITS = "PERMIT"
     UMICH_SENTIMENT = "UMCSENT"
-    LEADING_INDEX = "USSLIND"
+    LEADING_INDEX = "USSLIND"  # discontinued Feb 2020
+    LEADING_INDEX_OECD = "USALOLITOAASTSAM"  # OECD CLI USA Amplitude Adjusted (active)
+    LEADING_INDEX_EZ = "BSCICP02EZM460S"  # OECD Business Confidence Euro Area (leading proxy)
+    CONSUMER_CONFIDENCE_EZ = "CSCICP02EZM460S"  # Consumer Confidence Euro Area
     CONTINUING_CLAIMS = "CCSA"
     JOB_OPENINGS = "JTSJOL"
     QUITS_RATE = "JTSQUR"
@@ -199,6 +202,22 @@ class FREDSeries:
     BREAKEVEN_10Y = "T10YIE"           # 10Y breakeven inflation
     MICHIGAN_1Y = "MICH"               # Michigan 1Y inflation expectations
 
+    # CPI Components (for detailed inflation breakdown)
+    CPI_SHELTER = "CUSR0000SAH1"           # CPI Shelter YoY
+    CPI_SERVICES_EX_ENERGY = "CUSR0000SASLE"  # CPI Services Less Energy Services
+    CPI_COMMODITIES_EX_FOOD_ENERGY = "CUSR0000SACL1"  # CPI Commodities Less Food/Energy
+    CPI_FOOD = "CPIUFDSL"                  # CPI Food
+    CPI_ENERGY = "CPIENGSL"                # CPI Energy
+
+    # US Fiscal
+    DEFICIT_GDP = "FYFSGDA188S"            # Federal Surplus/Deficit % GDP
+    DEBT_GDP = "GFDEGDQ188S"              # Federal Debt % GDP
+    INTEREST_GDP = "FYOIGDA188S"            # Federal Outlays: Interest as % GDP (annual)
+
+    # Financial Conditions
+    # STL_FIN_STRESS already defined above as STLFSI4
+    # LEADING_INDEX already defined above as USSLIND
+
 
 # =============================================================================
 # BCCh SERIES IDs - COMPREHENSIVE (93+ series)
@@ -239,6 +258,39 @@ class BCChSeries:
 
     # Confianza
     IPEC = "F089.IPE.IND.75M2.M"               # Percepcion economia
+    IMCE_TOTAL = "G089.IME.IND.A0.M"           # IMCE Total (confianza empresarial)
+    IMCE_SIN_MINERIA = "G089.IME.IND.A04.M"    # IMCE Sin Mineria
+
+    # IPC Detalle Chile (base 2023=100)
+    IPC_SAE = "F074.IPCSAE.VAR.Z.2023.C.M"     # IPC sin alimentos y energia (core)
+    IPC_SERVICIOS = "F074.IPCS.VAR.Z.2023.C.M" # IPC Servicios
+    IPC_BIENES = "F074.IPCB.VAR.Z.2023.C.M"    # IPC Bienes
+    IPC_ENERGIA = "F074.IPCE.VAR.Z.2023.C.M"   # IPC Energia
+
+    # EEE Largo Plazo (parametros estructurales)
+    EEE_IPC_LP = "F089.IPC.V12.LP.M"           # Inflacion promedio largo plazo
+    EEE_TPM_LP = "F089.TPM.TAS.LP.M"           # TPM promedio largo plazo (tasa neutral)
+    EEE_PIB_LP = "F089.PIB.V12.LP.M"           # PIB promedio largo plazo (crecimiento potencial)
+    EEE_TCN_LP = "F089.TCN.V12.LP.M"           # Tipo cambio largo plazo
+
+    # EEE Expectativas TPM por horizonte
+    EEE_TPM_PROX_REUNION = "F089.TPM.TAS.11.M" # TPM siguiente reunion
+    EEE_TPM_11M = "F089.TPM.TAS.14.M"          # TPM en 11 meses
+    EEE_TPM_23M = "F089.TPM.TAS.15.M"          # TPM en 23 meses
+
+    # EOF - Encuesta Operadores Financieros (mayor frecuencia)
+    EOF_TPM_12M = "F089.EOF.TPM.12MS.D"         # TPM 12 meses (operadores)
+    EOF_TPM_24M = "F089.EOF.TPM.24MS.D"         # TPM 24 meses (operadores)
+    EOF_IPC_12M = "F089.EOF.VII.12MS.D"         # Inflacion 12 meses (operadores)
+    EOF_BTP_5Y = "F089.EOF.RF_BTP_5Y.14D.D"    # Exp tasa BTP 5Y
+    EOF_BTP_10Y = "F089.EOF.RF_BTP_10Y.14D.D"  # Exp tasa BTP 10Y
+    EOF_BTU_5Y = "F089.EOF.RF_BTU_5Y.14D.D"    # Exp tasa BTU 5Y
+    EOF_BTU_10Y = "F089.EOF.RF_BTU_10Y.14D.D"  # Exp tasa BTU 10Y
+    EOF_TC_28D = "F089.EOF.TC.28DA.D"           # Exp USD/CLP 28 dias
+    EOF_TC_3M = "F089.EOF.TC.7MA.D"             # Exp USD/CLP 3 meses
+
+    # EEE Tipo de cambio
+    EEE_TCN_11M = "F089.TCN.PRE.14.M"          # EEE USD/CLP 11 meses
 
     # =========================================================================
     # CHILE ACTIVIDAD SECTORIAL
@@ -323,6 +375,7 @@ class BCChSeries:
     EPU_USA = "F019.EPU.IND.10.M"
     EPU_GLOBAL = "F019.EPU.IND.90.M"
     EPU_EUROPA = "F019.EPU.IND.94.M"
+    EPU_UK = "F019.EPU.IND.UK.M"
 
     # =========================================================================
     # BOLSAS INTERNACIONALES
@@ -434,5 +487,18 @@ class BCChSeries:
 
 SOFR_FED_SPREAD = 0.08
 RATE_INCREMENT = 0.25
-DEFAULT_LOOKBACK_DAYS = 120
-HISTORICAL_PERCENTILE_YEARS = 5
+DEFAULT_LOOKBACK_DAYS = 120          # For get_latest() — only need recent data
+DEFAULT_HISTORY_DAYS = 3650          # ~10 years — for full time series
+HISTORICAL_PERCENTILE_YEARS = 10     # For VIX/spread percentile calculations
+
+# 2026 FOMC Schedule (public calendar — update annually)
+FOMC_2026 = [
+    ('Jan 28-29', 'Jan'),
+    ('Mar 18-19', 'Mar'),
+    ('May 6-7', 'May'),
+    ('Jun 17-18', 'Jun'),
+    ('Jul 29-30', 'Jul'),
+    ('Sep 16-17', 'Sep'),
+    ('Oct 28-29', 'Oct'),
+    ('Dec 9-10', 'Dec'),
+]

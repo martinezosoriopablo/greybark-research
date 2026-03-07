@@ -59,6 +59,15 @@ class MacroReportRenderer:
             forecast_data=self.forecast_data,
             company_name=self.branding.get('company_name', ''))
 
+        # Inject Bloomberg data if available
+        try:
+            from bloomberg_reader import BloombergData
+            bbg = BloombergData()
+            if bbg.available:
+                self.content_generator.bloomberg = bbg
+        except Exception:
+            pass
+
     def _print(self, msg: str):
         if self.verbose:
             print(msg)
@@ -94,12 +103,38 @@ class MacroReportRenderer:
         if output_filename is None:
             output_filename = f"macro_report_{datetime.now().strftime('%Y-%m-%d')}.html"
 
+        # Append data provenance div (hidden, for audit)
+        html = self._append_provenance(html)
+
         output_path = self.output_dir / output_filename
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html)
 
         self._print(f"\n[OK] Reporte Macro generado: {output_path}")
         return str(output_path)
+
+    def _append_provenance(self, html: str) -> str:
+        """Append hidden data provenance div to HTML for audit trail."""
+        try:
+            from narrative_engine import get_provenance_records, clear_provenance_records
+            import json as _json
+            records = get_provenance_records()
+            if records:
+                provenance_json = _json.dumps(records, ensure_ascii=False, indent=2)
+                div = (
+                    f'\n<div id="data-provenance" style="display:none" '
+                    f'data-report="macro" data-generated="{datetime.now().isoformat()}">'
+                    f'\n{provenance_json}\n</div>\n'
+                )
+                # Insert before </body> if present, else append
+                if '</body>' in html:
+                    html = html.replace('</body>', div + '</body>')
+                else:
+                    html += div
+                clear_provenance_records()
+        except Exception:
+            pass
+        return html
 
     def _render_template(self, template, content: Dict) -> str:
         """Renderiza el template con el contenido usando Jinja2."""
@@ -170,7 +205,7 @@ class MacroReportRenderer:
 
         # Probability-Weighted Forecasts
         ponderado = content['pronóstico_ponderado']
-        replacements['{{weighted_metodologia}}'] = ponderado['metodologia']
+        replacements['{{weighted_metodologia}}'] = ponderado.get('metodologia', 'N/D')
 
         weighted_rows = ''
         for esc in ponderado['escenarios']:
@@ -178,14 +213,14 @@ class MacroReportRenderer:
                 <td>{esc['nombre']}</td>
                 <td style="text-align:center">{esc['probabilidad']}</td>
                 <td style="text-align:center">{esc['gdp_us']}</td>
-                <td style="text-align:center">{esc['gdp_world']}</td>
+                <td style="text-align:center">{esc.get('gdp_world', 'N/D')}</td>
                 <td style="text-align:center">{esc['sp500']}</td>
             </tr>'''
         replacements['{{weighted_scenarios_rows}}'] = weighted_rows
 
-        replacements['{{weighted_gdp_us}}'] = ponderado['weighted_forecasts']['gdp_us']
-        replacements['{{weighted_gdp_world}}'] = ponderado['weighted_forecasts']['gdp_world']
-        replacements['{{weighted_sp500}}'] = ponderado['weighted_forecasts']['sp500']
+        replacements['{{weighted_gdp_us}}'] = ponderado['weighted_forecasts'].get('gdp_us', 'N/D')
+        replacements['{{weighted_gdp_world}}'] = ponderado['weighted_forecasts'].get('gdp_world', 'N/D')
+        replacements['{{weighted_sp500}}'] = ponderado['weighted_forecasts'].get('sp500', 'N/D')
         replacements['{{weighted_implicancia}}'] = ponderado['implicancia']
 
         # Vs Previous Forecast
@@ -523,36 +558,68 @@ class MacroReportRenderer:
         # 7. ESCENARIOS Y RIESGOS
         esc = content['escenarios_riesgos']
 
-        # Scenarios
-        scenarios = esc['escenarios']
+        # Scenarios — handle both old dict format and new list format
+        scenarios_raw = esc.get('escenarios', {})
         scenarios_html = ''
-        for key, s in scenarios.items():
-            card_class = key
-            scenarios_html += f'''
-            <div class="scenario-card {card_class}">
-                <div class="scenario-header">
-                    <span class="scenario-name">{s['nombre']}</span>
-                    <span class="scenario-prob">{s['probabilidad']}%</span>
-                </div>
-                <div class="scenario-desc">{s['descripcion']}</div>
-            </div>'''
+        if isinstance(scenarios_raw, dict):
+            scenario_list = scenarios_raw.get('escenarios', [])
+            if isinstance(scenario_list, dict):
+                # Old format: dict of dicts
+                for key, s in scenario_list.items():
+                    scenarios_html += f'''
+                    <div class="scenario-card {key}">
+                        <div class="scenario-header">
+                            <span class="scenario-name">{s.get("nombre", key)}</span>
+                            <span class="scenario-prob">{s.get("probabilidad", "N/D")}%</span>
+                        </div>
+                        <div class="scenario-desc">{s.get("descripcion", "")}</div>
+                    </div>'''
+            else:
+                # New format: list of dicts
+                for s in scenario_list:
+                    nombre = s.get('nombre', 'N/D')
+                    prob = s.get('probabilidad', 'N/D')
+                    desc = s.get('descripcion', '')
+                    scenarios_html += f'''
+                    <div class="scenario-card">
+                        <div class="scenario-header">
+                            <span class="scenario-name">{nombre}</span>
+                            <span class="scenario-prob">{prob}</span>
+                        </div>
+                        <div class="scenario-desc">{desc}</div>
+                    </div>'''
+            narrativa = scenarios_raw.get('narrativa', '')
+            if narrativa:
+                scenarios_html += f'<p style="margin-top:12px;color:#4a5568;">{narrativa}</p>'
         replacements['{{scenarios_html}}'] = scenarios_html
 
-        # Risks
+        # Risks — handle both old list format and new dict format
+        risks_raw = esc.get('top_risks', {})
         risks_html = ''
-        for r in esc['top_risks']:
+        if isinstance(risks_raw, dict):
+            risk_list = risks_raw.get('riesgos', [])
+            narrativa = risks_raw.get('narrativa', '')
+        elif isinstance(risks_raw, list):
+            risk_list = risks_raw
+            narrativa = ''
+        else:
+            risk_list = []
+            narrativa = ''
+        for r in risk_list:
             risks_html += f'''
             <div class="risk-card">
                 <div class="risk-header">
-                    <span class="risk-name">{r['nombre']}</span>
+                    <span class="risk-name">{r.get("nombre", "N/D")}</span>
                     <span class="risk-metrics">
-                        <span>Prob: <strong>{r['probabilidad']}</strong></span>
-                        <span>Impacto: <strong>{r['impacto']}</strong></span>
+                        <span>Prob: <strong>{r.get("probabilidad", "N/D")}</strong></span>
+                        <span>Impacto: <strong>{r.get("impacto", "N/D")}</strong></span>
                     </span>
                 </div>
-                <p style="margin: 10px 0; color: #4a5568;">{r['descripcion']}</p>
-                <p style="font-size: 9pt; color: #718096;"><strong>Señal temprana:</strong> {r['senal_temprana']}</p>
+                <p style="margin: 10px 0; color: #4a5568;">{r.get("descripcion", r.get("horizonte", ""))}</p>
+                <p style="font-size: 9pt; color: #718096;"><strong>Monitoreo:</strong> {r.get("senal_temprana", r.get("monitoreo", "N/D"))}</p>
             </div>'''
+        if narrativa and not risk_list:
+            risks_html = f'<p style="color:#4a5568;">{narrativa}</p>'
         replacements['{{risks_html}}'] = risks_html
 
         # 8. CONCLUSIONES

@@ -481,6 +481,86 @@ class MonthlyPipeline:
         return verdict
 
     # =====================================================================
+    # FASE 2.1: INFORME DE ANTECEDENTES
+    # =====================================================================
+
+    def generate_antecedentes(self, data: Dict[str, Any]) -> Optional[Dict]:
+        """Generate the formal Informe de Antecedentes (Phase 2.1).
+
+        Validates data completeness field-by-field and generates
+        JSON + HTML background reports documenting all available data.
+        """
+        self._print_header("FASE 2.1", "INFORME DE ANTECEDENTES")
+        start = time.time()
+
+        try:
+            from data_completeness_validator import DataCompletenessValidator
+            from antecedentes_report import AntecedentesReport
+            from council_data_collector import CouncilDataCollector
+
+            # Rebuild agent_data_map to validate
+            collector = CouncilDataCollector(verbose=False)
+            macro_quant = data.get('macro_quant', {})
+            daily_summary = data.get('daily_summary', {})
+            intelligence = data.get('intelligence', {})
+
+            agent_data_map = collector._prepare_agent_specific_data(
+                macro_quant, daily_summary, intelligence, 'macro'
+            )
+
+            # Inject equity/rf data if available
+            equity_data = data.get('equity', {})
+            if equity_data and isinstance(equity_data, dict) and 'error' not in equity_data:
+                rv_agent = agent_data_map.get('rv', {})
+                rv_agent['equity_data'] = {
+                    'valuations': equity_data.get('valuations', {}),
+                    'earnings': equity_data.get('earnings', {}),
+                    'factors': equity_data.get('factors', {}),
+                    'sectors': equity_data.get('sectors', {}),
+                }
+                riesgo_agent = agent_data_map.get('riesgo', {})
+                riesgo_agent['equity_risk'] = equity_data.get('risk', {})
+
+            rf_data = data.get('rf', {})
+            if rf_data and isinstance(rf_data, dict) and 'error' not in rf_data:
+                rf_agent = agent_data_map.get('rf', {})
+                rf_agent['rf_data'] = {
+                    'yield_curve': rf_data.get('yield_curve', {}),
+                    'credit_spreads': rf_data.get('credit_spreads', {}),
+                    'inflation': rf_data.get('inflation', {}),
+                }
+
+            # Run completeness validation
+            validator = DataCompletenessValidator(verbose=True)
+            completeness = validator.validate(agent_data_map)
+            validator.print_report(completeness)
+
+            # Store completeness for later phases
+            self._completeness = completeness
+
+            # Generate antecedentes report
+            report_gen = AntecedentesReport(verbose=True)
+            report = report_gen.generate(
+                agent_data_map, completeness,
+                metadata={'date': self.date_str, 'pipeline': 'monthly'}
+            )
+
+            # Save JSON + HTML
+            report_gen.save_json(report, self.date_str)
+            report_gen.save_html(report, self.date_str)
+
+            elapsed = time.time() - start
+            self._print(f"\n  Antecedentes completado en {elapsed:.1f}s")
+            return report
+
+        except Exception as e:
+            self._print_err(f"Antecedentes falló: {e}")
+            import traceback
+            traceback.print_exc()
+            self.errors.append(f"Fase 2.1 - Antecedentes: {e}")
+            return None
+
+    # =====================================================================
     # FASE 2.5: INTELLIGENCE BRIEFING
     # =====================================================================
 
@@ -725,6 +805,81 @@ class MonthlyPipeline:
         return path, content
 
     # =====================================================================
+    # FASE 3.5: VALIDACIÓN POST-COUNCIL
+    # =====================================================================
+
+    def validate_post_council(self, council_result: Dict, data: Dict) -> Optional[Dict]:
+        """Validate agent outputs against their input data (Phase 3.5)."""
+        if not council_result or council_result.get('aborted'):
+            return None
+
+        self._print_header("FASE 3.5", "VALIDACIÓN POST-COUNCIL")
+        start = time.time()
+
+        try:
+            from post_council_validator import PostCouncilValidator
+
+            # We need council_input with agent_data — reconstruct from runner's collector
+            # The simplest approach: rebuild agent_data from our data
+            from council_data_collector import CouncilDataCollector
+            collector = CouncilDataCollector(verbose=False)
+
+            # Quick prepare to get agent_data map
+            macro_quant = data.get('macro_quant', {})
+            daily_summary = data.get('daily_summary', {})
+            intelligence = data.get('intelligence', {})
+
+            agent_data_map = collector._prepare_agent_specific_data(
+                macro_quant, daily_summary, intelligence, 'macro'
+            )
+
+            # Inject equity/rf data same as in run_council
+            equity_data = data.get('equity', {})
+            if equity_data and isinstance(equity_data, dict) and 'error' not in equity_data:
+                rv_agent = agent_data_map.get('rv', {})
+                rv_agent['equity_data'] = {
+                    'valuations': equity_data.get('valuations', {}),
+                    'earnings': equity_data.get('earnings', {}),
+                    'factors': equity_data.get('factors', {}),
+                    'sectors': equity_data.get('sectors', {}),
+                }
+                riesgo_agent = agent_data_map.get('riesgo', {})
+                riesgo_agent['equity_risk'] = equity_data.get('risk', {})
+                riesgo_agent['equity_credit'] = equity_data.get('credit', {})
+
+            rf_data = data.get('rf', {})
+            if rf_data and isinstance(rf_data, dict) and 'error' not in rf_data:
+                rf_agent = agent_data_map.get('rf', {})
+                rf_agent['rf_data'] = {
+                    'yield_curve': rf_data.get('yield_curve', {}),
+                    'credit_spreads': rf_data.get('credit_spreads', {}),
+                    'inflation': rf_data.get('inflation', {}),
+                }
+                riesgo_agent = agent_data_map.get('riesgo', {})
+                riesgo_agent['rf_credit'] = rf_data.get('credit_spreads', {})
+
+            council_input = {'agent_data': agent_data_map}
+
+            validator = PostCouncilValidator(verbose=True)
+            report = validator.validate_all(council_result, council_input)
+
+            print(validator.format_report(report))
+
+            # Save
+            validator.save(report, self.date_str)
+
+            elapsed = time.time() - start
+            self._print(f"\n  Validación post-council completada en {elapsed:.1f}s")
+
+            return report
+
+        except Exception as e:
+            self._print_err(f"Validación post-council falló: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    # =====================================================================
     # FASE 4.5: AUDITORÍA DE COHERENCIA
     # =====================================================================
 
@@ -839,6 +994,96 @@ class MonthlyPipeline:
         self._print(f"  Resultado: {audit_path}")
 
     # =====================================================================
+    # FASE 4.6: DATA INTEGRITY REPORT
+    # =====================================================================
+
+    def generate_integrity_report(self) -> Optional[Dict]:
+        """Generate a summary data integrity report (Phase 4.6).
+
+        Aggregates results from: completeness validation (2.1),
+        post-council validation (3.5), and coherence audit (4.5).
+        """
+        self._print_header("FASE 4.6", "DATA INTEGRITY REPORT")
+
+        report = {
+            'date': self.date_str,
+            'timestamp': datetime.now().isoformat(),
+            'completeness': {},
+            'post_council': {},
+            'coherence_audit': {},
+            'overall_verdict': 'UNKNOWN',
+        }
+
+        # Completeness
+        completeness = getattr(self, '_completeness', None)
+        if completeness:
+            report['completeness'] = {
+                'verdict': completeness.verdict,
+                'agents': {
+                    name: {
+                        'required_coverage': round(ac.required_coverage * 100, 1),
+                        'important_coverage': round(ac.important_coverage * 100, 1),
+                    }
+                    for name, ac in completeness.agents.items()
+                }
+            }
+
+        # Post-council
+        post_council = getattr(self, 'post_council_result', None)
+        if post_council:
+            report['post_council'] = {
+                'verdict': post_council.get('verdict', '?'),
+                'total_flags': post_council.get('total_flags', 0),
+                'flags_summary': [
+                    f"{f.get('agent')}: {f.get('classification')} — {f.get('value')}"
+                    for f in post_council.get('flags', [])[:10]
+                ],
+            }
+
+        # Coherence audit
+        audit = getattr(self, 'audit_result', None)
+        if audit and isinstance(audit, dict):
+            high_flags = [f for f in audit.get('flags', []) if f.get('severity') == 'high']
+            report['coherence_audit'] = {
+                'total_flags': len(audit.get('flags', [])),
+                'high_flags': len(high_flags),
+                'resolved': bool(audit.get('resolution', {}).get('status') == 'resolved'),
+            }
+
+        # Overall verdict
+        verdicts = []
+        if completeness:
+            verdicts.append(completeness.verdict)
+        if post_council:
+            verdicts.append(post_council.get('verdict', 'UNKNOWN'))
+
+        if 'NO_GO' in verdicts:
+            report['overall_verdict'] = 'FAILED'
+        elif 'SIGNIFICANT' in verdicts or 'CAUTION' in verdicts:
+            report['overall_verdict'] = 'CAUTION'
+        elif all(v in ('GO', 'CLEAN', 'MINOR') for v in verdicts):
+            report['overall_verdict'] = 'CLEAN'
+        else:
+            report['overall_verdict'] = 'UNKNOWN'
+
+        # Save
+        path = REPORTS_DIR / f"data_integrity_{self.date_str}.json"
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+
+        # Print summary
+        print(f"\n  Data Integrity Verdict: [{report['overall_verdict']}]")
+        if completeness:
+            print(f"    Completeness: {completeness.verdict}")
+        if post_council:
+            print(f"    Post-council: {post_council.get('verdict', '?')} ({post_council.get('total_flags', 0)} flags)")
+        if audit and isinstance(audit, dict):
+            print(f"    Coherence: {len(audit.get('flags', []))} flags")
+        print(f"  Saved: {path}")
+
+        return report
+
+    # =====================================================================
     # FASE 5: RESUMEN Y ENTREGA
     # =====================================================================
 
@@ -920,6 +1165,9 @@ class MonthlyPipeline:
         if verdict in ('NO_GO', 'CANCELLED') or self.dry_run:
             return 1 if verdict == 'NO_GO' else 0
 
+        # ---- FASE 2.1: Informe de Antecedentes ----
+        self.antecedentes = self.generate_antecedentes(self.data)
+
         # ---- FASE 2.5: Intelligence Briefing ----
         self.briefing = self.generate_intelligence_briefing(self.data)
 
@@ -932,6 +1180,11 @@ class MonthlyPipeline:
         if self.council_result and self.council_result.get('aborted'):
             print("\n  [NO-GO] Council abortó por preflight. Generando reportes con defaults...")
             self.council_result = None
+
+        # ---- FASE 3.5: Validación Post-Council ----
+        self.post_council_result = self.validate_post_council(
+            self.council_result, self.data
+        )
 
         # ---- FASE 4: Reportes ----
         equity_data = self.data.get('equity')
@@ -948,6 +1201,9 @@ class MonthlyPipeline:
 
         # ---- FASE 4.5: Auditoría de Coherencia ----
         self.audit_result = self.audit_coherence()
+
+        # ---- FASE 4.6: Data Integrity Report ----
+        self.integrity_report = self.generate_integrity_report()
 
         # ---- FASE 5: Resumen ----
         self.print_summary(self.report_results)

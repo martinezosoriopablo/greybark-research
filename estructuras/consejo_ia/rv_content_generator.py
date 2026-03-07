@@ -35,6 +35,20 @@ class RVContentGenerator:
         self.month_name = self._get_spanish_month(self.date.month)
         self.year = self.date.year
         self._used_council_paras = set()  # Track used paragraphs to avoid duplication
+        self._parser = None
+        self.bloomberg = None  # BloombergReader, injected externally
+
+    @property
+    def parser(self):
+        """Lazy-init council parser."""
+        if self._parser is None:
+            try:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser(self.council)
+            except Exception:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser({})
+        return self._parser
 
     def _get_spanish_month(self, month: int) -> str:
         """Retorna nombre del mes en espanol."""
@@ -193,9 +207,9 @@ class RVContentGenerator:
     def _generate_global_stance(self) -> Dict[str, Any]:
         """Genera postura global de equity con narrativa Claude-powered."""
         result = {
-            'view': 'CONSTRUCTIVO',
+            'view': 'N/D',
             'cambio': '=',
-            'conviccion': 'MEDIA-ALTA',
+            'conviccion': 'N/D',
             'driver_principal': '',
             'narrativa': '',
         }
@@ -203,7 +217,7 @@ class RVContentGenerator:
         rv = self._panel('rv') if self._has_council() else ''
         final = self._final() if self._has_council() else ''
 
-        # Extract view from final recommendation
+        # Extract view from council — NO default stance
         if final:
             text = final.lower()
             import re as _re
@@ -220,6 +234,10 @@ class RVContentGenerator:
                 result['view'] = 'CONSTRUCTIVO'
                 result['conviccion'] = 'MEDIA-ALTA'
             elif 'neutral' in text:
+                result['view'] = 'NEUTRAL'
+                result['conviccion'] = 'MEDIA'
+            else:
+                # Council exists but no explicit keyword — default to NEUTRAL
                 result['view'] = 'NEUTRAL'
                 result['conviccion'] = 'MEDIA'
 
@@ -278,14 +296,36 @@ class RVContentGenerator:
             'Chile': 'ipsa',
         }
 
+        # Try to get views from council parser first
+        equity_views = self.parser.get_equity_views()
+
+        # Region label → parser key mapping
+        parser_key_map = {
+            'Global Equity': 'global',
+            'Estados Unidos': 'estados unidos',
+            'Europa': 'europa',
+            'Emergentes': 'emergentes',
+            'Japon': 'japon',
+            'Chile': 'chile',
+        }
+
         defaults = [
-            {'mercado': 'Global Equity', 'indice': 'MSCI ACWI', 'view': 'OW', 'cambio': '=', 'driver': 'Earnings resilientes, tasas estables'},
-            {'mercado': 'Estados Unidos', 'indice': 'S&P 500', 'view': 'NEUTRAL', 'cambio': '-', 'driver': 'Valuacion elevada, concentracion'},
-            {'mercado': 'Europa', 'indice': 'Stoxx 600', 'view': 'OW', 'cambio': '+', 'driver': 'Valuacion atractiva, BCE dovish'},
-            {'mercado': 'Emergentes', 'indice': 'MSCI EM', 'view': 'OW', 'cambio': '=', 'driver': 'China estabilizando, valuacion'},
-            {'mercado': 'Japon', 'indice': 'Topix', 'view': 'OW', 'cambio': '=', 'driver': 'Reformas corporativas, yen'},
-            {'mercado': 'Chile', 'indice': 'IPSA', 'view': 'OW', 'cambio': '+', 'driver': 'Valuacion atractiva, tasas bajando'},
+            {'mercado': 'Global Equity', 'indice': 'MSCI ACWI', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Estados Unidos', 'indice': 'S&P 500', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Europa', 'indice': 'Stoxx 600', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Emergentes', 'indice': 'MSCI EM', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Japon', 'indice': 'Topix', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Chile', 'indice': 'IPSA', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
         ]
+
+        # Overlay council views if available
+        if equity_views:
+            for row in defaults:
+                parser_key = parser_key_map.get(row['mercado'], row['mercado'].lower())
+                if parser_key in equity_views:
+                    ev = equity_views[parser_key]
+                    row['view'] = ev.get('view', 'Sin recomendación')
+                    row['driver'] = ev.get('rationale', '-')
 
         # Enrich with real BCCh index returns
         for row in defaults:
@@ -400,16 +440,24 @@ class RVContentGenerator:
         }
 
     def _generate_regional_multiples(self) -> List[Dict[str, Any]]:
-        """Genera tabla de multiples por region usando datos reales de yfinance."""
+        """Genera tabla de multiples por region usando datos reales de yfinance + Bloomberg."""
 
-        # Mapeo región → (key en valuations, nombre display, PE promedio 10Y estimado)
+        # Mapeo región → (key en valuations, nombre display, bbg_key for Bloomberg extended)
         region_map = [
-            ('us', 'S&P 500', 18.5),
-            ('europe', 'Stoxx 600', 14.5),
-            ('em', 'MSCI EM', 13.2),
-            ('japan', 'Topix', 14.5),
-            ('chile', 'IPSA', 12.0),
+            ('us', 'S&P 500', 'spx'),
+            ('europe', 'Stoxx 600', 'stoxx600'),
+            ('em', 'MSCI EM', 'msci_em'),
+            ('japan', 'Topix', 'topix'),
+            ('chile', 'IPSA', 'ipsa'),
         ]
+
+        # Load Bloomberg extended valuations if available
+        bbg_vals = {}
+        if self.bloomberg:
+            try:
+                bbg_vals = self.bloomberg.get_valuations_extended()
+            except Exception:
+                pass
 
         if not self._has_data():
             # Fallback: tabla sin datos reales (se marca explícitamente)
@@ -421,7 +469,7 @@ class RVContentGenerator:
             ]
 
         result = []
-        for key, name, avg_pe_10y in region_map:
+        for key, name, bbg_key in region_map:
             v = self._val(key)
             if 'error' in v or not v:
                 result.append({
@@ -436,15 +484,32 @@ class RVContentGenerator:
             div_y = v.get('dividend_yield')
             ey = round(100 / pe, 1) if pe else None
 
-            # vs 10Y promedio (usando estimado razonable del promedio histórico)
-            if pe:
+            # Bloomberg overrides: PE 10Y avg, EV/EBITDA, Div Yield
+            bbg_region = bbg_vals.get(bbg_key, {})
+            avg_pe_10y = bbg_region.get('pe_10y')
+            ev_ebitda = bbg_region.get('ev')
+            bbg_pe_fwd = bbg_region.get('pe')
+            bbg_dy = bbg_region.get('dy')
+
+            # Use Bloomberg PE forward if yfinance didn't provide one
+            if not pe and bbg_pe_fwd:
+                pe = bbg_pe_fwd
+                ey = round(100 / pe, 1) if pe else None
+
+            # Use Bloomberg dividend yield if yfinance didn't provide one
+            if not div_y and bbg_dy:
+                div_y = bbg_dy
+
+            # vs 10Y promedio (now using Bloomberg 10Y avg when available)
+            vs_avg = None
+            if pe and avg_pe_10y:
                 vs_avg = ((pe / avg_pe_10y) - 1) * 100
                 vs_str = f"+{vs_avg:.0f}%" if vs_avg > 0 else f"{vs_avg:.0f}%"
             else:
                 vs_str = 'N/D'
 
             # Comentario basado en valuación
-            if pe and vs_avg:
+            if pe and vs_avg is not None:
                 if vs_avg > 15:
                     comentario = 'Caro vs historia'
                 elif vs_avg > 5:
@@ -462,7 +527,7 @@ class RVContentGenerator:
                 'mercado': name,
                 'pe_fwd': self._fmt(pe, 'x') if pe else 'N/D',
                 'vs_10y_avg': vs_str,
-                'ev_ebitda': 'N/D',  # ETFs no reportan EV/EBITDA
+                'ev_ebitda': f"{ev_ebitda:.1f}x" if ev_ebitda else 'N/D',
                 'pb': self._fmt(pb, 'x') if pb else 'N/D',
                 'div_yield': self._fmt(div_y, '%') if div_y else 'N/D',
                 'earning_yield': self._fmt(ey, '%') if ey else 'N/D',
@@ -624,8 +689,7 @@ class RVContentGenerator:
             parts = ["Las valorizaciones globales reflejan dispersión entre mercados. "]
 
             if us_pe:
-                vs_hist = ((us_pe / 18.5) - 1) * 100
-                parts.append(f"US cotiza a {us_pe:.1f}x P/E ({vs_hist:+.0f}% vs promedio 10Y). ")
+                parts.append(f"US cotiza a {us_pe:.1f}x P/E. ")
 
             ex_us_parts = []
             if eu_pe:
@@ -666,13 +730,13 @@ class RVContentGenerator:
         """Genera tabla de crecimiento de earnings con datos reales de AV."""
         ed = self._earnings_data()
         if not ed or 'error' in ed:
-            # Fallback a defaults estaticos
+            # Fallback — no hardcoded EPS values
             return [
-                {'region': 'S&P 500', 'eps_2025': '$255', 'eps_2026f': '$280', 'growth': '+10%', 'revision_3m': '+2%'},
-                {'region': 'Stoxx 600', 'eps_2025': 'E29', 'eps_2026f': 'E32', 'growth': '+10%', 'revision_3m': '+1%'},
-                {'region': 'MSCI EM', 'eps_2025': '$88', 'eps_2026f': '$98', 'growth': '+11%', 'revision_3m': '-1%'},
-                {'region': 'Topix', 'eps_2025': 'Y170', 'eps_2026f': 'Y188', 'growth': '+11%', 'revision_3m': '+3%'},
-                {'region': 'IPSA', 'eps_2025': 'CLP 2900', 'eps_2026f': 'CLP 3250', 'growth': '+12%', 'revision_3m': '+4%'},
+                {'region': 'S&P 500', 'growth': 'N/D', 'revision_3m': 'N/D', 'beat_rate': 'N/D', 'pe_trailing': 'N/D', 'pe_forward': 'N/D'},
+                {'region': 'Stoxx 600', 'growth': 'N/D', 'revision_3m': 'N/D', 'beat_rate': 'N/D', 'pe_trailing': 'N/D', 'pe_forward': 'N/D'},
+                {'region': 'MSCI EM', 'growth': 'N/D', 'revision_3m': 'N/D', 'beat_rate': 'N/D', 'pe_trailing': 'N/D', 'pe_forward': 'N/D'},
+                {'region': 'Topix', 'growth': 'N/D', 'revision_3m': 'N/D', 'beat_rate': 'N/D', 'pe_trailing': 'N/D', 'pe_forward': 'N/D'},
+                {'region': 'IPSA', 'growth': 'N/D', 'revision_3m': 'N/D', 'beat_rate': 'N/D', 'pe_trailing': 'N/D', 'pe_forward': 'N/D'},
             ]
 
         rows = []
@@ -712,17 +776,15 @@ class RVContentGenerator:
 
         default_result = {
             'narrativa': (
-                "Las revisiones de earnings muestran tendencia positiva en la mayoria de mercados. "
-                "Japon y Chile lideran con revisiones al alza de +3% y +4% en los ultimos 3 meses, "
-                "mientras EM muestra leve deterioro por China. El breadth de revisiones "
-                "(% de empresas con upgrades vs downgrades) es positivo en 60% de los mercados."
+                "Datos de revisiones de earnings no disponibles. "
+                "Se requiere ejecutar equity_data_collector para obtener datos reales de revisiones."
             ),
             'por_region': [
-                {'region': 'US', 'upgrades': '52%', 'downgrades': '38%', 'net': '+14%', 'tendencia': 'Mejorando'},
-                {'region': 'Europa', 'upgrades': '48%', 'downgrades': '42%', 'net': '+6%', 'tendencia': 'Estable'},
-                {'region': 'EM', 'upgrades': '42%', 'downgrades': '48%', 'net': '-6%', 'tendencia': 'Deteriorando'},
-                {'region': 'Japon', 'upgrades': '55%', 'downgrades': '35%', 'net': '+20%', 'tendencia': 'Fuerte'},
-                {'region': 'Chile', 'upgrades': '58%', 'downgrades': '32%', 'net': '+26%', 'tendencia': 'Muy fuerte'},
+                {'region': 'US', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'Europa', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'EM', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'Japon', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'Chile', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
             ]
         }
 
@@ -791,16 +853,15 @@ class RVContentGenerator:
 
         default_result = {
             'narrativa': (
-                "Los margenes operativos se han estabilizado tras la compresion de 2022-2023. "
-                "US lidera con margenes de 12.5%, seguido por Japon mejorando a 8.5%. "
-                "El ROE muestra dispersion, con US en 18% y Europa en 12%."
+                "Datos de márgenes y ROE no disponibles. "
+                "Se requiere ejecutar equity_data_collector para obtener datos reales."
             ),
             'datos': [
-                {'region': 'S&P 500', 'margen_op': '12.5%', 'roe': '18%', 'margen_neto': '11%', 'tendencia': 'Estable'},
-                {'region': 'Stoxx 600', 'margen_op': '9.8%', 'roe': '12%', 'margen_neto': '8%', 'tendencia': 'Mejorando'},
-                {'region': 'MSCI EM', 'margen_op': '11.2%', 'roe': '11%', 'margen_neto': '9%', 'tendencia': 'Presion'},
-                {'region': 'Topix', 'margen_op': '8.5%', 'roe': '10%', 'margen_neto': '6%', 'tendencia': 'Mejorando'},
-                {'region': 'IPSA', 'margen_op': '14.2%', 'roe': '12%', 'margen_neto': '10%', 'tendencia': 'Fuerte'},
+                {'region': 'S&P 500', 'margen_op': 'N/D', 'roe': 'N/D', 'margen_neto': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'Stoxx 600', 'margen_op': 'N/D', 'roe': 'N/D', 'margen_neto': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'MSCI EM', 'margen_op': 'N/D', 'roe': 'N/D', 'margen_neto': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'Topix', 'margen_op': 'N/D', 'roe': 'N/D', 'margen_neto': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'IPSA', 'margen_op': 'N/D', 'roe': 'N/D', 'margen_neto': 'N/D', 'tendencia': 'N/D'},
             ]
         }
 
@@ -866,12 +927,10 @@ class RVContentGenerator:
         ed = self._earnings_data()
         calendar = ed.get('calendar', {}) if ed and 'error' not in ed else {}
 
+        # Placeholder when no real data available
         default_calendar = [
-            {'fecha': '19 Feb', 'empresa': 'NVIDIA', 'sector': 'Technology', 'relevancia': 'Alta', 'expectativa': 'Beat esperado'},
-            {'fecha': '20 Feb', 'empresa': 'Walmart', 'sector': 'Consumer', 'relevancia': 'Alta', 'expectativa': 'Guia importante'},
-            {'fecha': '25 Feb', 'empresa': 'Salesforce', 'sector': 'Technology', 'relevancia': 'Media', 'expectativa': 'AI monetization'},
-            {'fecha': '27 Feb', 'empresa': 'Falabella', 'sector': 'Retail Chile', 'relevancia': 'Alta', 'expectativa': 'Recuperacion consumo'},
-            {'fecha': '5 Mar', 'empresa': 'Broadcom', 'sector': 'Semiconductors', 'relevancia': 'Alta', 'expectativa': 'AI demand'},
+            {'fecha': '-', 'empresa': '-', 'nombre': 'Calendario de earnings no disponible',
+             'estimado': 'N/D', 'relevancia': '-'}
         ]
 
         if not calendar or 'error' in calendar:
@@ -983,19 +1042,49 @@ class RVContentGenerator:
         if oil is not None and oil_ytd is not None:
             energy_cat = f'WTI {oil:.0f} USD/bbl ({oil_ytd:+.1f}% YTD), OPEC+'
 
+        # Get sector views from council parser
+        sector_views = self.parser.get_sector_views()
+
+        # Sector name → parser key mapping
+        sector_parser_map = {
+            'Technology': 'technology',
+            'Healthcare': 'healthcare',
+            'Financials': 'financials',
+            'Materials': 'materials',
+            'Industrials': 'industrials',
+            'Consumer Disc.': 'consumer disc.',
+            'Energy': 'energy',
+            'Comm Services': 'comm services',
+            'Consumer Staples': 'consumer staples',
+            'Utilities': 'utilities',
+            'Real Estate': 'real estate',
+        }
+
         sector_map = [
-            ('Technology', 'technology', 'OW', 'Cara', 'Solido', 'AI capex continua, semiconductors'),
-            ('Healthcare', 'healthcare', 'OW', 'Atractiva', 'Estable', 'Innovacion GLP-1, defensivo'),
-            ('Financials', 'financials', 'OW', 'Barata', 'Mejorando', 'NIM estabilizando, buybacks'),
-            ('Materials', 'materials', 'OW', 'Atractiva', 'Ciclico', mat_cat),
-            ('Industrials', 'industrials', 'NEUTRAL', 'Fair', 'Mixto', 'Nearshoring, pero valuacion'),
-            ('Consumer Disc.', 'consumer_disc', 'NEUTRAL', 'Cara', 'Presion', 'Consumo normalizando'),
-            ('Energy', 'energy', 'NEUTRAL', 'Barata', 'Ciclico', energy_cat),
-            ('Comm Services', 'comm_services', 'NEUTRAL', 'Fair', 'Mixto', 'Regulacion, AI beneficiario'),
-            ('Consumer Staples', 'consumer_staples', 'UW', 'Cara', 'Estable', 'Sin catalizador, GLP-1 riesgo'),
-            ('Utilities', 'utilities', 'UW', 'Cara', 'Estable', 'Tasas aun elevadas'),
-            ('Real Estate', 'real_estate', 'UW', 'Mixta', 'Presion', 'Oficinas estructural negativo'),
+            ('Technology', 'technology', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Healthcare', 'healthcare', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Financials', 'financials', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Materials', 'materials', 'Sin recomendación', 'N/D', 'N/D', mat_cat),
+            ('Industrials', 'industrials', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Consumer Disc.', 'consumer_disc', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Energy', 'energy', 'Sin recomendación', 'N/D', 'N/D', energy_cat),
+            ('Comm Services', 'comm_services', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Consumer Staples', 'consumer_staples', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Utilities', 'utilities', 'Sin recomendación', 'N/D', 'N/D', '-'),
+            ('Real Estate', 'real_estate', 'Sin recomendación', 'N/D', 'N/D', '-'),
         ]
+
+        # Overlay council sector views if available
+        if sector_views:
+            sector_map_updated = []
+            for name, key, view, val_default, earn_default, cat_default in sector_map:
+                parser_key = sector_parser_map.get(name, name.lower())
+                if parser_key in sector_views:
+                    sv = sector_views[parser_key]
+                    view = sv.get('view', 'Sin recomendación')
+                    cat_default = sv.get('rationale', cat_default)
+                sector_map_updated.append((name, key, view, val_default, earn_default, cat_default))
+            sector_map = sector_map_updated
 
         result = []
         for name, key, view, val_default, earn_default, cat_default in sector_map:
@@ -1040,105 +1129,51 @@ class RVContentGenerator:
         return result
 
     def _generate_preferred_sectors(self) -> List[Dict[str, Any]]:
-        """Genera detalle de sectores preferidos."""
+        """Genera detalle de sectores preferidos from council parser."""
+        sector_views = self.parser.get_sector_views()
+        if sector_views:
+            preferred = [
+                {'sector': k.title(), 'view': v['view'], 'tesis': v.get('rationale', '-'),
+                 'upside': 'N/D', 'subsectores': [], 'evitar': []}
+                for k, v in sector_views.items()
+                if v.get('view') == 'OW'
+            ]
+            if preferred:
+                return preferred
+
+        # Fallback: no hardcoded views
         return [
-            {
-                'sector': 'Technology',
-                'view': 'OVERWEIGHT',
-                'tesis': (
-                    "El sector tecnologico sigue siendo el principal beneficiario de la revolucion AI. "
-                    "Preferimos exposicion selectiva a semiconductores (NVIDIA, ASML) y hyperscalers "
-                    "(Microsoft, Google) sobre software puro que enfrenta disrupcion."
-                ),
-                'subsectores': ['Semiconductors', 'Cloud Infrastructure', 'Cybersecurity'],
-                'evitar': ['Legacy Software', 'Hardware commoditizado'],
-                'riesgos': ['Valuacion elevada', 'Regulacion antimonopolio', 'Desaceleracion capex'],
-                'upside': '+15-20%',
-                'empresas_referencia': ['NVIDIA', 'Microsoft', 'ASML', 'Broadcom']
-            },
-            {
-                'sector': 'Healthcare',
-                'view': 'OVERWEIGHT',
-                'tesis': (
-                    "Healthcare ofrece combinacion atractiva de crecimiento defensivo y valuacion razonable. "
-                    "La innovacion en GLP-1 y oncologia provee drivers seculares. Sector sub-owned "
-                    "tras underperformance de 2023-2024."
-                ),
-                'subsectores': ['Large Cap Pharma', 'Biotech selectivo', 'Med Devices'],
-                'evitar': ['Managed Care (regulacion)', 'Generic Pharma'],
-                'riesgos': ['IRA pricing pressure', 'Clinical trial failures'],
-                'upside': '+12-15%',
-                'empresas_referencia': ['Eli Lilly', 'Novo Nordisk', 'UnitedHealth', 'Intuitive Surgical']
-            },
-            {
-                'sector': 'Financials',
-                'view': 'OVERWEIGHT',
-                'tesis': (
-                    "Bancos ofrecen valuacion atractiva con NIM estabilizando y calidad crediticia solida. "
-                    "El sector se beneficia de curva de tasas normalizandose y buybacks agresivos. "
-                    "Preferimos bancos diversificados sobre regionales."
-                ),
-                'subsectores': ['Large Cap Banks', 'Insurance', 'Asset Managers'],
-                'evitar': ['Regional Banks', 'Fintech especulativo'],
-                'riesgos': ['Recesion hard landing', 'CRE exposure', 'Regulacion'],
-                'upside': '+10-15%',
-                'empresas_referencia': ['JPMorgan', 'Bank of America', 'Allianz', 'Blackstone']
-            },
-            {
-                'sector': 'Materials',
-                'view': 'OVERWEIGHT',
-                'tesis': (
-                    "Sector beneficiado por transicion energetica (cobre, litio) y estabilizacion China. "
-                    "Valuacion atractiva tras correccion de 2023. Preferimos cobre sobre otros metales "
-                    "por deficit estructural de oferta."
-                ),
-                'subsectores': ['Copper miners', 'Specialty Chemicals', 'Packaging'],
-                'evitar': ['Iron ore (China property)', 'Coal'],
-                'riesgos': ['Desaceleracion China', 'USD fuerte'],
-                'upside': '+15-20%',
-                'empresas_referencia': ['Freeport-McMoRan', 'BHP', 'Linde', 'Antofagasta']
-            },
+            {'sector': 'N/D', 'view': 'Sin recomendación del comité',
+             'tesis': 'Ver análisis del council para sectores preferidos.',
+             'upside': 'N/D', 'subsectores': [], 'evitar': []},
         ]
 
     def _generate_avoid_sectors(self) -> List[Dict[str, Any]]:
-        """Genera detalle de sectores a evitar."""
+        """Genera detalle de sectores a evitar from council parser."""
+        sector_views = self.parser.get_sector_views()
+        if sector_views:
+            avoid = [
+                {'sector': k.title(), 'view': v['view'],
+                 'razon': v.get('rationale', '-'),
+                 'que_cambiaria': 'N/D'}
+                for k, v in sector_views.items()
+                if v.get('view') == 'UW'
+            ]
+            if avoid:
+                return avoid
+
+        # Fallback: no hardcoded views
         return [
-            {
-                'sector': 'Consumer Staples',
-                'view': 'UNDERWEIGHT',
-                'razon': (
-                    "Valuacion cara (P/E 22x) sin crecimiento de earnings. Riesgo estructural de GLP-1 "
-                    "drugs afectando volumen de alimentos y bebidas. Sin catalizador positivo visible."
-                ),
-                'que_cambiaria': 'Correccion de valuacion de 15%+ o evidencia de resiliencia vs GLP-1'
-            },
-            {
-                'sector': 'Utilities',
-                'view': 'UNDERWEIGHT',
-                'razon': (
-                    "Tasas reales elevadas comprimen valuacion del sector. Dividend yield no competitivo "
-                    "vs bonos. Capex elevado en renovables sin retornos claros."
-                ),
-                'que_cambiaria': 'Recortes agresivos de tasas o re-pricing significativo'
-            },
-            {
-                'sector': 'Real Estate',
-                'view': 'UNDERWEIGHT',
-                'razon': (
-                    "Oficinas enfrentan headwind estructural por trabajo remoto. Refinanciamiento "
-                    "a tasas mas altas presiona earnings. Data centers son excepcion pero valuacion elevada."
-                ),
-                'que_cambiaria': 'Normalizacion de ocupacion oficinas o caida de tasas de 100bp+'
-            },
+            {'sector': 'N/D', 'view': 'Sin recomendación del comité',
+             'razon': 'Ver análisis del council para sectores a evitar.',
+             'que_cambiaria': 'N/D'},
         ]
 
     def _generate_sector_narrative(self) -> str:
         """Genera narrativa sectorial."""
         default = (
-            "Nuestra preferencia sectorial refleja un balance entre crecimiento secular (Technology, Healthcare) "
-            "y value ciclico (Financials, Materials). Evitamos sectores defensivos caros sin catalizador "
-            "(Staples, Utilities) y Real Estate por headwinds estructurales. En Technology somos selectivos, "
-            "prefiriendo semiconductores y cloud sobre software legacy."
+            "Preferencia sectorial no disponible. "
+            "Ver analisis del council para recomendaciones de sectores especificos."
         )
 
         if not self._has_council():
@@ -1186,22 +1221,20 @@ class RVContentGenerator:
             ytd_spread = gv_spread.get('ytd', 0)
             if ytd_spread > 5:
                 narrativa = (
-                    f"Growth lidera significativamente sobre Value en lo que va del año "
+                    f"Growth lidera sobre Value YTD "
                     f"({performance['growth_ytd']} vs {performance['value_ytd']}, spread de {performance['spread_ytd']}). "
-                    "El dominio de Growth sugiere precaución por concentración. "
-                    "Recomendamos barbell: Quality Growth selectivo + Deep Value cíclico."
+                    "Ver council para recomendación de estilo."
                 )
             elif ytd_spread < -5:
                 narrativa = (
-                    f"Value ha superado a Growth este año ({performance['value_ytd']} vs {performance['growth_ytd']}). "
-                    "La rotación hacia Value refleja tasas elevadas y preferencia por fundamentales. "
-                    "Favorecemos Value cíclico (Financials, Materials) con exposición selectiva a Growth de calidad."
+                    f"Value supera a Growth YTD ({performance['value_ytd']} vs {performance['growth_ytd']}, "
+                    f"spread de {performance['spread_ytd']}). "
+                    "Ver council para recomendación de estilo."
                 )
             else:
                 narrativa = (
                     f"Growth y Value muestran performance similar YTD ({performance['growth_ytd']} vs {performance['value_ytd']}). "
-                    "El balance actual apoya un enfoque barbell equilibrado entre Quality Growth "
-                    "y Deep Value cíclico, evitando Growth especulativo sin earnings."
+                    "Ver council para recomendación de estilo."
                 )
         else:
             performance = {
@@ -1223,7 +1256,7 @@ class RVContentGenerator:
         }
 
     def _generate_factor_performance(self) -> List[Dict[str, Any]]:
-        """Genera performance de factores usando scores reales de FactorAnalytics."""
+        """Genera performance de factores usando scores reales de FactorAnalytics + Bloomberg."""
 
         fd = self.market_data.get('factors', {})
         has_factors = fd and 'error' not in fd
@@ -1234,44 +1267,88 @@ class RVContentGenerator:
         v_ret = sd.get('value', {}).get('returns', {}) if sd and 'error' not in sd else {}
         sm_ret = sd.get('small_cap', {}).get('returns', {}) if sd and 'error' not in sd else {}
 
+        # Bloomberg factor returns (MSCI factor indices) as fallback/supplement
+        bbg_factors = {}
+        if self.bloomberg:
+            try:
+                bbg_factors = self.bloomberg.get_factor_returns()
+            except Exception:
+                pass
+
         # Scores promedio por factor (SPY como referencia US)
         spy_scores = fd.get('SPY', {}) if has_factors else {}
+
+        # Get factor views from council parser (dynamic, not hardcoded)
+        factor_views = self.parser.get_factor_views() or {}
+
+        def _fv(key: str) -> dict:
+            """Lookup factor view from council parser, fallback N/D."""
+            v = factor_views.get(key, {})
+            return {
+                'view': v.get('view', 'N/D'),
+                'rationale': v.get('rationale', 'Sin vista del consejo'),
+            }
+
+        def _fv_size() -> dict:
+            """Try multiple key variants for size/small cap factor."""
+            for key in ('size small', 'size (small)', 'small cap', 'size'):
+                v = factor_views.get(key)
+                if v:
+                    return {
+                        'view': v.get('view', 'N/D'),
+                        'rationale': v.get('rationale', 'Sin vista del consejo'),
+                    }
+            return {'view': 'N/D', 'rationale': 'Sin vista del consejo'}
+
+        fv_quality = _fv('quality')
+        fv_momentum = _fv('momentum')
+        fv_value = _fv('value')
+        fv_growth = _fv('growth')
+        fv_size = _fv_size()
+
+        def _bbg_ytd(bbg_key: str) -> Optional[str]:
+            """Get Bloomberg factor YTD return formatted."""
+            val = bbg_factors.get(bbg_key)
+            if val is not None:
+                prefix = '+' if val >= 0 else ''
+                return f"{prefix}{val:.1f}%"
+            return None
 
         factors = [
             {
                 'factor': 'Quality',
                 'score': self._fmt(spy_scores.get('quality'), '/100') if spy_scores.get('quality') is not None else 'N/D',
-                'ytd': 'N/D',
-                'view': 'OW',
-                'rationale': 'Late cycle favorece calidad, bajo leverage',
+                'ytd': _bbg_ytd('quality') or 'N/D',
+                'view': fv_quality['view'],
+                'rationale': fv_quality['rationale'],
             },
             {
                 'factor': 'Momentum',
                 'score': self._fmt(spy_scores.get('momentum'), '/100') if spy_scores.get('momentum') is not None else 'N/D',
-                'ytd': 'N/D',
-                'view': 'NEUTRAL',
-                'rationale': 'Funciona pero caro, riesgo de reversal',
+                'ytd': _bbg_ytd('momentum') or 'N/D',
+                'view': fv_momentum['view'],
+                'rationale': fv_momentum['rationale'],
             },
             {
                 'factor': 'Value',
                 'score': self._fmt(spy_scores.get('value'), '/100') if spy_scores.get('value') is not None else 'N/D',
-                'ytd': self._fmt(v_ret.get('ytd'), '%', prefix='+' if (v_ret.get('ytd') or 0) >= 0 else '') if v_ret.get('ytd') is not None else 'N/D',
-                'view': 'OW',
-                'rationale': 'Descuento historico, catalizador de tasas',
+                'ytd': self._fmt(v_ret.get('ytd'), '%', prefix='+' if (v_ret.get('ytd') or 0) >= 0 else '') if v_ret.get('ytd') is not None else (_bbg_ytd('value') or 'N/D'),
+                'view': fv_value['view'],
+                'rationale': fv_value['rationale'],
             },
             {
                 'factor': 'Growth',
                 'score': self._fmt(spy_scores.get('growth'), '/100') if spy_scores.get('growth') is not None else 'N/D',
-                'ytd': self._fmt(g_ret.get('ytd'), '%', prefix='+' if (g_ret.get('ytd') or 0) >= 0 else '') if g_ret.get('ytd') is not None else 'N/D',
-                'view': 'NEUTRAL',
-                'rationale': 'Selectivo, solo quality growth',
+                'ytd': self._fmt(g_ret.get('ytd'), '%', prefix='+' if (g_ret.get('ytd') or 0) >= 0 else '') if g_ret.get('ytd') is not None else (_bbg_ytd('growth') or 'N/D'),
+                'view': fv_growth['view'],
+                'rationale': fv_growth['rationale'],
             },
             {
                 'factor': 'Size (Small)',
                 'score': 'N/D',
-                'ytd': self._fmt(sm_ret.get('ytd'), '%', prefix='+' if (sm_ret.get('ytd') or 0) >= 0 else '') if sm_ret.get('ytd') is not None else 'N/D',
-                'view': 'UW',
-                'rationale': 'Riesgo refinanciamiento, menos liquidez',
+                'ytd': self._fmt(sm_ret.get('ytd'), '%', prefix='+' if (sm_ret.get('ytd') or 0) >= 0 else '') if sm_ret.get('ytd') is not None else (_bbg_ytd('size') or 'N/D'),
+                'view': fv_size['view'],
+                'rationale': fv_size['rationale'],
             },
         ]
 
@@ -1310,28 +1387,25 @@ class RVContentGenerator:
         sm_ytd = sm_ret.get('ytd')
         spread_ytd = size_spread.get('ytd')
 
-        # Narrativa dinámica
+        # Narrativa puramente descriptiva — la preferencia viene del council
         if lg_ytd is not None and sm_ytd is not None:
             if spread_ytd and spread_ytd > 3:
                 narrativa = (
-                    f"Small caps ({sm_ytd:+.1f}% YTD) están superando a large caps ({lg_ytd:+.1f}% YTD), "
-                    f"spread de {spread_ytd:+.1f}pp. Pero mantenemos cautela por riesgo de refinanciamiento."
+                    f"Small caps ({sm_ytd:+.1f}% YTD) superan a large caps ({lg_ytd:+.1f}% YTD), "
+                    f"spread de {spread_ytd:+.1f}pp. Ver council para recomendación de tamaño."
                 )
             elif spread_ytd and spread_ytd < -3:
                 narrativa = (
                     f"Large caps ({lg_ytd:+.1f}% YTD) lideran sobre small caps ({sm_ytd:+.1f}% YTD), "
-                    f"spread de {spread_ytd:+.1f}pp. Confirma preferencia por calidad y acceso a capital."
+                    f"spread de {spread_ytd:+.1f}pp. Ver council para recomendación de tamaño."
                 )
             else:
                 narrativa = (
                     f"Large ({lg_ytd:+.1f}% YTD) y small caps ({sm_ytd:+.1f}% YTD) muestran "
-                    f"performance similar. Preferimos large caps por menor riesgo de refinanciamiento."
+                    f"performance similar (spread {spread_ytd:+.1f}pp). Ver council para preferencia."
                 )
         else:
-            narrativa = (
-                "Small caps enfrentan headwinds por refinanciamiento a tasas más altas y menor "
-                "visibilidad de earnings. Preferimos Large Caps por calidad y acceso a capital."
-            )
+            narrativa = "Datos de size no disponibles. Ver council para recomendación."
 
         return {
             'performance': {
@@ -1342,22 +1416,39 @@ class RVContentGenerator:
                 'small_1m': self._fmt(sm_ret.get('1m'), '%', prefix='+' if (sm_ret.get('1m') or 0) >= 0 else '') if sm_ret.get('1m') is not None else 'N/D',
             },
             'signal': size_signal,
-            'view': 'UNDERWEIGHT Small Caps' if size_signal == 'LARGE_CAP' else 'NEUTRAL Size',
+            'view': 'Ver council',
             'narrativa': narrativa,
         }
 
     def _generate_style_recommendation(self) -> Dict[str, Any]:
-        """Genera recomendacion de style."""
-        return {
-            'recomendacion': 'Quality + Value Barbell',
-            'quality_allocation': '60%',
-            'value_allocation': '40%',
-            'evitar': ['Speculative Growth', 'Low Quality Small Caps'],
-            'rationale': (
-                "En un entorno de tasas estables y crecimiento moderado, Quality ofrece resiliencia "
-                "mientras Value provee upside ciclico. El barbell captura lo mejor de ambos mundos "
-                "evitando el Growth especulativo y el Value trap."
+        """Genera recomendacion de style — contenido viene del council."""
+        from .narrative_engine import generate_narrative
+
+        # Extract council RV context for style recommendation
+        rv_panel = self.council.get('panel_outputs', {}).get('rv', '') if self.council else ''
+
+        if rv_panel:
+            rationale = generate_narrative(
+                section_name="rv_style_recommendation",
+                prompt=(
+                    "Escribe 1-2 oraciones sobre la recomendación de estilo de inversión "
+                    "(growth vs value, quality, momentum) basándote en el contexto del council. "
+                    "Sé específico sobre qué estilo favorecer y por qué."
+                ),
+                council_context=rv_panel[:1500],
+                quant_context="",
+                company_name=self.company_name,
+                max_tokens=200
             )
+        else:
+            rationale = "Ver council para recomendación de estilo."
+
+        return {
+            'recomendacion': 'Ver council',
+            'quality_allocation': 'N/D',
+            'value_allocation': 'N/D',
+            'evitar': [],
+            'rationale': rationale
         }
 
     # =========================================================================
@@ -1383,39 +1474,31 @@ class RVContentGenerator:
         ret_ytd = v.get('returns', {}).get('ytd')
 
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
-        pe_historia = 18.5  # Promedio histórico S&P 500
 
-        # View dinámico basado en valuación real
-        view = 'NEUTRAL'
-        if pe and pe > 22:
-            view = 'NEUTRAL'
-            cambio = 'Valuación elevada'
-        elif pe and pe < 17:
-            view = 'OW'
-            cambio = 'Descuento atractivo'
-        else:
-            view = 'NEUTRAL'
-            cambio = '='
+        # Try to get US view from council parser
+        equity_views = self.parser.get_equity_views()
+        us_council_view = equity_views.get('estados unidos', equity_views.get('us', {})) if equity_views else {}
+        view = us_council_view.get('view', 'Sin recomendación') if us_council_view else 'Sin recomendación'
+        cambio = '='
 
         result = {
             'mercado': 'Estados Unidos',
             'indice': 'S&P 500',
             'view': view,
             'cambio': cambio,
-            'target_12m': f"{price * 1.06:,.0f}" if price else 'N/D',
-            'upside': '+6%',
+            'target_12m': 'N/D',
+            'upside': 'N/D',
             'pe_actual': pe_str,
-            'pe_historia': f'{pe_historia}x',
+            'pe_historia': 'N/D',
             'narrativa': (
-                f"El S&P 500 cotiza a {pe_str} P/E"
-                + (f", {((pe/pe_historia)-1)*100:+.0f}% vs promedio histórico de {pe_historia}x. " if pe else ". ")
+                f"El S&P 500 cotiza a {pe_str} P/E. "
                 + (f"El retorno YTD es de {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + "Earnings resilientes pero valuación limita upside. Preferimos exposición selectiva."
+                + (us_council_view.get('rationale', '') + '. ' if us_council_view.get('rationale') else '')
             ),
-            'sectores_preferidos': ['Technology (selectivo)', 'Healthcare', 'Financials'],
-            'sectores_evitar': ['Consumer Staples', 'Utilities'],
-            'catalizadores': ['Earnings beats', 'Soft landing confirmado', 'AI monetization'],
-            'riesgos': ['Valuacion de-rating', 'Concentracion', 'Reflacion']
+            'sectores_preferidos': [],
+            'sectores_evitar': [],
+            'catalizadores': [],
+            'riesgos': []
         }
 
         # Enrich from council if available
@@ -1438,29 +1521,31 @@ class RVContentGenerator:
         pe = v.get('pe_trailing') or v.get('pe_forward')
         price = v.get('price')
         ret_ytd = v.get('returns', {}).get('ytd')
-        pe_historia = 14.5
 
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
+
+        # Get Europe view from council parser
+        equity_views = self.parser.get_equity_views()
+        eu_council_view = equity_views.get('europa', equity_views.get('europe', {})) if equity_views else {}
 
         result = {
             'mercado': 'Europa',
             'indice': 'Stoxx 600',
-            'view': 'OW' if (pe and pe < pe_historia) else 'NEUTRAL',
-            'cambio': '=' if not pe else ('Descuento atractivo' if pe < pe_historia else 'Fair value'),
-            'target_12m': f"{price * 1.12:,.0f}" if price else 'N/D',
-            'upside': '+12%',
+            'view': eu_council_view.get('view', 'Sin recomendación') if eu_council_view else 'Sin recomendación',
+            'cambio': '=',
+            'target_12m': 'N/D',
+            'upside': 'N/D',
             'pe_actual': pe_str,
-            'pe_historia': f'{pe_historia}x',
+            'pe_historia': 'N/D',
             'narrativa': (
-                f"Europa cotiza a {pe_str} P/E"
-                + (f", {((pe/pe_historia)-1)*100:+.0f}% vs promedio histórico. " if pe else ". ")
+                f"Europa cotiza a {pe_str} P/E. "
                 + (f"Retorno YTD: {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + "BCE en modo dovish y descuento vs US refuerzan preferencia por mercado europeo."
+                + (eu_council_view.get('rationale', '') + '. ' if eu_council_view.get('rationale') else '')
             ),
-            'sectores_preferidos': ['Luxury', 'Industrials', 'Banks', 'Pharma'],
-            'sectores_evitar': ['Utilities', 'Autos domesticos'],
-            'catalizadores': ['BCE dovish', 'Estabilizacion China', 'Earnings beats'],
-            'riesgos': ['Geopolitica Ucrania', 'Energia', 'Fragmentacion politica']
+            'sectores_preferidos': [],
+            'sectores_evitar': [],
+            'catalizadores': [],
+            'riesgos': []
         }
 
         if self._has_council():
@@ -1482,34 +1567,36 @@ class RVContentGenerator:
         pe = v.get('pe_trailing') or v.get('pe_forward')
         price = v.get('price')
         ret_ytd = v.get('returns', {}).get('ytd')
-        pe_historia = 13.2
 
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
+
+        # Get EM view from council parser
+        equity_views = self.parser.get_equity_views()
+        em_council_view = equity_views.get('emergentes', equity_views.get('em', {})) if equity_views else {}
 
         result = {
             'mercado': 'Emergentes',
             'indice': 'MSCI EM',
-            'view': 'OW' if (pe and pe < pe_historia) else 'NEUTRAL',
+            'view': em_council_view.get('view', 'Sin recomendación') if em_council_view else 'Sin recomendación',
             'cambio': '=',
-            'target_12m': f"{price * 1.15:,.0f}" if price else 'N/D',
-            'upside': '+15%',
+            'target_12m': 'N/D',
+            'upside': 'N/D',
             'pe_actual': pe_str,
-            'pe_historia': f'{pe_historia}x',
+            'pe_historia': 'N/D',
             'narrativa': (
-                f"EM cotiza a {pe_str} P/E"
-                + (f", {((pe/pe_historia)-1)*100:+.0f}% vs promedio. " if pe else ". ")
+                f"EM cotiza a {pe_str} P/E. "
                 + (f"Retorno YTD: {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + "Valuación atractiva con China estabilizando y LatAm ofreciendo crecimiento estructural."
+                + (em_council_view.get('rationale', '') + '. ' if em_council_view.get('rationale') else '')
             ),
-            'paises_preferidos': ['India', 'Indonesia', 'Brasil', 'Mexico'],
-            'paises_evitar': ['Turquia', 'Sudafrica'],
+            'paises_preferidos': [],
+            'paises_evitar': [],
             'china_view': {
-                'view': 'NEUTRAL', 'peso_benchmark': '25%',
-                'peso_recomendado': '20%',
-                'comentario': 'Estabilizando pero riesgos estructurales persisten'
+                'view': 'N/D', 'peso_benchmark': 'N/D',
+                'peso_recomendado': 'N/D',
+                'comentario': 'Ver análisis del council para vista China'
             },
-            'catalizadores': ['China estabilizando', 'Commodities up', 'Nearshoring'],
-            'riesgos': ['USD fortaleza', 'China hard landing', 'Tasas US higher for longer']
+            'catalizadores': [],
+            'riesgos': []
         }
 
         if self._has_council():
@@ -1531,30 +1618,32 @@ class RVContentGenerator:
         pe = v.get('pe_trailing') or v.get('pe_forward')
         price = v.get('price')
         ret_ytd = v.get('returns', {}).get('ytd')
-        pe_historia = 14.5
 
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
+
+        # Get Japan view from council parser
+        equity_views = self.parser.get_equity_views()
+        jp_council_view = equity_views.get('japon', equity_views.get('japan', {})) if equity_views else {}
 
         return {
             'mercado': 'Japon',
             'indice': 'Topix',
-            'view': 'OW',
+            'view': jp_council_view.get('view', 'Sin recomendación') if jp_council_view else 'Sin recomendación',
             'cambio': '=',
-            'target_12m': f"{price * 1.14:,.0f}" if price else 'N/D',
-            'upside': '+14%',
+            'target_12m': 'N/D',
+            'upside': 'N/D',
             'pe_actual': pe_str,
-            'pe_historia': f'{pe_historia}x',
+            'pe_historia': 'N/D',
             'narrativa': (
-                f"Japón cotiza a {pe_str} P/E"
-                + (f", {((pe/pe_historia)-1)*100:+.0f}% vs promedio. " if pe else ". ")
+                f"Japón cotiza a {pe_str} P/E. "
                 + (f"Retorno YTD: {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + "Reformas corporativas mejoran ROE y payout. Yen débil beneficia exportadores."
+                + (jp_council_view.get('rationale', '') + '. ' if jp_council_view.get('rationale') else '')
             ),
-            'sectores_preferidos': ['Autos exportadores', 'Trading Houses', 'Banks', 'Tech'],
-            'sectores_evitar': ['Utilities domesticas', 'Retail domestico'],
-            'temas_clave': ['Reformas corporativas', 'Unwinding deflation', 'Turismo'],
-            'catalizadores': ['Yen estable/debil', 'Buybacks record', 'Earnings upgrades'],
-            'riesgos': ['JPY apreciacion rapida', 'BOJ hawkish surprise']
+            'sectores_preferidos': [],
+            'sectores_evitar': [],
+            'temas_clave': [],
+            'catalizadores': [],
+            'riesgos': []
         }
 
     def _generate_chile_view(self) -> Dict[str, Any]:
@@ -1564,12 +1653,12 @@ class RVContentGenerator:
         price = v.get('price')
         ret_ytd = v.get('returns', {}).get('ytd')
         div_y = v.get('dividend_yield')
-        # Dynamic PE history: use average of real picks if available, else 12.0
+        # Dynamic PE history: use average of real picks if available, else None
         chile_picks_data = self.market_data.get('chile_picks', [])
         real_pes = [p.get('pe_trailing') or p.get('pe_forward')
                     for p in chile_picks_data
                     if (p.get('pe_trailing') or p.get('pe_forward')) is not None]
-        pe_historia = round(sum(real_pes) / len(real_pes), 1) if real_pes else 12.0
+        pe_historia = round(sum(real_pes) / len(real_pes), 1) if real_pes else None
 
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
 
@@ -1599,8 +1688,10 @@ class RVContentGenerator:
             if ipsa_ytd is not None:
                 parts.append(f" ({ipsa_ytd:+.1f}% YTD)")
             parts.append(". ")
-        if pe:
+        if pe and pe_historia:
             parts.append(f"ECH ETF a {pe_str} P/E, {((pe/pe_historia)-1)*100:+.0f}% vs promedio histórico de {pe_historia}x. ")
+        elif pe:
+            parts.append(f"ECH ETF a {pe_str} P/E. ")
         if ret_ytd is not None and ipsa_ytd is not None:
             parts.append(f"ECH (USD) {ret_ytd:+.1f}% YTD vs IPSA (CLP) {ipsa_ytd:+.1f}% — diferencia por FX. ")
         elif ret_ytd is not None:
@@ -1616,8 +1707,7 @@ class RVContentGenerator:
         if ipsa_mentions > 3 or cobre_mentions > 3:
             parts.append(f"Alta visibilidad en prensa local ({ipsa_mentions} menciones IPSA, {cobre_mentions} menciones cobre). ")
 
-        parts.append("Ciclo de tasas favorable con BCCh en modo dovish. Preferimos bancos, retail y utilities reguladas.")
-        narrativa = ''.join(parts) if parts else "Chile muestra valuaciones atractivas con ciclo de tasas favorable."
+        narrativa = ''.join(parts) if parts else "Ver council para vista Chile."
 
         # Council enrichment
         if self._has_council():
@@ -1635,13 +1725,17 @@ class RVContentGenerator:
         usdclp_str = f"${usdclp:,.0f}" if usdclp else 'N/D'
         usdclp_chg = f" ({usdclp_1m:+.1f}% 1M, {usdclp_ytd:+.1f}% YTD)" if usdclp_1m is not None and usdclp_ytd is not None else ''
 
+        # Get Chile view from council parser
+        equity_views = self.parser.get_equity_views()
+        cl_council_view = equity_views.get('chile', {}) if equity_views else {}
+
         return {
             'mercado': 'Chile',
             'indice': 'IPSA',
-            'view': 'OW' if (pe and pe < pe_historia) else 'NEUTRAL',
-            'cambio': 'Descuento atractivo' if (pe and pe < pe_historia * 0.9) else '=',
-            'target_12m': f"{price * 1.18:,.0f}" if price else 'N/D',
-            'upside': '+18%',
+            'view': cl_council_view.get('view', 'Sin recomendación') if cl_council_view else 'Sin recomendación',
+            'cambio': '=',
+            'target_12m': 'N/D',
+            'upside': 'N/D',
             'nivel_actual': f"{ipsa_level:,.0f}" if ipsa_level else (f"{price:,.0f}" if price else 'N/D'),
             'ipsa_retornos': {
                 'ytd': self._fmt(ipsa_ytd, '%', prefix='+' if (ipsa_ytd or 0) >= 0 else '') if ipsa_ytd is not None else 'N/D',
@@ -1649,17 +1743,17 @@ class RVContentGenerator:
                 '3m': self._fmt(ipsa_3m, '%', prefix='+' if (ipsa_3m or 0) >= 0 else '') if ipsa_3m is not None else 'N/D',
             },
             'pe_actual': pe_str,
-            'pe_historia': f'{pe_historia}x',
+            'pe_historia': f'{pe_historia}x' if pe_historia else 'N/D',
             'narrativa': narrativa,
             'commodities_context': {
                 'cobre': f"{copper:.2f} USD/lb ({copper_ytd:+.1f}% YTD)" if copper and copper_ytd is not None else 'N/D',
                 'litio': f"{lithium:.0f} USD/ton ({lithium_ytd:+.1f}% YTD)" if lithium and lithium_ytd is not None else 'N/D',
             },
-            'sectores_preferidos': ['Bancos', 'Retail', 'Utilities reguladas', 'Commodities'],
-            'sectores_evitar': ['Construccion', 'Small caps iliquidas'],
+            'sectores_preferidos': [],
+            'sectores_evitar': [],
             'top_picks': self._build_chile_top_picks(chile_picks_data),
-            'catalizadores': ['Recortes TPM', 'Cobre fuerte', 'Consumo recuperando'],
-            'riesgos': ['Riesgo politico', 'Cobre colapso', 'Liquidez mercado'],
+            'catalizadores': [],
+            'riesgos': [],
             'usd_clp_sensitivity': {
                 'titulo': 'Sensibilidad a USD/CLP',
                 'nivel_actual': usdclp_str + usdclp_chg,
@@ -1668,7 +1762,7 @@ class RVContentGenerator:
                     {'escenario': f'Neutral (~${usdclp:,.0f})' if usdclp else 'Neutral', 'impacto_ipsa': '0%', 'impacto_earnings': '0%', 'comentario': 'Base case'},
                     {'escenario': 'CLP debil (>$900)', 'impacto_ipsa': '+2%', 'impacto_earnings': '+4%', 'comentario': 'Positivo para exportadores'}
                 ],
-                'beta_ipsa_usdclp': '+0.35',
+                'beta_ipsa_usdclp': 'N/D',
                 'comentario': 'IPSA tiene correlacion positiva con depreciacion CLP por peso exportadores'
             }
         }
@@ -1698,13 +1792,8 @@ class RVContentGenerator:
                 })
             return top_picks
 
-        # Fallback hardcoded (marcados como estimados)
-        return [
-            {'empresa': 'Banco de Chile', 'ticker': 'BCH', 'pe': '~15x (est.)', 'div_yield': '~4.5% (est.)', 'rationale': 'Mejor calidad, dividend'},
-            {'empresa': 'Santander Chile', 'ticker': 'BSAC', 'pe': '~14x (est.)', 'div_yield': '~3.5% (est.)', 'rationale': 'Banca retail líder'},
-            {'empresa': 'SQM', 'ticker': 'SQM', 'pe': '~17x (est.)', 'div_yield': 'N/D', 'rationale': 'Litio + cobre'},
-            {'empresa': 'LATAM Airlines', 'ticker': 'LTM', 'pe': '~12x (est.)', 'div_yield': '~4% (est.)', 'rationale': 'Recovery aéreo'},
-        ]
+        # No real data available — return empty (no fabricated values)
+        return []
 
     # =========================================================================
     # SECCION 7: FLUJOS Y POSICIONAMIENTO
@@ -2242,12 +2331,10 @@ class RVContentGenerator:
 
     def _generate_event_calendar(self) -> List[Dict[str, Any]]:
         """Genera calendario de eventos."""
+        # No hardcoded dates — require real data; show placeholder if empty
         return [
-            {'fecha': '19 Feb', 'evento': 'NVIDIA Earnings', 'relevancia': 'Alta', 'impacto': 'AI bellwether'},
-            {'fecha': '25 Feb', 'evento': 'PCE Inflation USA', 'relevancia': 'Alta', 'impacto': 'Fed path'},
-            {'fecha': '5 Mar', 'evento': 'NPC China', 'relevancia': 'Alta', 'impacto': 'Estimulos'},
-            {'fecha': '18-19 Mar', 'evento': 'FOMC Meeting', 'relevancia': 'Alta', 'impacto': 'Tasas'},
-            {'fecha': 'Q1', 'evento': 'Earnings Season Q4', 'relevancia': 'Alta', 'impacto': 'Guidance 2026'},
+            {'fecha': '-', 'evento': 'Calendario no disponible — sin datos de eventos',
+             'relevancia': '-', 'impacto': 'N/D'}
         ]
 
     # =========================================================================
@@ -2382,6 +2469,14 @@ class RVContentGenerator:
 
     def generate_all_content(self) -> Dict[str, Any]:
         """Genera todo el contenido del reporte RV."""
+        # Set up anti-fabrication filter with verified market data
+        try:
+            from narrative_engine import set_verified_data, clear_verified_data, build_verified_data_rv
+            vd = build_verified_data_rv(self.market_data)
+            if vd:
+                set_verified_data(vd)
+        except Exception:
+            pass
 
         content = {
             'metadata': {
@@ -2407,6 +2502,13 @@ class RVContentGenerator:
         eq_targets = self.generate_equity_targets()
         if eq_targets.get('available'):
             content['equity_targets'] = eq_targets
+
+        # Clear anti-fabrication verified data
+        try:
+            from narrative_engine import clear_verified_data
+            clear_verified_data()
+        except Exception:
+            pass
 
         return content
 

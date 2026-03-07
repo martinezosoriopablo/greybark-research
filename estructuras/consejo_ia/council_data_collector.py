@@ -97,6 +97,21 @@ class CouncilDataCollector:
             self._print(f"  [ERR] Macro USA: {e}")
             data['macro_usa'] = {'error': str(e)}
 
+        # 2b. Leading Indicators (FRED)
+        try:
+            self._print("  -> Leading indicators (FRED)...")
+            fred_lei = fred if 'fred' in dir() else None
+            if fred_lei is None:
+                from greybark.data_sources.fred_client import FREDClient
+                fred_lei = FREDClient()
+            data['leading_indicators'] = fred_lei.get_leading_indicators()
+            lei_ok = sum(1 for k, v in data['leading_indicators'].items()
+                         if v is not None and k != 'timestamp')
+            self._print(f"  [OK] Leading indicators: {lei_ok}/5 series")
+        except Exception as e:
+            self._print(f"  [ERR] Leading indicators: {e}")
+            data['leading_indicators'] = {'error': str(e)}
+
         # 3. Inflation Analytics
         try:
             from greybark.analytics.macro.inflation_analytics import InflationAnalytics
@@ -142,7 +157,11 @@ class CouncilDataCollector:
                 'macro': bcch.get_chile_macro(),
                 'spc_curve': bcch.get_spc_curve(),
                 'credit': bcch.get_credit(),
-                'commodities': bcch.get_commodities()
+                'commodities': bcch.get_commodities(),
+                'eee_expectations': bcch.get_eee_expectations(),
+                'eof_expectations': bcch.get_eof_expectations(),
+                'imce': bcch.get_imce(),
+                'ipc_detail': bcch.get_ipc_detail(),
             }
         except Exception as e:
             self._print(f"  [ERR] Chile Extended: {e}")
@@ -246,6 +265,7 @@ class CouncilDataCollector:
                 'stock_indices': bcch.get_stock_indices(),
                 'gdp': bcch.get_international_gdp(),
                 'unemployment': bcch.get_international_unemployment(),
+                'volatility_epu': bcch.get_volatility(),
             }
         except Exception as e:
             self._print(f"  [ERR] International: {e}")
@@ -259,8 +279,13 @@ class CouncilDataCollector:
                     'pmi': self.bloomberg.get_pmi_latest(),
                     'cds': self.bloomberg.get_cds_data(),
                     'credit_spreads': self.bloomberg.get_sector_spreads(),
+                    'sofr_curve': self.bloomberg.get_sofr_curve(),
                     'epfr_flows': self.bloomberg.get_epfr_flows(),
                     'embi': self.bloomberg.get_embi_spreads(),
+                    'china_extended': self.bloomberg.get_china_extended(),
+                    'valuations_extended': self.bloomberg.get_valuations_extended(),
+                    'factor_returns': self.bloomberg.get_factor_returns(),
+                    'intl_curves': self.bloomberg.get_intl_curves(),
                     'available_series': len(self.bloomberg.campos),
                 }
                 self._print(f"  [OK] Bloomberg: {len(self.bloomberg.campos)} series disponibles")
@@ -269,6 +294,70 @@ class CouncilDataCollector:
         except Exception as e:
             self._print(f"  [ERR] Bloomberg: {e}")
             data['bloomberg'] = {'error': str(e)}
+
+        # 12. CPI Components, Fiscal, LatAm (ChartDataProvider)
+        try:
+            from chart_data_provider import ChartDataProvider
+            self._print("  -> CPI components, fiscal, LatAm macro...")
+            cdp = ChartDataProvider(lookback_months=36)
+            data['cpi_components'] = cdp.get_usa_cpi_components()
+            data['fiscal'] = cdp.get_usa_fiscal()
+            data['latam_macro'] = cdp.get_latam_macro()
+        except Exception as e:
+            self._print(f"  [ERR] CPI/Fiscal/LatAm: {e}")
+            data['cpi_components'] = {'error': str(e)}
+            data['fiscal'] = {'error': str(e)}
+            data['latam_macro'] = {'error': str(e)}
+
+        # 13. BEA (Bureau of Economic Analysis)
+        try:
+            from greybark.data_sources.bea_client import BEAClient
+            self._print("  -> BEA (GDP, PCE, profits, fiscal)...")
+            bea = BEAClient()
+            if bea.api_key:
+                data['bea'] = bea.get_full_dashboard()
+                ok_count = sum(1 for v in data['bea'].values()
+                               if isinstance(v, dict) and '_source' in v)
+                self._print(f"  [OK] BEA: {ok_count}/6 modules")
+            else:
+                data['bea'] = {'available': False}
+                self._print("  [SKIP] BEA: no API key")
+        except Exception as e:
+            self._print(f"  [ERR] BEA: {e}")
+            data['bea'] = {'error': str(e)}
+
+        # 14. OECD KEI (CLI, unemployment, CPI, GDP, rates, confidence)
+        try:
+            from greybark.data_sources.oecd_client import OECDClient
+            self._print("  -> OECD KEI (CLI, confidence, macro)...")
+            oecd = OECDClient()
+            data['oecd'] = {
+                'cli': oecd.get_cli(),
+                'cci': oecd.get_consumer_confidence(),
+                'bci': oecd.get_business_confidence(),
+                'unemployment': oecd.get_unemployment(),
+                'cpi_inflation': oecd.get_cpi_inflation(),
+                'interest_rates': oecd.get_interest_rates(),
+            }
+            ok_count = sum(1 for v in data['oecd'].values()
+                           if isinstance(v, dict) and len(v) > 1)
+            self._print(f"  [OK] OECD: {ok_count}/6 series")
+        except Exception as e:
+            self._print(f"  [ERR] OECD: {e}")
+            data['oecd'] = {'error': str(e)}
+
+        # 15. NY Fed (SOFR/EFFR/OBFR, GSCPI, R-star, Term Premia)
+        try:
+            from greybark.data_sources.nyfed_client import NYFedClient
+            self._print("  -> NY Fed (rates, GSCPI, R-star, term premia)...")
+            nyfed = NYFedClient()
+            data['nyfed'] = nyfed.get_full_dashboard()
+            ok_count = sum(1 for v in data['nyfed'].values()
+                           if isinstance(v, dict) and len(v) > 1)
+            self._print(f"  [OK] NY Fed: {ok_count}/5 modules")
+        except Exception as e:
+            self._print(f"  [ERR] NY Fed: {e}")
+            data['nyfed'] = {'error': str(e)}
 
         self._print("[DataCollector] Datos cuantitativos completados")
         return data
@@ -515,6 +604,21 @@ class CouncilDataCollector:
                     'fed_direction': self._forecast_data.get('rate_forecasts', {}).get('fed_funds', {}).get('direction'),
                 }
 
+        # Data completeness validation (field-by-field)
+        try:
+            from data_completeness_validator import DataCompletenessValidator
+            completeness_validator = DataCompletenessValidator(verbose=self.verbose)
+            completeness = completeness_validator.validate(council_input['agent_data'])
+            council_input['completeness'] = completeness.to_dict()
+
+            # Override preflight verdict if completeness is worse
+            if completeness.verdict == 'NO_GO' and council_input['preflight'].get('overall_verdict') != 'NO_GO':
+                council_input['preflight']['overall_verdict'] = 'NO_GO'
+                self._print("[DataCollector] Completeness override: NO_GO")
+        except Exception as e:
+            self._print(f"[DataCollector] Completeness validation failed: {e}")
+            council_input['completeness'] = {'error': str(e)}
+
         self._print(f"\n[DataCollector] Input preparado para {report_type}")
 
         return council_input
@@ -551,14 +655,45 @@ class CouncilDataCollector:
 
         agent_data = {}
 
-        # IAS Macro: regime + macro + inflation + chile + china + international
+        # IAS Macro: regime + macro + inflation + chile + china + international + BEA + LEI + OECD + NYFed
+        chile_ext = quant.get('chile_extended', {})
+        bea = quant.get('bea', {})
+        oecd = quant.get('oecd', {})
+        nyfed = quant.get('nyfed', {})
+        bbg = quant.get('bloomberg', {})
         agent_data['macro'] = {
             'regime': quant.get('regime', {}),
             'macro_usa': quant.get('macro_usa', {}),
+            'leading_indicators': quant.get('leading_indicators', {}),
             'inflation': quant.get('inflation', {}),
+            'cpi_components': quant.get('cpi_components', {}),
+            'fiscal': quant.get('fiscal', {}),
             'chile': quant.get('chile', {}),
+            'chile_eee': chile_ext.get('eee_expectations', {}),
+            'chile_imce': chile_ext.get('imce', {}),
+            'chile_ipc_detail': chile_ext.get('ipc_detail', {}),
             'china': quant.get('china', {}),
             'international': quant.get('international', {}),
+            'latam_macro': quant.get('latam_macro', {}),
+            # BEA data
+            'bea_gdp': bea.get('gdp', {}),
+            'bea_pce': bea.get('pce_inflation', {}),
+            'bea_income': bea.get('personal_income', {}),
+            'bea_profits': bea.get('corporate_profits', {}),
+            'bea_fiscal': bea.get('fiscal', {}),
+            # OECD
+            'oecd_cli': oecd.get('cli', {}),
+            'oecd_cci': oecd.get('cci', {}),
+            'oecd_bci': oecd.get('bci', {}),
+            'oecd_unemployment': oecd.get('unemployment', {}),
+            'oecd_cpi': oecd.get('cpi_inflation', {}),
+            # NY Fed
+            'nyfed_rstar': nyfed.get('rstar', {}),
+            'nyfed_gscpi': nyfed.get('gscpi', {}),
+            'nyfed_term_premia': nyfed.get('term_premia', {}),
+            # Bloomberg structured
+            'bbg_pmi': bbg.get('pmi', {}),
+            'bbg_china_extended': bbg.get('china_extended', {}),
             'bloomberg_context': self.bloomberg.format_for_macro_agent() if self.bloomberg.available else '',
             'intelligence_themes': filter_themes([
                 'Política Monetaria', 'Inflación', 'Crecimiento', 'Chile',
@@ -573,6 +708,10 @@ class CouncilDataCollector:
             'breadth': quant.get('breadth', {}),
             'indices': quant.get('international', {}).get('stock_indices', {}),
             'macro_usa': quant.get('macro_usa', {}),
+            # Bloomberg structured
+            'bbg_valuations': bbg.get('valuations_extended', {}),
+            'bbg_factor_returns': bbg.get('factor_returns', {}),
+            'bbg_epfr_flows': bbg.get('epfr_flows', {}),
             'bloomberg_context': self.bloomberg.format_for_rv_agent() if self.bloomberg.available else '',
             'intelligence_themes': filter_themes([
                 'Tecnología', 'Earnings', 'Crecimiento', 'LatAm',
@@ -582,14 +721,27 @@ class CouncilDataCollector:
             'temas_mes': daily.get('temas_recurrentes', []),
         }
 
-        # IAS RF: regime + rates + inflation + chile rates
+        # IAS RF: regime + rates + inflation + chile rates + fiscal + NYFed
         agent_data['rf'] = {
             'regime': quant.get('regime', {}),
             'rates': quant.get('rates', {}),
             'inflation': quant.get('inflation', {}),
+            'cpi_components': quant.get('cpi_components', {}),
+            'fiscal': quant.get('fiscal', {}),
             'chile': quant.get('chile', {}),
             'chile_extended': quant.get('chile_extended', {}),
             'bonds_intl': quant.get('international', {}).get('bonds_10y', {}),
+            # NY Fed rates and term premia
+            'nyfed_rates': nyfed.get('reference_rates', {}),
+            'nyfed_term_premia': nyfed.get('term_premia', {}),
+            'nyfed_rstar': nyfed.get('rstar', {}),
+            # OECD rates
+            'oecd_rates': oecd.get('interest_rates', {}),
+            # Bloomberg structured data
+            'bbg_sofr_curve': bbg.get('sofr_curve', {}),
+            'bbg_credit_spreads': bbg.get('credit_spreads', {}),
+            'bbg_cds': bbg.get('cds', {}),
+            'bbg_intl_curves': bbg.get('intl_curves', {}),
             'bloomberg_context': self.bloomberg.format_for_rf_agent() if self.bloomberg.available else '',
             'intelligence_themes': filter_themes([
                 'Política Monetaria', 'Inflación', 'Renta Fija',
@@ -599,11 +751,17 @@ class CouncilDataCollector:
             'temas_mes': daily.get('temas_recurrentes', []),
         }
 
-        # IAS Riesgo: regime + risk
+        # IAS Riesgo: regime + risk + volatility/EPU + GSCPI
         agent_data['riesgo'] = {
             'regime': quant.get('regime', {}),
             'risk': quant.get('risk', {}),
             'china': quant.get('china', {}),
+            'volatility_epu': quant.get('international', {}).get('volatility_epu', {}),
+            'nyfed_gscpi': nyfed.get('gscpi', {}),
+            'oecd_cli': oecd.get('cli', {}),
+            # Bloomberg structured: CDS + credit spreads for risk monitoring
+            'bbg_cds': bbg.get('cds', {}),
+            'bbg_credit_spreads': bbg.get('credit_spreads', {}),
             'bloomberg_context': self.bloomberg.format_for_risk_agent() if self.bloomberg.available else '',
             'intelligence_themes': filter_themes([
                 'Riesgo', 'Geopolítica', 'Crecimiento',
@@ -613,13 +771,22 @@ class CouncilDataCollector:
             'temas_mes': daily.get('temas_recurrentes', []),
         }
 
-        # IAS Geo: contexto geopolítico + commodities + international
+        # IAS Geo: contexto geopolítico + commodities + international + EPU + LEI + OECD + GSCPI
         agent_data['geo'] = {
             'daily_context': daily,
             'regime': quant.get('regime', {}),
             'commodities': quant.get('chile_extended', {}).get('commodities', {}),
             'epu': quant.get('china', {}).get('epu_signal', {}),
+            'volatility_epu': quant.get('international', {}).get('volatility_epu', {}),
+            'leading_indicators': quant.get('leading_indicators', {}),
             'international': quant.get('international', {}),
+            'oecd_cli': oecd.get('cli', {}),
+            'oecd_cci': oecd.get('cci', {}),
+            'nyfed_gscpi': nyfed.get('gscpi', {}),
+            # Bloomberg structured: CDS + EMBI for geopolitical stress
+            'bbg_cds': bbg.get('cds', {}),
+            'bbg_embi': bbg.get('embi', {}),
+            'bbg_china_extended': bbg.get('china_extended', {}),
             'bloomberg_context': self.bloomberg.format_for_geo_agent() if self.bloomberg.available else '',
             'intelligence_themes': filter_themes([
                 'Geopolítica', 'Commodities', 'LatAm', 'Chile',

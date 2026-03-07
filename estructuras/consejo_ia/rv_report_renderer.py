@@ -50,6 +50,15 @@ class RVReportRenderer:
             self.council_result, self.market_data, forecast_data=self.forecast_data,
             company_name=self.branding.get('company_name', ''))
 
+        # Inject Bloomberg data if available
+        try:
+            from bloomberg_reader import BloombergData
+            bbg = BloombergData()
+            if bbg.available:
+                self.content_generator.bloomberg = bbg
+        except Exception:
+            pass
+
     def _print(self, msg: str):
         if self.verbose:
             print(msg)
@@ -92,12 +101,37 @@ class RVReportRenderer:
         if output_filename is None:
             output_filename = f"rv_report_{datetime.now().strftime('%Y-%m-%d')}.html"
 
+        # Append data provenance div (hidden, for audit)
+        html = self._append_provenance(html)
+
         output_path = self.output_dir / output_filename
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html)
 
         self._print(f"\n[OK] Reporte RV generado: {output_path}")
         return str(output_path)
+
+    def _append_provenance(self, html: str) -> str:
+        """Append hidden data provenance div to HTML for audit trail."""
+        try:
+            from narrative_engine import get_provenance_records, clear_provenance_records
+            import json as _json
+            records = get_provenance_records()
+            if records:
+                provenance_json = _json.dumps(records, ensure_ascii=False, indent=2)
+                div = (
+                    f'\n<div id="data-provenance" style="display:none" '
+                    f'data-report="rv" data-generated="{datetime.now().isoformat()}">'
+                    f'\n{provenance_json}\n</div>\n'
+                )
+                if '</body>' in html:
+                    html = html.replace('</body>', div + '</body>')
+                else:
+                    html += div
+                clear_provenance_records()
+        except Exception:
+            pass
+        return html
 
     def _render_template(self, template, content: Dict, charts: Dict = None) -> str:
         """Renderiza el template con el contenido y charts usando Jinja2."""
@@ -234,8 +268,8 @@ class RVReportRenderer:
         # Preferred sectors
         pref_html = ''
         for s in sect['sectores_preferidos']:
-            subsectors = ''.join([f'<span class="sector-tag preferred">{sub}</span>' for sub in s['subsectores']])
-            avoid = ''.join([f'<span class="sector-tag avoid">{a}</span>' for a in s['evitar']])
+            subsectors = ''.join([f'<span class="sector-tag preferred">{sub}</span>' for sub in s.get('subsectores', [])])
+            avoid = ''.join([f'<span class="sector-tag avoid">{a}</span>' for a in s.get('evitar', [])])
             pref_html += f'''
             <div class="sector-card ow">
                 <div class="sector-card-header">

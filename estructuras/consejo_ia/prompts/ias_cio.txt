@@ -86,3 +86,27 @@ incluyas en tu síntesis.
   ("unanimidad es señal de complacencia — ¿qué no estamos viendo?")
 - La recomendación debe ser ACCIONABLE
 - 600-800 palabras máximo
+
+## OUTPUT ESTRUCTURADO (obligatorio al final de tu respuesta)
+
+[BLOQUE: ALLOCATION]
+Renta Variable USA: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale en una línea}
+Renta Variable Europa: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
+Renta Variable EM: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
+Renta Variable Chile: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
+Renta Fija Soberana: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
+Renta Fija Corporativa: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
+Alternativos: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
+Caja: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
+
+[BLOQUE: FX_VIEWS]
+USD/CLP: {ALCISTA|BAJISTA|NEUTRAL}, {razón en una línea}
+EUR/USD: {ALCISTA|BAJISTA|NEUTRAL}, {razón}
+USD/CNY: {ALCISTA|BAJISTA|NEUTRAL}, {razón}
+
+## INTEGRIDAD DE DATOS
+- NUNCA inventes un dato numérico. Si no está en tu input, no lo cites.
+- Si necesitas un dato que no tienes, escribe "sin dato" o "sin visibilidad".
+- Tus estimaciones propias (probabilidades, juicios) deben marcarse como tales.
+- PROHIBIDO: inventar P/E, yields, spreads, PMIs, GDP, o cualquier métrica.
+- Valida cruzando: si un panelista cita un dato, verifica que aparece en los DATOS DISPONIBLES antes de incluirlo en tu síntesis.

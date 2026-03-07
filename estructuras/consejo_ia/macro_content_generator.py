@@ -45,6 +45,20 @@ class MacroContentGenerator:
         self._usa_latest = None    # Lazy-loaded USA real data cache
         self._europe_latest = None  # Lazy-loaded Europe real data cache
         self._china_latest = None   # Lazy-loaded China real data cache
+        self.bloomberg = None  # Injected externally
+        self._parser = None  # Lazy council parser
+
+    @property
+    def parser(self):
+        """Lazy-init council parser."""
+        if self._parser is None:
+            try:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser(self.council)
+            except Exception:
+                from council_parser import CouncilParser
+                self._parser = CouncilParser({})
+        return self._parser
 
     def _get_spanish_month(self, month: int) -> str:
         """Retorna nombre del mes en espanol."""
@@ -271,8 +285,21 @@ class MacroContentGenerator:
         if has_gdp or has_infl or has_rates:
             return self._generate_forecasts_table_real()
 
-        # Hardcoded fallback
-        return self._generate_forecasts_table_hardcoded()
+        # No forecast data — return empty with N/D
+        return {
+            'gdp_growth': [
+                {'region': r, 'actual_2025': 'N/D', 'forecast_2026': 'N/D', 'consenso': 'N/D', 'vs_anterior': 'N/A'}
+                for r in ['USA', 'Euro Area', 'China', 'Chile']
+            ],
+            'inflation_core': [
+                {'region': r, 'actual_2025': 'N/D', 'forecast_2026': 'N/D', 'consenso': 'N/D', 'vs_anterior': 'N/A'}
+                for r in ['USA', 'Euro Area', 'Chile']
+            ],
+            'policy_rates': [
+                {'banco': b, 'actual': 'N/D', 'forecast_2026': 'N/D', 'consenso': 'N/D', 'vs_anterior': 'N/A'}
+                for b in ['Fed Funds', 'ECB Deposit', 'BCCh TPM']
+            ],
+        }
 
     def _generate_forecasts_table_real(self) -> Dict[str, List[Dict]]:
         """Genera tabla de forecasts con datos reales del forecast engine."""
@@ -345,88 +372,157 @@ class MacroContentGenerator:
             'policy_rates': rate_rows,
         }
 
-    def _generate_forecasts_table_hardcoded(self) -> Dict[str, List[Dict]]:
-        """Fallback: tabla de forecasts 100% hardcodeada."""
-        return {
-            'gdp_growth': [
-                {'region': 'World', 'actual_2025': '2.8%', 'forecast_2026': '2.9%', 'consenso': '2.7%', 'vs_anterior': '+0.1'},
-                {'region': 'USA', 'actual_2025': '2.4%', 'forecast_2026': '2.2%', 'consenso': '2.0%', 'vs_anterior': '='},
-                {'region': 'Euro Area', 'actual_2025': '1.2%', 'forecast_2026': '1.4%', 'consenso': '1.2%', 'vs_anterior': '+0.2'},
-                {'region': 'China', 'actual_2025': '4.8%', 'forecast_2026': '4.5%', 'consenso': '4.3%', 'vs_anterior': '='},
-                {'region': 'Chile', 'actual_2025': '2.3%', 'forecast_2026': '2.5%', 'consenso': '2.2%', 'vs_anterior': '+0.3'},
-            ],
-            'inflation_core': [
-                {'region': 'USA', 'actual_2025': '2.6%', 'forecast_2026': '2.3%', 'consenso': '2.4%', 'vs_anterior': '-0.1'},
-                {'region': 'Euro Area', 'actual_2025': '2.3%', 'forecast_2026': '2.0%', 'consenso': '2.1%', 'vs_anterior': '='},
-                {'region': 'Chile', 'actual_2025': '3.2%', 'forecast_2026': '3.0%', 'consenso': '3.1%', 'vs_anterior': '='},
-            ],
-            'policy_rates': [
-                {'banco': 'Fed Funds', 'actual': '3.75%', 'forecast_2026': '3.50%', 'consenso': '3.50%', 'vs_anterior': '='},
-                {'banco': 'ECB Deposit', 'actual': '2.25%', 'forecast_2026': '2.00%', 'consenso': '2.00%', 'vs_anterior': '='},
-                {'banco': 'BCCh TPM', 'actual': '4.50%', 'forecast_2026': '4.25%', 'consenso': '4.25%', 'vs_anterior': '='},
-            ]
-        }
+    @staticmethod
+    def _classify_scenario(name: str) -> str:
+        """Classify a scenario name as 'upside', 'downside', or 'base'."""
+        lower = name.lower()
+        if any(w in lower for w in ('upside', 'alcista', 'optimista', 'bull',
+                                     'soft landing', 'aterrizaje suave')):
+            return 'upside'
+        if any(w in lower for w in ('downside', 'bajista', 'pesimista', 'bear',
+                                     'recesión', 'recesion', 'hard landing',
+                                     'crisis', 'stagflation', 'estanflación')):
+            return 'downside'
+        return 'base'
+
+    def _get_sp500_index_level(self) -> Optional[float]:
+        """Fetch the actual S&P 500 index level (^GSPC) via yfinance."""
+        try:
+            import yfinance as yf
+            idx = yf.Ticker('^GSPC')
+            hist = idx.history(period='5d')
+            if hist.empty:
+                return None
+            return float(hist['Close'].iloc[-1])
+        except Exception:
+            return None
 
     def generate_probability_weighted_forecasts(self) -> Dict[str, Any]:
         """Genera pronósticos ponderados por probabilidad de escenarios.
-        Uses equity targets from forecast engine if available."""
+        Uses council scenario data and forecast engine equity targets.
+        S&P 500 values are displayed as index levels (^GSPC), not SPY ETF prices.
+        Each scenario gets a differentiated S&P target: base=target, upside=range_high, downside=range_low."""
 
-        # Get S&P 500 target from forecast engine
-        sp500_target = self._fc('equity_targets', 'sp500', 'target_12m')
-        sp500_current = self._fc('equity_targets', 'sp500', 'current_price')
-        gdp_us_fc = self._fc('gdp_forecasts', 'usa', 'forecast_12m')
+        # Get scenario probabilities from council
+        scenarios = self.parser.get_scenario_probs() if self.parser else None
+        if not scenarios:
+            return {
+                'titulo': 'Pronóstico Ponderado por Escenarios',
+                'metodologia': 'Weighted Average = Σ(Probabilidad_i × Pronóstico_i)',
+                'escenarios': [],
+                'weighted_forecasts': {},
+                'implicancia': 'N/D — Sin escenarios definidos por el comité.',
+            }
 
-        # Scenario S&P targets centered on engine forecast
-        if sp500_target and sp500_current:
-            base = sp500_target
-            # Bull = +8% above target, Bear = -15% from current
-            bull_sp = round(sp500_current * 1.15)
-            bear_sp = round(sp500_current * 0.85)
+        # Get equity target data from forecast engine
+        sp500_data = self._fc('equity_targets', 'sp500') or {}
+        spy_target = sp500_data.get('target_12m')       # SPY ETF price
+        spy_current = sp500_data.get('current_price')    # SPY ETF price
+        spy_range = sp500_data.get('range', [])          # [low, high] in SPY prices
+        spy_range_low = spy_range[0] if len(spy_range) >= 2 else spy_target
+        spy_range_high = spy_range[1] if len(spy_range) >= 2 else spy_target
+
+        # Compute SPY→S&P 500 index scaling factor
+        # The forecast engine uses SPY (ETF ~1/10 of index). We need actual index levels.
+        sp500_index = self._get_sp500_index_level()
+        if sp500_index and spy_current and spy_current > 0:
+            spy_to_index = sp500_index / spy_current
+        elif spy_current and spy_current > 0:
+            spy_to_index = 10.0  # Fallback: SPY ≈ S&P 500 / 10
         else:
-            base = 5800
-            bull_sp = 6200
-            bear_sp = 4800
+            spy_to_index = 10.0
 
-        base_gdp = gdp_us_fc if gdp_us_fc else 2.2
+        # Convert SPY prices to S&P 500 index levels
+        sp_current = round(spy_current * spy_to_index) if spy_current else None
+        sp_target = round(spy_target * spy_to_index) if spy_target else None
+        sp_range_low = round(spy_range_low * spy_to_index) if spy_range_low else sp_target
+        sp_range_high = round(spy_range_high * spy_to_index) if spy_range_high else sp_target
 
-        scenarios = {
-            'soft_landing': {'prob': 0.55, 'gdp_us': base_gdp, 'gdp_world': 2.9, 'sp500': base},
-            'no_landing': {'prob': 0.20, 'gdp_us': base_gdp + 0.6, 'gdp_world': 3.3, 'sp500': bull_sp},
-            'hard_landing': {'prob': 0.25, 'gdp_us': 0.5, 'gdp_world': 2.0, 'sp500': bear_sp}
+        # Map scenario type → S&P 500 index target
+        sp_by_type = {
+            'base': sp_target,
+            'upside': sp_range_high,
+            'downside': sp_range_low,
         }
 
-        gdp_us_weighted = sum(s['prob'] * s['gdp_us'] for s in scenarios.values())
-        gdp_world_weighted = sum(s['prob'] * s['gdp_world'] for s in scenarios.values())
-        sp500_weighted = sum(s['prob'] * s['sp500'] for s in scenarios.values())
+        gdp_us_fc = self._fc('gdp_forecasts', 'usa', 'forecast_12m')
+        # World GDP: try IMF consensus first, then forecast engine 'world' key
+        gdp_world_fc = self._fc('imf_consensus', 'gdp', 'world')
+        if gdp_world_fc is None:
+            gdp_world_fc = self._fc('gdp_forecasts', 'world', 'forecast_12m')
+
+        # Build scenario rows from council data
+        scenario_rows = []
+        weighted_gdp_parts = []
+        weighted_gdp_world_parts = []
+        weighted_sp_parts = []
+
+        for key, data in scenarios.items():
+            prob = data.get('prob', 0)
+            name = data.get('name', key)
+
+            # Classify scenario to pick the right S&P target
+            sc_type = self._classify_scenario(name)
+            sp_val = sp_by_type.get(sc_type)
+
+            # GDP USA: use forecast engine if available, otherwise N/D
+            gdp_val = gdp_us_fc if gdp_us_fc is not None else None
+            gdp_display = f'{gdp_val:.1f}%' if gdp_val is not None else 'N/D'
+
+            # GDP World: use IMF consensus or forecast engine, otherwise N/D
+            gdp_world_val = gdp_world_fc if gdp_world_fc is not None else None
+            gdp_world_display = f'{gdp_world_val:.1f}%' if gdp_world_val is not None else 'N/D'
+
+            # S&P 500: per-scenario index level
+            sp_display = f'{sp_val:,.0f}' if sp_val else 'N/D'
+
+            scenario_rows.append({
+                'nombre': name,
+                'probabilidad': f"{int(prob * 100)}%",
+                'gdp_us': gdp_display,
+                'gdp_world': gdp_world_display,
+                'sp500': sp_display,
+            })
+
+            if gdp_val is not None:
+                weighted_gdp_parts.append(prob * gdp_val)
+            if gdp_world_val is not None:
+                weighted_gdp_world_parts.append(prob * gdp_world_val)
+            if sp_val:
+                weighted_sp_parts.append(prob * sp_val)
+
+        # Compute weighted forecasts only if we have data
+        weighted_forecasts = {}
+        if weighted_gdp_parts:
+            gdp_weighted = sum(weighted_gdp_parts)
+            weighted_forecasts['gdp_us'] = f'{gdp_weighted:.1f}%'
+        if weighted_gdp_world_parts:
+            gdp_world_weighted = sum(weighted_gdp_world_parts)
+            weighted_forecasts['gdp_world'] = f'{gdp_world_weighted:.1f}%'
+        if weighted_sp_parts:
+            sp_weighted = sum(weighted_sp_parts)
+            weighted_forecasts['sp500'] = f'{sp_weighted:,.0f}'
+
+        # Build implicancia text
+        if weighted_forecasts.get('gdp_us') and weighted_forecasts.get('sp500') and sp_current:
+            gdp_w = sum(weighted_gdp_parts)
+            sp_w = sum(weighted_sp_parts)
+            implicancia = (
+                f"El pronóstico ponderado de GDP USA es {gdp_w:.1f}%. El S&P 500 ponderado de "
+                f"{sp_w:,.0f} implica un retorno de "
+                f"{((sp_w / sp_current - 1) * 100):.1f}% desde niveles actuales."
+            )
+        elif weighted_forecasts.get('gdp_us'):
+            implicancia = f"El pronóstico ponderado de GDP USA es {sum(weighted_gdp_parts):.1f}%."
+        else:
+            implicancia = 'N/D — Datos insuficientes para pronóstico ponderado.'
 
         return {
             'titulo': 'Pronóstico Ponderado por Escenarios',
             'metodologia': 'Weighted Average = Σ(Probabilidad_i × Pronóstico_i)',
-            'escenarios': [
-                {'nombre': 'Soft Landing', 'probabilidad': '55%',
-                 'gdp_us': f'{scenarios["soft_landing"]["gdp_us"]:.1f}%', 'gdp_world': '2.9%',
-                 'sp500': f'{scenarios["soft_landing"]["sp500"]:,.0f}'},
-                {'nombre': 'No Landing', 'probabilidad': '20%',
-                 'gdp_us': f'{scenarios["no_landing"]["gdp_us"]:.1f}%', 'gdp_world': '3.3%',
-                 'sp500': f'{scenarios["no_landing"]["sp500"]:,.0f}'},
-                {'nombre': 'Hard Landing', 'probabilidad': '25%',
-                 'gdp_us': '0.5%', 'gdp_world': '2.0%',
-                 'sp500': f'{scenarios["hard_landing"]["sp500"]:,.0f}'},
-            ],
-            'weighted_forecasts': {
-                'gdp_us': f'{gdp_us_weighted:.1f}%',
-                'gdp_world': f'{gdp_world_weighted:.1f}%',
-                'sp500': f'{sp500_weighted:,.0f}',
-                'formula_example': f'GDP US = (0.55×{base_gdp:.1f}) + (0.20×{base_gdp+0.6:.1f}) + (0.25×0.5) = {gdp_us_weighted:.1f}%'
-            },
-            'implicancia': (
-                f"El pronóstico ponderado de GDP USA es {gdp_us_weighted:.1f}%, reflejando el peso "
-                f"significativo del escenario de hard landing (25%). El S&P 500 ponderado de "
-                f"{sp500_weighted:,.0f} implica un retorno de "
-                f"{((sp500_weighted / sp500_current - 1) * 100):.1f}% desde niveles actuales."
-                if sp500_current else
-                f"El pronóstico ponderado de GDP USA es {gdp_us_weighted:.1f}%."
-            )
+            'escenarios': scenario_rows,
+            'weighted_forecasts': weighted_forecasts,
+            'implicancia': implicancia,
         }
 
     def generate_vs_previous_forecast(self) -> Dict[str, Any]:
@@ -568,13 +664,7 @@ class MacroContentGenerator:
                 f"equilibrado y ganancias reales de salarios. La inversion empresarial se recupera "
                 f"con impulso del sector tech/AI."
             ),
-            'drivers': [
-                {'componente': 'Consumo Privado', 'contribución': '+1.8pp', 'tendencia': 'Solido'},
-                {'componente': 'Inversion Fija', 'contribución': '+0.4pp', 'tendencia': 'Mixto'},
-                {'componente': 'Gobierno', 'contribución': '+0.3pp', 'tendencia': 'Estable'},
-                {'componente': 'Net Exports', 'contribución': '-0.2pp', 'tendencia': 'Drag'},
-                {'componente': 'Inventarios', 'contribución': '+0.5pp', 'tendencia': 'Volatil'},
-            ],
+            'drivers': [],  # GDP component breakdown not available via free APIs
             'leading_indicators': [
                 {'indicador': 'Mfg New Orders', 'valor': no_val, 'tendencia': 'Leading'},
                 {'indicador': 'Housing Starts', 'valor': hs_val, 'tendencia': 'Recuperando'},
@@ -680,18 +770,35 @@ class MacroContentGenerator:
                 {'indicador': 'CPI Core', 'valor': cpi_c_yoy, 'anterior': 'N/D', 'mom': cpi_c_mom_str},
                 {'indicador': 'PCE Core', 'valor': pce_c_yoy, 'anterior': 'N/D', 'mom': pce_c_mom_str},
             ],
-            'componentes': [
-                {'componente': 'Shelter', 'valor': '5.1% a/a', 'tendencia': 'Desacelerando'},
-                {'componente': 'Services ex-Housing', 'valor': '3.5% a/a', 'tendencia': 'Sticky'},
-                {'componente': 'Core Goods', 'valor': '-0.3% a/a', 'tendencia': 'Deflacion'},
-                {'componente': 'Food', 'valor': '2.1% a/a', 'tendencia': 'Estable'},
-                {'componente': 'Energy', 'valor': '-2.5% a/a', 'tendencia': 'Deflacion'},
-            ],
+            'componentes': self._build_cpi_components(),
             'expectativas': [
                 {'medida': 'UMich Sentiment', 'valor': umich, 'comentario': 'Datos FRED'},
-                {'medida': 'SPF 10yr', 'valor': '2.1%', 'comentario': 'Ancladas'},
+                {'medida': 'SPF 10yr', 'valor': 'N/D', 'comentario': '-'},
             ]
         }
+
+    def _build_cpi_components(self) -> List[Dict]:
+        """Build CPI components from FRED data."""
+        if not self.data:
+            return [{'componente': c, 'valor': 'N/D', 'tendencia': '-'} for c in
+                    ['Shelter', 'Services ex-Energy', 'Core Goods', 'Food', 'Energy']]
+        try:
+            comp = self.data.get_usa_cpi_components()
+        except Exception:
+            comp = {}
+        mapping = [
+            ('Shelter', 'shelter'),
+            ('Services ex-Energy', 'services_ex_energy'),
+            ('Core Goods', 'goods_ex_food_energy'),
+            ('Food', 'food'),
+            ('Energy', 'energy'),
+        ]
+        result = []
+        for label, key in mapping:
+            val = comp.get(key)
+            val_str = f"{val:.1f}% a/a" if val is not None else 'N/D'
+            result.append({'componente': label, 'valor': val_str, 'tendencia': '-'})
+        return result
 
     def _generate_fed_policy(self) -> Dict[str, Any]:
         """Genera seccion de política monetaria Fed."""
@@ -735,10 +842,10 @@ class MacroContentGenerator:
             ),
             'tasas': {
                 'actual': ff_str,
-                'neutral_estimada': '3.00%',
+                'neutral_estimada': 'N/D',
                 'real_actual': real_str,
-                'proyección_2026': '3.50%',
-                'mercado_implica': '3.25%'
+                'proyección_2026': self._fc_pct('rate_forecasts', 'fed_funds', 'forecast_12m'),
+                'mercado_implica': 'N/D',
             },
             'dot_plot': dot_plot,
             'taylor_rule': self._build_taylor_rule(ff),
@@ -772,11 +879,9 @@ class MacroContentGenerator:
         terminal = fc.get('terminal')
         current = fc.get('current')
 
-        # 2026 FOMC schedule (key meetings)
-        schedule = [
-            ('Mar 18-19', 34), ('May 6-7', 76), ('Jun 17-18', 125),
-            ('Jul 29-30', 167), ('Sep 16-17', 216), ('Oct 28-29', 258),
-        ]
+        # 2026 FOMC schedule from config
+        from greybark.config import FOMC_2026
+        schedule = [(d, i * 40) for i, (d, _) in enumerate(FOMC_2026[1:])]  # skip past meetings
 
         if current is None or terminal is None or cuts == 0:
             # No data — return first 3 with N/D
@@ -806,24 +911,36 @@ class MacroContentGenerator:
 
     def _generate_usa_fiscal(self) -> Dict[str, Any]:
         """Genera seccion de política fiscal EE.UU."""
+        fiscal = {}
+        if self.data:
+            try:
+                fiscal = self.data.get_usa_fiscal()
+            except Exception:
+                pass
+
+        deficit = fiscal.get('deficit_gdp')
+        debt = fiscal.get('debt_gdp')
+        interest = fiscal.get('interest_gdp')
+
+        deficit_str = f"{deficit:.1f}% GDP" if deficit is not None else 'N/D'
+        debt_str = f"{debt:.1f}% GDP" if debt is not None else 'N/D'
+        interest_str = f"{interest:.1f}% GDP" if interest is not None else 'N/D'
+
         return {
             'titulo': 'Política Fiscal',
             'narrativa': (
-                "El déficit fiscal cerro 2025 en 5.8% del GDP tras esfuerzos de consolidacion. "
-                "Para 2026 proyectamos déficit de 5.5% con impulso fiscal neutro. La deuda publica "
-                "se estabiliza en 123% del GDP. Los costos de servicio de deuda siguen elevados "
-                "pero menores que en 2024 gracias a la baja de tasas."
+                f"El déficit fiscal se ubica en {deficit_str}. "
+                f"La deuda publica se situa en {debt_str}. "
+                f"Los costos de servicio de deuda representan {interest_str}."
             ),
             'datos': [
-                {'indicador': 'Déficit Fiscal', 'valor': '-5.5% GDP', 'anterior': '-5.8%'},
-                {'indicador': 'Deuda Publica', 'valor': '123% GDP', 'anterior': '122%'},
-                {'indicador': 'Impulso Fiscal', 'valor': '0.0pp', 'comentario': 'Neutro'},
-                {'indicador': 'Costo Deuda', 'valor': '3.0% GDP', 'anterior': '3.2%'},
+                {'indicador': 'Déficit Fiscal', 'valor': deficit_str, 'anterior': 'N/D'},
+                {'indicador': 'Deuda Publica', 'valor': debt_str, 'anterior': 'N/D'},
+                {'indicador': 'Costo Deuda', 'valor': interest_str, 'anterior': 'N/D'},
             ],
             'riesgos': [
-                'Nuevos tax cuts de administracion Trump podrian ampliar déficit',
+                'Politica fiscal expansiva podria ampliar déficit',
                 'Gasto en defensa creciente por tensiones geopolíticas',
-                'Moody\'s mantiene outlook negativo sobre rating AAA'
             ]
         }
 
@@ -846,11 +963,11 @@ class MacroContentGenerator:
         eu = self._get_europe_latest()
 
         # Real data with fallback
-        gdp_ez = self._fmt(eu.get('gdp_qoq'), suffix='% t/t') if eu.get('gdp_qoq') is not None else '1.2%'
-        gdp_de = self._fmt(eu.get('gdp_alemania'), suffix='% t/t') if eu.get('gdp_alemania') is not None else '0.6%'
-        gdp_fr = self._fmt(eu.get('gdp_francia'), suffix='% t/t') if eu.get('gdp_francia') is not None else '1.1%'
-        gdp_uk = self._fmt(eu.get('gdp_uk'), suffix='% t/t') if eu.get('gdp_uk') is not None else '1.0%'
-        desemp = self._fmt(eu.get('unemployment')) if eu.get('unemployment') is not None else '6.4%'
+        gdp_ez = self._fmt(eu.get('gdp_qoq'), suffix='% t/t')
+        gdp_de = self._fmt(eu.get('gdp_alemania'), suffix='% t/t')
+        gdp_fr = self._fmt(eu.get('gdp_francia'), suffix='% t/t')
+        gdp_uk = self._fmt(eu.get('gdp_uk'), suffix='% t/t')
+        desemp = self._fmt(eu.get('unemployment'))
 
         has_real = bool(eu.get('gdp_qoq') is not None)
         src = ' (datos BCCh)' if has_real else ''
@@ -866,15 +983,15 @@ class MacroContentGenerator:
                 f"mantiene expansión moderada."
             ),
             'por_pais': [
-                {'pais': 'Euro Area', 'gdp_2025': gdp_ez, 'gdp_2026f': '1.4%', 'consenso': '1.2%'},
-                {'pais': 'Alemania', 'gdp_2025': gdp_de, 'gdp_2026f': '1.0%', 'consenso': '0.8%'},
-                {'pais': 'Francia', 'gdp_2025': gdp_fr, 'gdp_2026f': '1.3%', 'consenso': '1.1%'},
-                {'pais': 'UK', 'gdp_2025': gdp_uk, 'gdp_2026f': '1.2%', 'consenso': '1.1%'},
+                {'pais': 'Euro Area', 'gdp_2025': gdp_ez, 'gdp_2026f': self._fc_pct('gdp_forecasts', 'eurozone', 'forecast_12m'), 'consenso': 'N/D'},
+                {'pais': 'Alemania', 'gdp_2025': gdp_de, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
+                {'pais': 'Francia', 'gdp_2025': gdp_fr, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
+                {'pais': 'UK', 'gdp_2025': gdp_uk, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
             ],
             'indicadores': [
                 {'indicador': 'Desempleo Eurozona', 'valor': desemp, 'comentario': 'BCCh' if has_real else 'Estimado'},
-                {'indicador': 'PMI Manufacturing', 'valor': '46.2', 'comentario': 'Estimado (propietario)'},
-                {'indicador': 'PMI Services', 'valor': '51.5', 'comentario': 'Estimado (propietario)'},
+                {'indicador': 'PMI Manufacturing', 'valor': self._get_bloomberg_pmi('euro_mfg'), 'comentario': 'Bloomberg'},
+                {'indicador': 'PMI Services', 'valor': self._get_bloomberg_pmi('euro_svc'), 'comentario': 'Bloomberg'},
             ],
             'desafios_estructurales': [
                 'Demografia adversa - población en edad laboral decreciendo',
@@ -884,13 +1001,46 @@ class MacroContentGenerator:
             ]
         }
 
+    def _bbg_val(self, campo_id: str, decimals: int = 1) -> str:
+        """Get a formatted Bloomberg value by campo_id, or 'N/D' if unavailable."""
+        if self.bloomberg:
+            try:
+                val = self.bloomberg.get_latest(campo_id)
+                if val is not None:
+                    return f"{val:.{decimals}f}"
+            except Exception:
+                pass
+        return 'N/D'
+
+    def _bbg_prev(self, campo_id: str, decimals: int = 1) -> str:
+        """Get a formatted Bloomberg previous-month value, or 'N/D'."""
+        if self.bloomberg:
+            try:
+                val = self.bloomberg.get_previous(campo_id)
+                if val is not None:
+                    return f"{val:.{decimals}f}"
+            except Exception:
+                pass
+        return 'N/D'
+
+    def _get_bloomberg_pmi(self, key: str) -> str:
+        """Get PMI from Bloomberg data."""
+        if self.bloomberg:
+            try:
+                pmi = self.bloomberg.get_pmi_latest()
+                if pmi and key in pmi:
+                    return f"{pmi[key]:.1f}"
+            except Exception:
+                pass
+        return 'N/D'
+
     def _generate_europe_inflation(self) -> Dict[str, Any]:
         """Genera seccion de inflación Europa."""
         eu = self._get_europe_latest()
 
-        cpi_val = self._fmt(eu.get('cpi')) if eu.get('cpi') is not None else '2.1%'
-        core_val = self._fmt(eu.get('core_cpi')) if eu.get('core_cpi') is not None else '2.3%'
-        ppi_val = self._fmt(eu.get('ppi')) if eu.get('ppi') is not None else 'N/D'
+        cpi_val = self._fmt(eu.get('cpi'))
+        core_val = self._fmt(eu.get('core_cpi'))
+        ppi_val = self._fmt(eu.get('ppi'))
 
         has_real = bool(eu.get('cpi') is not None)
         src = ' (datos BCCh)' if has_real else ''
@@ -908,7 +1058,7 @@ class MacroContentGenerator:
                 {'indicador': 'HICP Headline', 'valor': cpi_val, 'anterior': '-'},
                 {'indicador': 'HICP Core', 'valor': core_val, 'anterior': '-'},
                 {'indicador': 'PPI Eurozona', 'valor': ppi_val, 'anterior': '-'},
-                {'indicador': 'Salarios Negociados', 'valor': '3.2%', 'anterior': '3.5%'},
+                {'indicador': 'Salarios Negociados', 'valor': 'N/D', 'anterior': 'N/D'},
             ]
         }
 
@@ -916,8 +1066,8 @@ class MacroContentGenerator:
         """Genera seccion de política monetaria BCE."""
         eu = self._get_europe_latest()
 
-        ecb_rate = self._fmt(eu.get('ecb_rate'), decimals=2) if eu.get('ecb_rate') is not None else '2.25%'
-        bund_10y = self._fmt(eu.get('bund_10y'), decimals=2) if eu.get('bund_10y') is not None else '2.30%'
+        ecb_rate = self._fmt(eu.get('ecb_rate'), decimals=2)
+        bund_10y = self._fmt(eu.get('bund_10y'), decimals=2)
 
         has_real = bool(eu.get('ecb_rate') is not None)
         src = ' (datos BCCh)' if has_real else ''
@@ -934,14 +1084,10 @@ class MacroContentGenerator:
             'tasas': {
                 'deposito_actual': ecb_rate,
                 'refi_actual': bund_10y,
-                'proyección_2026': '2.00%',
-                'neutral_estimada': '2.00%'
+                'proyección_2026': self._fc_pct('rate_forecasts', 'ecb', 'forecast_12m'),
+                'neutral_estimada': 'N/D',
             },
-            'próximos_movimientos': [
-                {'fecha': 'Marzo', 'expectativa': 'Hold', 'probabilidad': '85%'},
-                {'fecha': 'Junio', 'expectativa': 'Hold', 'probabilidad': '70%'},
-                {'fecha': 'Septiembre', 'expectativa': '-25bp', 'probabilidad': '50%'},
-            ],
+            'próximos_movimientos': [],  # No market-implied probabilities available
             'balance_riesgos': {
                 'dovish': 'Crecimiento aun debil, EUR fuerte, crédito restringido',
                 'hawkish': 'Inflación servicios rebotando, salarios acelerando'
@@ -993,9 +1139,9 @@ class MacroContentGenerator:
         """Genera seccion de crecimiento China."""
         cn = self._get_china_latest()
 
-        gdp_val = self._fmt(cn.get('gdp_qoq'), suffix='% t/t') if cn.get('gdp_qoq') is not None else '4.8% a/a'
-        cpi_val = self._fmt(cn.get('cpi')) if cn.get('cpi') is not None else '0.3%'
-        desemp_val = self._fmt(cn.get('unemployment')) if cn.get('unemployment') is not None else '5.0%'
+        gdp_val = self._fmt(cn.get('gdp_qoq'), suffix='% t/t')
+        cpi_val = self._fmt(cn.get('cpi'))
+        desemp_val = self._fmt(cn.get('unemployment'))
 
         has_real = bool(cn.get('gdp_qoq') is not None)
         src = ' (datos BCCh)' if has_real else ''
@@ -1015,27 +1161,38 @@ class MacroContentGenerator:
                 {'indicador': 'Desempleo Urbano', 'valor': desemp_val, 'anterior': 'BCCh' if cn.get('unemployment') is not None else 'Estimado'},
             ],
             'indicadores': [
-                {'indicador': 'PMI Manufacturing', 'valor': '50.2', 'comentario': 'Estimado (propietario)'},
-                {'indicador': 'PMI Services', 'valor': '52.1', 'comentario': 'Estimado (propietario)'},
+                {'indicador': 'PMI Manufacturing', 'valor': self._get_bloomberg_pmi('china_mfg'), 'comentario': 'Bloomberg'},
+                {'indicador': 'PMI Services', 'valor': self._get_bloomberg_pmi('china_svc'), 'comentario': 'Bloomberg'},
             ]
         }
 
     def _generate_china_property(self) -> Dict[str, Any]:
         """Genera seccion de sector inmobiliario China."""
+        prop_sales = self._bbg_val('china_property_sales_yoy')
+        prop_prev = self._bbg_prev('china_property_sales_yoy')
+
+        has_bbg = prop_sales != 'N/D'
+        if has_bbg:
+            narrativa = (
+                f"Las ventas de propiedades residenciales muestran una variacion YoY de {prop_sales}%. "
+                "El sector inmobiliario sigue bajo presion, pero las medidas de soporte del gobierno "
+                "apuntan a estabilizar la actividad gradualmente."
+            )
+        else:
+            narrativa = (
+                "El sector inmobiliario muestra señales de estabilizacion tras las agresivas "
+                "medidas de soporte, aunque los niveles de actividad permanecen deprimidos. "
+                "Datos detallados de propiedad no disponibles via APIs gratuitas."
+            )
+
         return {
             'titulo': 'Sector Inmobiliario',
-            'narrativa': (
-                "El sector inmobiliario muestra señales de estabilizacion tras las agresivas "
-                "medidas de soporte, aunque los niveles de actividad permanecen deprimidos vs "
-                "2021. Las ventas de propiedades caen 15% a/a pero el ritmo de caida se modera. "
-                "Estimamos que el drag del sector sobre el GDP sera de -0.5pp en 2026, "
-                "menor que el -1.0pp de 2025."
-            ),
+            'narrativa': narrativa,
             'datos': [
-                {'indicador': 'Property Sales', 'valor': '-15% a/a', 'anterior': '-20%'},
-                {'indicador': 'Housing Starts', 'valor': '-25% a/a', 'anterior': '-30%'},
-                {'indicador': 'Home Prices (Tier 1)', 'valor': '-3% a/a', 'anterior': '-5%'},
-                {'indicador': 'Developer Funding', 'valor': '-10% a/a', 'anterior': '-15%'},
+                {'indicador': 'Property Sales YoY', 'valor': prop_sales, 'anterior': prop_prev},
+                {'indicador': 'Housing Starts', 'valor': 'N/D', 'anterior': 'N/D'},
+                {'indicador': 'Home Prices (Tier 1)', 'valor': 'N/D', 'anterior': 'N/D'},
+                {'indicador': 'Developer Funding', 'valor': 'N/D', 'anterior': 'N/D'},
             ],
             'políticas_soporte': [
                 'Reduccion tasas hipotecarias',
@@ -1043,28 +1200,44 @@ class MacroContentGenerator:
                 'Programa de compra de inventarios por gobiernos locales',
                 'Financiamiento a developers viables'
             ],
-            'drag_estimado': {
-                '2024': '-1.0pp del GDP',
-                '2025f': '-0.5pp del GDP',
-                '2026f': '-0.2pp del GDP'
-            }
+            'drag_estimado': {}
         }
 
     def _generate_china_credit(self) -> Dict[str, Any]:
         """Genera seccion de impulso crediticio China."""
+        tsf = self._bbg_val('china_tsf_yoy')
+        tsf_prev = self._bbg_prev('china_tsf_yoy')
+        new_loans = self._bbg_val('china_new_loans', 0)
+        new_loans_prev = self._bbg_prev('china_new_loans', 0)
+        m2 = self._bbg_val('china_m2_yoy')
+        m2_prev = self._bbg_prev('china_m2_yoy')
+
+        has_bbg = tsf != 'N/D' or m2 != 'N/D'
+        if has_bbg:
+            parts = []
+            if tsf != 'N/D':
+                parts.append(f"TSF crece {tsf}% YoY")
+            if m2 != 'N/D':
+                parts.append(f"M2 al {m2}% YoY")
+            narrativa = (
+                f"El impulso crediticio chino muestra {', '.join(parts)}. "
+                "Históricamente, el credit impulse positivo precede mejor demanda "
+                "de commodities y crecimiento global con lag de 6-9 meses."
+            )
+        else:
+            narrativa = (
+                "El impulso crediticio se ha vuelto positivo tras meses de contracción, "
+                "senalando mejor soporte al crecimiento."
+            )
+
         return {
             'titulo': 'Impulso Crediticio',
-            'narrativa': (
-                "El impulso crediticio se ha vuelto positivo tras meses de contracción, "
-                "senalando mejor soporte al crecimiento. El Total Social Financing crece "
-                "al 10% a/a, con expansión en bonos gubernamentales compensando debilidad "
-                "en crédito corporativo y shadow banking."
-            ),
+            'narrativa': narrativa,
             'datos': [
-                {'indicador': 'TSF Growth', 'valor': '10.0% a/a', 'anterior': '9.5%'},
-                {'indicador': 'New Yuan Loans', 'valor': 'CNY 1.2T', 'anterior': 'CNY 1.0T'},
-                {'indicador': 'Credit Impulse', 'valor': '+2.5pp', 'anterior': '+1.0pp'},
-                {'indicador': 'M2 Growth', 'valor': '8.5% a/a', 'anterior': '8.0%'},
+                {'indicador': 'TSF Growth YoY', 'valor': tsf, 'anterior': tsf_prev},
+                {'indicador': 'New Yuan Loans', 'valor': new_loans, 'anterior': new_loans_prev},
+                {'indicador': 'Credit Impulse', 'valor': 'N/D', 'anterior': 'N/D'},
+                {'indicador': 'M2 Growth YoY', 'valor': m2, 'anterior': m2_prev},
             ],
             'implicancias_globales': (
                 "El credit impulse positivo en China históricamente precede mejor demanda "
@@ -1074,20 +1247,43 @@ class MacroContentGenerator:
 
     def _generate_china_trade(self) -> Dict[str, Any]:
         """Genera seccion de comercio exterior China."""
-        return {
-            'titulo': 'Comercio Exterior',
-            'narrativa': (
+        trade_bal = self._bbg_val('china_trade_bal', 1)
+        trade_prev = self._bbg_prev('china_trade_bal', 1)
+        exp_yoy = self._bbg_val('china_exp_yoy')
+        exp_prev = self._bbg_prev('china_exp_yoy')
+        imp_yoy = self._bbg_val('china_imp_yoy')
+        imp_prev = self._bbg_prev('china_imp_yoy')
+
+        has_bbg = exp_yoy != 'N/D' or trade_bal != 'N/D'
+        if has_bbg:
+            parts = []
+            if exp_yoy != 'N/D':
+                parts.append(f"exportaciones al {exp_yoy}% YoY")
+            if imp_yoy != 'N/D':
+                parts.append(f"importaciones al {imp_yoy}% YoY")
+            if trade_bal != 'N/D':
+                parts.append(f"balanza comercial en USD {trade_bal}bn")
+            narrativa = (
+                f"Comercio exterior chino: {', '.join(parts)}. "
+                "El overcapacity industrial en sectores como EVs, paneles solares y maquinaria "
+                "mantiene tensiones comerciales con socios."
+            )
+        else:
+            narrativa = (
                 "Las exportaciones chinas mantienen fortaleza impulsadas por productos "
                 "manufacturados, especialmente autos eléctricos, paneles solares y maquinaria. "
                 "El superávit comercial se mantiene en niveles record, generando tensiones "
                 "comerciales con socios. El overcapacity industrial es un riesgo para "
                 "competidores globales."
-            ),
+            )
+
+        return {
+            'titulo': 'Comercio Exterior',
+            'narrativa': narrativa,
             'datos': [
-                {'indicador': 'Trade Balance', 'valor': '$75B', 'anterior': '$70B'},
-                {'indicador': 'Exports', 'valor': '+8% a/a', 'anterior': '+5%'},
-                {'indicador': 'Imports', 'valor': '+2% a/a', 'anterior': '-1%'},
-                {'indicador': 'Exports to US', 'valor': '+12% a/a', 'comentario': 'Front-loading?'},
+                {'indicador': 'Trade Balance', 'valor': trade_bal, 'anterior': trade_prev},
+                {'indicador': 'Exports YoY', 'valor': exp_yoy, 'anterior': exp_prev},
+                {'indicador': 'Imports YoY', 'valor': imp_yoy, 'anterior': imp_prev},
             ],
             'implicancias_commodities': [
                 'Demanda de cobre estable por sector construcción/infra',
@@ -1100,8 +1296,8 @@ class MacroContentGenerator:
         """Genera seccion de política monetaria PBOC."""
         cn = self._get_china_latest()
 
-        pboc_rate = self._fmt(cn.get('pboc_rate'), decimals=2) if cn.get('pboc_rate') is not None else '2.50%'
-        cny_val = f"{cn['cny_usd']:.2f}" if cn.get('cny_usd') is not None else '7.30'
+        pboc_rate = self._fmt(cn.get('pboc_rate'), decimals=2)
+        cny_val = f"{cn['cny_usd']:.2f}" if cn.get('cny_usd') is not None else 'N/D'
         shanghai = f"{cn['shanghai']:.0f}" if cn.get('shanghai') is not None else 'N/D'
 
         has_real = bool(cn.get('pboc_rate') is not None)
@@ -1117,10 +1313,10 @@ class MacroContentGenerator:
             ),
             'tasas': {
                 'pboc_rate': pboc_rate,
-                'lpr_1y': '3.10%',
-                'lpr_5y': '3.60%',
-                'rrr': '9.50%',
-                'yuan_usdcny': cny_val
+                'lpr_1y': 'N/D',
+                'lpr_5y': 'N/D',
+                'rrr': 'N/D',
+                'yuan_usdcny': cny_val,
             },
             'outlook': {
                 'tasas': 'Sesgo neutral, espacio limitado para más recortes',
@@ -1152,33 +1348,29 @@ class MacroContentGenerator:
         desemp = cl.get('desempleo')
 
         # Use real values if available
-        imacec_str = self._fmt(imacec) + ' a/a' if imacec is not None else '2.5% a/a'
-        desemp_str = self._fmt(desemp) if desemp is not None else '8.5%'
+        imacec_str = (self._fmt(imacec) + ' a/a') if imacec is not None else 'N/D'
+        desemp_str = self._fmt(desemp)
 
         narrativa = (
             f"La economía chilena consolida su recuperación. "
-            f"El IMACEC muestra expansión de {imacec_str if imacec is not None else '~2.5% a/a'}, "
+            f"El IMACEC muestra expansión de {imacec_str}, "
             f"con servicios y mineria como drivers. "
             f"El consumo privado mantiene dinamismo apoyado por salarios reales positivos. "
             f"La tasa de desempleo se ubica en {desemp_str}. "
-            f"Proyectamos GDP de 2.5% para 2026."
+            f"Proyección de GDP para 2026: {self._fc_pct('gdp_forecasts', 'chile', 'forecast_12m')}."
         )
 
         return {
             'titulo': 'Chile - Crecimiento',
             'narrativa': narrativa,
             'datos': [
-                {'indicador': 'IMACEC', 'valor': imacec_str, 'anterior': '2.2%', 'tendencia': 'Recuperando'},
-                {'indicador': 'GDP Trim (t/t-4)', 'valor': '2.3%', 'anterior': '2.0%', 'tendencia': 'Estable'},
-                {'indicador': 'Consumo Privado', 'valor': '3.5% a/a', 'anterior': '3.0%', 'tendencia': 'Solido'},
-                {'indicador': 'Inversion (FBCF)', 'valor': '-2.0% a/a', 'anterior': '-3.5%', 'tendencia': 'Debil'},
-                {'indicador': 'Exportaciones', 'valor': '4.5% a/a', 'anterior': '3.8%', 'tendencia': 'Firme'},
+                {'indicador': 'IMACEC', 'valor': imacec_str, 'anterior': 'N/D', 'tendencia': '-'},
+                {'indicador': 'GDP Trim (t/t-4)', 'valor': 'N/D', 'anterior': 'N/D', 'tendencia': '-'},
+                {'indicador': 'Consumo Privado', 'valor': 'N/D', 'anterior': 'N/D', 'tendencia': '-'},
+                {'indicador': 'Inversion (FBCF)', 'valor': 'N/D', 'anterior': 'N/D', 'tendencia': '-'},
             ],
             'mercado_laboral': [
-                {'indicador': 'Tasa Desempleo', 'valor': desemp_str, 'anterior': '8.8%'},
-                {'indicador': 'Ocupacion', 'valor': '+1.5% a/a', 'anterior': '+1.2%'},
-                {'indicador': 'Participación', 'valor': '60.5%', 'anterior': '60.2%'},
-                {'indicador': 'Salarios Reales', 'valor': '+1.8% a/a', 'anterior': '+1.5%'},
+                {'indicador': 'Tasa Desempleo', 'valor': desemp_str, 'anterior': 'N/D'},
             ]
         }
 
@@ -1188,30 +1380,26 @@ class MacroContentGenerator:
         ipc_yoy = cl.get('ipc_yoy')
         ipc_mom = cl.get('ipc_mom')
 
-        ipc_yoy_str = self._fmt(ipc_yoy) + ' a/a' if ipc_yoy is not None else '3.8% a/a'
-        ipc_mom_str = f"+{self._fmt(ipc_mom)}" if ipc_mom is not None else '+0.2%'
+        ipc_yoy_str = (self._fmt(ipc_yoy) + ' a/a') if ipc_yoy is not None else 'N/D'
+        ipc_mom_str = f"+{self._fmt(ipc_mom)}" if ipc_mom is not None else 'N/D'
 
         narrativa = (
             f"La desinflación continua on track, con el IPC convergiendo hacia la meta. "
             f"El IPC headline se ubica en {ipc_yoy_str}, "
             f"con una variación mensual de {ipc_mom_str}. "
-            f"Las expectativas de inflación a 2 años se mantienen ancladas en 3.0%."
+            f"Las expectativas de inflación son monitoreadas por el BCCh."
         )
 
         return {
             'titulo': 'Chile - Inflación',
             'narrativa': narrativa,
             'datos': [
-                {'indicador': 'IPC Headline', 'valor': ipc_yoy_str, 'anterior': '4.2%', 'mom': ipc_mom_str},
-                {'indicador': 'IPC Subyacente (SAE)', 'valor': '3.6% a/a', 'anterior': '3.9%', 'mom': '+0.3%'},
-                {'indicador': 'Transables', 'valor': '-0.5% a/a', 'anterior': '0.2%', 'comentario': 'Deflacion'},
-                {'indicador': 'No Transables', 'valor': '4.5% a/a', 'anterior': '4.8%', 'comentario': 'Moderando'},
+                {'indicador': 'IPC Headline', 'valor': ipc_yoy_str, 'anterior': 'N/D', 'mom': ipc_mom_str},
+                {'indicador': 'IPC Subyacente (SAE)', 'valor': 'N/D', 'anterior': 'N/D', 'mom': 'N/D'},
             ],
             'expectativas': [
-                {'medida': 'EEE 1 año', 'valor': '3.2%', 'anterior': '3.4%'},
-                {'medida': 'EEE 2 años', 'valor': '3.0%', 'anterior': '3.0%'},
-                {'medida': 'EOF 1 año', 'valor': '3.3%', 'anterior': '3.5%'},
-                {'medida': 'Breakevens 2y', 'valor': '3.1%', 'anterior': '3.2%'},
+                {'medida': 'EEE 1 año', 'valor': 'N/D', 'anterior': 'N/D'},
+                {'medida': 'EEE 2 años', 'valor': 'N/D', 'anterior': 'N/D'},
             ]
         }
 
@@ -1221,8 +1409,8 @@ class MacroContentGenerator:
         tpm = cl.get('tpm')
         ipc_yoy = cl.get('ipc_yoy')
 
-        tpm_str = self._fmt(tpm) if tpm is not None else '4.50%'
-        tpm_real_str = self._fmt(tpm - ipc_yoy, decimals=1) if (tpm is not None and ipc_yoy is not None) else '1.5%'
+        tpm_str = self._fmt(tpm)
+        tpm_real_str = self._fmt(tpm - ipc_yoy, decimals=1) if (tpm is not None and ipc_yoy is not None) else 'N/D'
 
         narrativa = (
             f"El BCCh mantiene la TPM en {tpm_str}. "
@@ -1236,26 +1424,20 @@ class MacroContentGenerator:
             'narrativa': narrativa,
             'tasas': {
                 'tpm_actual': tpm_str,
-                'tpm_neutral': '4.00%',
+                'tpm_neutral': 'N/D',
                 'tpm_real': tpm_real_str,
-                'proyección_2026': '4.25%',
-                'consenso_2026': '4.25%'
+                'proyección_2026': self._fc_pct('rate_forecasts', 'tpm_chile', 'forecast_12m'),
+                'consenso_2026': 'N/D',
             },
             'ipom_path': [
                 {'trimestre': 'Q1 2026', 'tpm_proyectada': tpm_str},
-                {'trimestre': 'Q2 2026', 'tpm_proyectada': '4.25%'},
-                {'trimestre': 'Q3 2026', 'tpm_proyectada': '4.25%'},
-                {'trimestre': 'Q4 2026', 'tpm_proyectada': '4.25%'},
+                {'trimestre': 'Q2 2026', 'tpm_proyectada': self._fc_pct('rate_forecasts', 'tpm_chile', 'forecast_12m')},
             ],
             'comunicacion': (
                 "El Consejo del BCCh senala que mantendra la TPM en niveles cercanos al neutral, "
                 "evaluando la evolución de la inflación y la actividad económica."
             ),
-            'proximas_reuniones': [
-                {'fecha': 'Mar 2026', 'expectativa': 'Hold', 'probabilidad': '70%'},
-                {'fecha': 'May 2026', 'expectativa': '-25bp', 'probabilidad': '55%'},
-                {'fecha': 'Jul 2026', 'expectativa': 'Hold', 'probabilidad': '60%'},
-            ]
+            'proximas_reuniones': [],  # No market-implied probabilities available
         }
 
     def _generate_chile_external(self) -> Dict[str, Any]:
@@ -1263,29 +1445,24 @@ class MacroContentGenerator:
         cl = self._get_chile_latest()
         usd_clp = cl.get('usd_clp')
 
-        usdclp_str = f"{usd_clp:.0f}" if usd_clp is not None else '920'
+        usdclp_str = f"{usd_clp:.0f}" if usd_clp is not None else 'N/D'
 
         narrativa = (
-            "La cuenta corriente se ha corregido significativamente desde los déficits "
-            "record de 2022. El déficit se ubica en -3.5% del GDP, financiado principalmente "
-            "por IED. Los terminos de intercambio mejoran levemente por precio del cobre, "
-            f"aunque el litio sigue deprimido. El tipo de cambio se ubica en "
-            f"{usdclp_str} CLP/USD."
+            f"El tipo de cambio se ubica en {usdclp_str} CLP/USD. "
+            f"Los terminos de intercambio dependen del precio del cobre y el litio."
         )
 
         return {
             'titulo': 'Chile - Cuentas Externas',
             'narrativa': narrativa,
             'datos': [
-                {'indicador': 'Cuenta Corriente', 'valor': '-3.5% GDP', 'anterior': '-4.2%'},
-                {'indicador': 'Balanza Comercial', 'valor': '+$1.5B', 'anterior': '+$1.2B'},
-                {'indicador': 'Terminos de Intercambio', 'valor': '+2% a/a', 'anterior': '-5%'},
-                {'indicador': 'IED Neta', 'valor': '$8B ytd', 'anterior': '$7B'},
+                {'indicador': 'Cuenta Corriente', 'valor': 'N/D', 'anterior': 'N/D'},
+                {'indicador': 'Balanza Comercial', 'valor': 'N/D', 'anterior': 'N/D'},
             ],
             'tipo_cambio': {
                 'usdclp_actual': usdclp_str,
-                'rango_12m': '850-980',
-                'drivers': 'Diferencial tasas, precio cobre, risk appetite global'
+                'rango_12m': 'N/D',
+                'drivers': 'Diferencial tasas, precio cobre, risk appetite global',
             }
         }
 
@@ -1301,7 +1478,24 @@ class MacroContentGenerator:
                     copper_price = float(cobre_series.iloc[-1])  # BCCh returns USD/lb directly
             except Exception:
                 pass
-        copper_str = f'${copper_price:.2f}/lb' if copper_price else '$4.35/lb'
+        copper_str = f'${copper_price:.2f}/lb' if copper_price else 'N/D'
+
+        # Get litio and brent from BCCh if available
+        litio_str = 'N/D'
+        brent_str = 'N/D'
+        if self.data:
+            try:
+                comm = self.data.get_commodities()
+                litio_series = comm.get('litio')
+                if litio_series is not None and len(litio_series) > 0:
+                    litio_val = float(litio_series.iloc[-1])
+                    litio_str = f'${litio_val:,.0f}/ton'
+                brent_series = comm.get('petroleo')
+                if brent_series is not None and len(brent_series) > 0:
+                    brent_val = float(brent_series.iloc[-1])
+                    brent_str = f'${brent_val:.1f}/bbl'
+            except Exception:
+                pass
 
         return {
             'titulo': 'Commodities Relevantes',
@@ -1309,139 +1503,79 @@ class MacroContentGenerator:
                 {
                     'nombre': 'Cobre',
                     'precio_actual': copper_str,
-                    'precio_anterior': '$4.20/lb',
-                    'cambio': '+3.6%',
+                    'precio_anterior': 'N/D',
+                    'cambio': 'N/D',
                     'outlook': 'Constructivo',
                     'balance': 'Déficit proyectado 2026-2027',
                     'drivers': 'Transición energetica, AI data centers, oferta limitada',
-                    'inventarios': {
-                        'lme': '185K tons',
-                        'shfe': '95K tons',
-                        'comex': '22K tons',
-                        'total': '302K tons',
-                        'dias_consumo': '4.2 dias',
-                        'vs_promedio_5y': '-35%',
-                        'tendencia': 'Normalizando pero aun tight'
-                    },
-                    'supply': {
-                        'producción_2026e': '22.5M tons',
-                        'demanda_2026e': '23.2M tons',
-                        'déficit': '-700K tons',
-                        'crecimiento_oferta': '+2.1%',
-                        'crecimiento_demanda': '+3.5%'
-                    },
-                    'breakeven_costs': {
-                        'percentil_90': '$3.50/lb',
-                        'percentil_75': '$3.00/lb',
-                        'percentil_50': '$2.50/lb',
-                        'costo_marginal': '$3.80/lb',
-                        'comentario': 'Precios actuales muy sobre costo marginal - soportan expansión'
-                    }
+                    'inventarios': {},  # No free API for LME/SHFE inventory data
+                    'supply': {},  # No free API for supply/demand balance
+                    'breakeven_costs': {},  # No free API for mining cost curves
                 },
                 {
                     'nombre': 'Litio',
-                    'precio_actual': '$10K/ton',
-                    'precio_anterior': '$12K/ton',
-                    'cambio': '-16.7%',
+                    'precio_actual': litio_str,
+                    'precio_anterior': 'N/D',
+                    'cambio': 'N/D',
                     'outlook': 'Estabilizando',
                     'balance': 'Superávit moderandose por cierre de capacidad marginal',
                     'drivers': 'Demanda EV solida pero oferta aun abundante',
-                    'inventarios': {
-                        'china_carbonato': '85K tons',
-                        'dias_consumo': '28 dias',
-                        'tendencia': 'Estabilizandose tras drawdown'
-                    },
-                    'supply': {
-                        'producción_2026e': '1.2M LCE tons',
-                        'demanda_2026e': '1.1M LCE tons',
-                        'superávit': '+100K tons',
-                        'crecimiento_oferta': '+15%',
-                        'crecimiento_demanda': '+20%'
-                    },
-                    'breakeven_costs': {
-                        'australia_spodumene': '$12K/ton',
-                        'chile_salmuera': '$6K/ton',
-                        'argentina_salmuera': '$8K/ton',
-                        'costo_marginal': '$14K/ton',
-                        'comentario': 'Precios bajo costo marginal - productores australianos bajo presion'
-                    }
+                    'inventarios': {},  # No free API for lithium inventory data
+                    'supply': {},  # No free API for supply/demand balance
+                    'breakeven_costs': {},  # No free API for cost curves
                 },
                 {
                     'nombre': 'Petróleo (Brent)',
-                    'precio_actual': '$78/bbl',
-                    'precio_anterior': '$82/bbl',
-                    'cambio': '-4.9%',
+                    'precio_actual': brent_str,
+                    'precio_anterior': 'N/D',
+                    'cambio': 'N/D',
                     'outlook': 'Neutral',
                     'balance': 'Equilibrado con OPEC+ support',
                     'drivers': 'Demanda China debil, OPEC+ disciplinado, geopolítica',
-                    'inventarios': {
-                        'oecd': '2.75B bbl',
-                        'dias_cobertura': '62 dias',
-                        'vs_promedio_5y': '+3%'
-                    },
-                    'breakeven_costs': {
-                        'shale_us': '$50/bbl',
-                        'offshore': '$45/bbl',
-                        'opec': '$35/bbl',
-                        'fiscal_breakeven_saudi': '$85/bbl'
-                    }
+                    'inventarios': {},  # No free API for OECD inventory data
+                    'breakeven_costs': {},  # No free API for cost curves
                 }
             ],
-            'transmisión_global': {
-                'titulo': 'Transmision a Chile',
-                'cobre_impacto': {
-                    'cuenta_corriente': '+$1.5B por cada +$0.50/lb',
-                    'ingresos_fiscales': '+$1.2B por cada +$0.50/lb',
-                    'tipo_cambio': '-25 CLP/USD por cada +$0.50/lb'
-                },
-                'petróleo_impacto': {
-                    'importaciones': '-$0.8B por cada +$10/bbl',
-                    'inflación': '+0.15pp IPC por cada +$10/bbl'
-                }
-            },
-            'impacto_fiscal': {
-                'cobre': '+$2.5B ingresos fiscales vs 2025',
-                'litio': 'Neutral vs expectativas revisadas',
-                'neto': 'Positivo para cuentas fiscales 2026'
-            }
+            'transmisión_global': {},  # No free data for fiscal sensitivity analysis
+            'impacto_fiscal': {},  # No free data for fiscal impact estimates
         }
 
     def _generate_latam_context(self) -> Dict[str, Any]:
         """Genera contexto de LatAm."""
         return {
             'titulo': 'Contexto LatAm',
-            'paises': [
-                {
-                    'pais': 'Brasil',
-                    'gdp': '2.0%',
-                    'inflación': '4.5%',
-                    'tasa': '11.75% (Selic)',
-                    'outlook': 'Fiscal sigue como riesgo; BCB hawkish',
-                    'riesgo_principal': 'Desanclaje expectativas inflación, sostenibilidad fiscal'
-                },
-                {
-                    'pais': 'Mexico',
-                    'gdp': '1.8%',
-                    'inflación': '4.2%',
-                    'tasa': '10.25% (Banxico)',
-                    'outlook': 'Nearshoring beneficia, Banxico en recortes',
-                    'riesgo_principal': 'Relacion con US post-elecciones, PEMEX'
-                },
-                {
-                    'pais': 'Colombia',
-                    'gdp': '1.5%',
-                    'inflación': '5.5%',
-                    'tasa': '9.50%',
-                    'outlook': 'Desinflación lenta, BanRep cautioso',
-                    'riesgo_principal': 'Política económica, déficit fiscal'
-                }
-            ],
+            'paises': self._build_latam_table(),
             'diferenciacion_chile': (
                 "Chile se diferencia positivamente por: (1) Inflación controlada y convergiendo, "
                 "(2) Banco central credible con espacio para recortes, (3) Cuentas externas "
                 "en correccion, (4) Precio del cobre favorable."
             )
         }
+
+    def _build_latam_table(self) -> List[Dict]:
+        """Build LatAm macro table from BCCh data."""
+        if not self.data:
+            return [{'pais': p, 'gdp': 'N/D', 'inflación': 'N/D', 'tasa': 'N/D', 'outlook': '-', 'riesgo_principal': '-'}
+                    for p in ['Brasil', 'Mexico', 'Colombia']]
+        try:
+            latam = self.data.get_latam_macro()
+        except Exception:
+            latam = {}
+        result = []
+        names = {'Brasil': 'Selic', 'Mexico': 'Banxico', 'Colombia': 'BanRep', 'Peru': 'BCRP'}
+        for country, rate_name in names.items():
+            d = latam.get(country, {})
+            cpi = d.get('cpi')
+            tasa = d.get('tasa')
+            result.append({
+                'pais': country,
+                'gdp': 'N/D',
+                'inflación': f"{cpi:.1f}%" if cpi is not None else 'N/D',
+                'tasa': f"{tasa:.2f}% ({rate_name})" if tasa is not None else 'N/D',
+                'outlook': '-',
+                'riesgo_principal': '-',
+            })
+        return result
 
     # =========================================================================
     # SECCION 6: TEMAS MACRO CLAVE
@@ -1595,100 +1729,57 @@ class MacroContentGenerator:
         }
 
     def _generate_scenarios(self) -> Dict[str, Any]:
-        """Genera escenarios macro."""
-        return {
-            'base': {
-                'nombre': 'Soft Landing',
-                'probabilidad': 55,
-                'descripcion': (
-                    "Crecimiento global se mantiene en 2.5-3.0%, inflación converge a targets, "
-                    "bancos centrales recortan tasas gradualmente. US evita recesión con "
-                    "desaceleración moderada. China estabiliza con estimulos."
-                ),
-                'implicancias': {
-                    'gdp_us': '2.0-2.5%',
-                    'inflación_us': '2.3-2.8%',
-                    'fed_funds': '3.50-4.00%',
-                    'sp500': '+5-10%'
-                }
-            },
-            'upside': {
-                'nombre': 'No Landing / Re-acceleracion',
-                'probabilidad': 20,
-                'descripcion': (
-                    "Crecimiento supera expectativas, productividad por AI, mercado laboral "
-                    "robusto. Riesgo: reflacion que fuerza a Fed a pausar o revertir recortes."
-                ),
-                'implicancias': {
-                    'gdp_us': '2.5-3.0%',
-                    'inflación_us': '3.0-3.5%',
-                    'fed_funds': '4.00-4.50%',
-                    'sp500': '+10-15%'
-                },
-                'triggers': [
-                    'GDP Q1 > 3% anualizado',
-                    'Core PCE estancado en 3%+',
-                    'NFP > 250K promedio'
-                ]
-            },
-            'downside': {
-                'nombre': 'Hard Landing / Recesión',
-                'probabilidad': 25,
-                'descripcion': (
-                    "Credit crunch, colapso consumo, desempleo sube a 5.5%+. "
-                    "Fed forzado a recortes agresivos. Risk off global."
-                ),
-                'implicancias': {
-                    'gdp_us': '-0.5-0.5%',
-                    'inflación_us': '1.5-2.0%',
-                    'fed_funds': '2.50-3.00%',
-                    'sp500': '-15-20%'
-                },
-                'triggers': [
-                    'Initial claims > 300K sostenido',
-                    'Desempleo > 5%',
-                    'Credit spreads HY > 500bp'
-                ]
+        """Scenarios from council parser — zero hardcoded data."""
+        scenarios = self.parser.get_scenario_probs() if self.parser else None
+        if not scenarios:
+            return {
+                'escenarios': [],
+                'narrativa': 'Sin escenarios definidos por el comité.'
             }
+
+        result = []
+        for key, data in scenarios.items():
+            result.append({
+                'nombre': data.get('name', key),
+                'probabilidad': data.get('prob', 'N/D'),
+                'descripcion': data.get('description', 'Sin descripción'),
+                'implicancias': {
+                    'gdp_us': 'N/D',
+                    'inflación_us': 'N/D',
+                    'fed_funds': 'N/D',
+                    'sp500': 'N/D',
+                },
+                'triggers': []
+            })
+
+        return {
+            'escenarios': result,
+            'narrativa': ''  # Will be filled by narrative_engine
         }
 
-    def _generate_top_risks(self) -> List[Dict[str, Any]]:
-        """Genera top 3 riesgos macro."""
-        return [
-            {
-                'nombre': 'Escalada Comercial US-China',
-                'probabilidad': '30%',
-                'impacto': 'Alto',
-                'descripcion': (
-                    "Aranceles adicionales de 25%+ podrian reducir GDP global en 0.5pp "
-                    "y generar presion inflaciónaria. Cadenas de suministro dislocadas."
-                ),
-                'senal_temprana': 'Anuncios de aranceles post-inauguracion, retorica agresiva',
-                'implicancia_macro': 'GDP -0.3pp, CPI +0.5pp, USD fortaleza'
-            },
-            {
-                'nombre': 'Inflación Sticky / Fed Hawkish',
-                'probabilidad': '25%',
-                'impacto': 'Medio-Alto',
-                'descripcion': (
-                    "Inflación de servicios no cede, Fed pausa o revierte recortes. "
-                    "Tasas largas suben, valuaciones bajo presion."
-                ),
-                'senal_temprana': 'Core PCE > 3% por 3 meses, wages acelerando',
-                'implicancia_macro': 'Fed Funds 4.5%+ EOY, 10y > 5%'
-            },
-            {
-                'nombre': 'Crisis Fiscal / Debt Ceiling',
-                'probabilidad': '20%',
-                'impacto': 'Medio',
-                'descripcion': (
-                    "Negociaciones de debt ceiling generan volatilidad. Riesgo de shutdown "
-                    "o downgrade crediticio. Presion sobre tasas largas."
-                ),
-                'senal_temprana': 'Stalemate en Congreso, CDS US widening',
-                'implicancia_macro': 'Term premium sube, USD debilidad temporal'
+    def _generate_top_risks(self) -> Dict[str, Any]:
+        """Top risks from council — zero hardcoded data."""
+        risks = self.parser.get_risk_assessment() if self.parser else None
+        if not risks:
+            return {
+                'riesgos': [],
+                'narrativa': 'Sin evaluación de riesgos del comité.'
             }
-        ]
+
+        result = []
+        for r in risks[:5]:  # Top 5
+            result.append({
+                'nombre': r.get('risk', 'N/D'),
+                'probabilidad': f"{r['probability']}" if r.get('probability') else 'N/D',
+                'impacto': r.get('impact', 'N/D'),
+                'horizonte': r.get('horizon', 'N/D'),
+                'monitoreo': r.get('risk', ''),
+            })
+
+        return {
+            'riesgos': result,
+            'narrativa': ''  # Will be filled by narrative_engine
+        }
 
     # =========================================================================
     # SECCION 8: CONCLUSIONES Y VISTA DEL COMITE
@@ -1829,7 +1920,7 @@ class MacroContentGenerator:
                     'vs_detalle': 'Vista alineada con expectativas del mercado.'
                 },
             ],
-            'posicionamiento_resumen': 'Postura neutral con sesgo constructivo.',
+            'posicionamiento_resumen': 'N/D — ver council para posicionamiento.',
             'proximo_reporte': 'Este analisis sirve como input para reportes de Asset Allocation y Renta Fija.'
         }
 
@@ -1839,8 +1930,16 @@ class MacroContentGenerator:
 
     def generate_all_content(self) -> Dict[str, Any]:
         """Genera todo el contenido del reporte macro."""
+        # Set up anti-fabrication filter with verified macro data
+        try:
+            from narrative_engine import set_verified_data, clear_verified_data, build_verified_data_macro
+            vd = build_verified_data_macro(self.quant, self.data)
+            if vd:
+                set_verified_data(vd)
+        except Exception:
+            pass
 
-        return {
+        content = {
             'metadata': {
                 'fecha': self.date.strftime('%Y-%m-%d'),
                 'mes': self.month_name,
@@ -1858,6 +1957,15 @@ class MacroContentGenerator:
             'escenarios_riesgos': self.generate_scenarios_risks(),
             'conclusiones': self.generate_conclusions()
         }
+
+        # Clear anti-fabrication verified data
+        try:
+            from narrative_engine import clear_verified_data
+            clear_verified_data()
+        except Exception:
+            pass
+
+        return content
 
 
 # =============================================================================

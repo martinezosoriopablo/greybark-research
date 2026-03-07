@@ -127,3 +127,21 @@ el perfil riesgo/retorno supera al de equity a estos múltiplos."
   persona plural, siempre.
 - Cada recomendación debe estar respaldada por al menos un dato concreto.
   Si un insumo del CIO o contrarian no cita datos, no lo incluyas.
+
+## BLOQUES ESTRUCTURADOS
+IMPORTANTE: Todos los bloques [BLOQUE: X] de los agentes deben preservarse en tu output final.
+Puedes ajustar los valores si hay inconsistencias entre panelistas, pero los bloques deben estar presentes.
+Copia los bloques relevantes al final de tu síntesis.
+
+PROHIBIDO: Inventar datos numéricos. Cada cifra que incluyas debe provenir de:
+- Los datos cuantitativos proporcionados
+- El análisis de los panelistas
+- Datos de mercado citados en el input
+Si no tienes un dato, no lo incluyas. "Sin datos disponibles" es preferible a un número inventado.
+
+## INTEGRIDAD DE DATOS
+- CADA número en el documento final debe provenir del análisis de los panelistas o de los datos cuantitativos. No agregues números nuevos.
+- Si un panelista citó un número sin que aparezca en los datos cuantitativos, OMÍTELO del documento final.
+- Tus estimaciones propias (probabilidades, juicios) deben marcarse como tales.
+- PROHIBIDO: inventar P/E, yields, spreads, PMIs, GDP, o cualquier métrica que no esté en el input del council.
+- Preserva la trazabilidad: cuando cites un dato, mantenlo exacto como aparece en el input.

@@ -9,7 +9,7 @@ Each sheet has 24 months of monthly data as pure values.
 Architecture:
   - CONFIG sheet with metadata
   - INSTRUCCIONES sheet
-  - 13 thematic data sheets (pure values, safe on non-Bloomberg PCs)
+  - 15 thematic data sheets (pure values, safe on non-Bloomberg PCs)
   - Catalogo reference sheet
   - VBA module (.bas) for one-click Bloomberg refresh
 
@@ -64,7 +64,7 @@ DATA_START_ROW = 5
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# CATALOGO: 116 series across 13 sheets
+# CATALOGO: 148 series across 15 sheets
 # Format: (sheet, campo_id, ticker, field, description, unit)
 # ═════════════════════════════════════════════════════════════════════════
 
@@ -72,56 +72,66 @@ CATALOG = [
     # ── PMI (11 series) ─────────────────────────────────────────────────
     ("PMI", "pmi_usa_mfg", "NAPMPMI Index", "PX_LAST", "ISM Manufacturing USA", "indice"),
     ("PMI", "pmi_usa_svc", "NAPMNMI Index", "PX_LAST", "ISM Services USA", "indice"),
-    ("PMI", "pmi_euro_mfg", "MPMIFMEZ Index", "PX_LAST", "PMI Mfg Eurozona", "indice"),
-    ("PMI", "pmi_euro_svc", "MPMISFEZ Index", "PX_LAST", "PMI Svc Eurozona", "indice"),
-    ("PMI", "pmi_euro_comp", "MPMIEZC Index", "PX_LAST", "PMI Composite Eurozona", "indice"),
+    ("PMI", "pmi_euro_mfg", "MPMIezma Index", "PX_LAST", "PMI Mfg Eurozona", "indice"),
+    ("PMI", "pmi_euro_svc", "MPMiezsa Index", "PX_LAST", "PMI Svc Eurozona", "indice"),
+    ("PMI", "pmi_euro_comp", "MPMIEZCa Index", "PX_LAST", "PMI Composite Eurozona", "indice"),
     ("PMI", "pmi_china_mfg", "CPMINDX Index", "PX_LAST", "PMI Mfg China (NBS)", "indice"),
-    ("PMI", "pmi_china_caixin", "CHPMCOMP Index", "PX_LAST", "Caixin Composite China", "indice"),
-    ("PMI", "pmi_japan", "JNMPMFG Index", "PX_LAST", "PMI Mfg Japon", "indice"),
-    ("PMI", "pmi_global", "MPMIJPGM Index", "PX_LAST", "JPM Global Composite", "indice"),
+    ("PMI", "pmi_china_caixin", "CPMICOMP Index", "PX_LAST", "Caixin Composite China", "indice"),
+    ("PMI", "pmi_japan", "MPMIJPMA Index", "PX_LAST", "PMI Mfg Japon", "indice"),
+    ("PMI", "pmi_japan_comp", "MPMIJPCA Index", "PX_LAST", "PMI Composite Japon", "indice"),
     ("PMI", "pmi_uk", "PMITMUK Index", "PX_LAST", "PMI Mfg UK", "indice"),
     ("PMI", "pmi_india", "NPIMINM Index", "PX_LAST", "PMI Mfg India", "indice"),
 
-    # ── China (11 series) ───────────────────────────────────────────────
+    # ── China (12 series) ───────────────────────────────────────────────
     ("China", "china_exp_yoy", "CNFREXPY Index", "PX_LAST", "Exportaciones YoY", "%"),
     ("China", "china_imp_yoy", "CNFRIMPY Index", "PX_LAST", "Importaciones YoY", "%"),
-    ("China", "china_trade_bal", "CTBABALA Index", "PX_LAST", "Balanza Comercial", "USD bn"),
+    ("China", "china_trade_bal", "CNTSTCN Index", "PX_LAST", "Balanza Comercial", "USD bn"),
     ("China", "china_tsf_yoy", "CNTSFTOT Index", "PX_LAST", "Total Social Financing YoY", "%"),
     ("China", "china_m2_yoy", "CNMS2YOY Index", "PX_LAST", "M2 Money Supply YoY", "%"),
     ("China", "china_ppi_yoy", "CHEFTYOY Index", "PX_LAST", "PPI YoY", "%"),
     ("China", "china_cpi_yoy", "CNCPIYOY Index", "PX_LAST", "CPI YoY", "%"),
     ("China", "china_new_loans", "CNNELOYN Index", "PX_LAST", "New Yuan Loans", "CNY bn"),
+    ("China", "china_property_sales_yoy", "CNPRSALY Index", "PX_LAST", "Property Sales YoY", "%"),
     ("China", "china_iron_ore", "SCO1 Comdty", "PX_LAST", "Iron Ore 62% Fe", "USD/t"),
     ("China", "china_copper", "HG1 Comdty", "PX_LAST", "Copper Future", "USD/lb"),
     ("China", "china_caixin_mfg", "CHPMINDX Index", "PX_LAST", "Caixin Mfg PMI", "indice"),
 
     # ── CDS Soberanos 5Y (14 series) ────────────────────────────────────
     ("CDS", "cds_usa", "CT786916 Corp", "PX_LAST", "USA CDS 5Y", "bps"),
-    ("CDS", "cds_alemania", "CT786894 Corp", "PX_LAST", "Alemania CDS 5Y", "bps"),
-    ("CDS", "cds_uk", "CUKEL1U5 CBGN Curncy", "PX_LAST", "UK CDS 5Y", "bps"),
+    ("CDS", "cds_alemania", "cdbr1u5 corp", "PX_LAST", "Alemania CDS 5Y", "bps"),
+    ("CDS", "cds_uk", "cUKT1u5 corp", "PX_LAST", "UK CDS 5Y", "bps"),
     ("CDS", "cds_japon", "CJGB1U5 CBGN Curncy", "PX_LAST", "Japon CDS 5Y", "bps"),
-    ("CDS", "cds_francia", "CT786904 Corp", "PX_LAST", "Francia CDS 5Y", "bps"),
-    ("CDS", "cds_italia", "CT786910 Corp", "PX_LAST", "Italia CDS 5Y", "bps"),
-    ("CDS", "cds_espana", "CT786900 Corp", "PX_LAST", "Espana CDS 5Y", "bps"),
-    ("CDS", "cds_brasil", "CT786878 Corp", "PX_LAST", "Brasil CDS 5Y", "bps"),
-    ("CDS", "cds_mexico", "CT786912 Corp", "PX_LAST", "Mexico CDS 5Y", "bps"),
-    ("CDS", "cds_colombia", "CT786884 Corp", "PX_LAST", "Colombia CDS 5Y", "bps"),
-    ("CDS", "cds_peru", "CT786914 Corp", "PX_LAST", "Peru CDS 5Y", "bps"),
-    ("CDS", "cds_chile", "CT786882 Corp", "PX_LAST", "Chile CDS 5Y", "bps"),
-    ("CDS", "cds_china", "CT786880 Corp", "PX_LAST", "China CDS 5Y", "bps"),
-    ("CDS", "cds_turquia", "CT786918 Corp", "PX_LAST", "Turquia CDS 5Y", "bps"),
+    ("CDS", "cds_francia", "CFRTR1U5 CORP", "PX_LAST", "Francia CDS 5Y", "bps"),
+    ("CDS", "cds_italia", "CITLY1U5 CORP", "PX_LAST", "Italia CDS 5Y", "bps"),
+    ("CDS", "cds_espana", "CSPA1U5 CORP", "PX_LAST", "Espana CDS 5Y", "bps"),
+    ("CDS", "cds_brasil", "CBRZ1U5 CORP", "PX_LAST", "Brasil CDS 5Y", "bps"),
+    ("CDS", "cds_mexico", "CMEX1U5 CORP", "PX_LAST", "Mexico CDS 5Y", "bps"),
+    ("CDS", "cds_colombia", "CCOL1U5 CORP", "PX_LAST", "Colombia CDS 5Y", "bps"),
+    ("CDS", "cds_peru", "CPERU1U5 CORP", "PX_LAST", "Peru CDS 5Y", "bps"),
+    ("CDS", "cds_chile", "CCHIL1U5 CORP", "PX_LAST", "Chile CDS 5Y", "bps"),
+    ("CDS", "cds_china", "CCHIN1U5 CORP", "PX_LAST", "China CDS 5Y", "bps"),
+    ("CDS", "cds_turquia", "CTURK1U5 CORP", "PX_LAST", "Turquia CDS 5Y", "bps"),
 
-    # ── Credit Spreads (13 series) ──────────────────────────────────────
-    ("Credit_Spreads", "oas_ig_total", "LUACOAS Index", "PX_LAST", "OAS IG Total (US)", "bps"),
-    ("Credit_Spreads", "oas_hy_total", "LF98OAS Index", "PX_LAST", "OAS HY Total (US)", "bps"),
+    # ── Credit Spreads (22 series) ──────────────────────────────────────
+    # IG Sector
+    ("Credit_Spreads", "oas_ig_total", "USOAIGTO Index", "PX_LAST", "OAS IG Total (US)", "bps"),
+    ("Credit_Spreads", "oas_ig_financiero", "USOAIGFI Index", "PX_LAST", "OAS IG Financiero", "bps"),
+    ("Credit_Spreads", "oas_ig_industrial", "USOAIGIN Index", "PX_LAST", "OAS IG Industrial", "bps"),
+    ("Credit_Spreads", "oas_ig_utilities", "USOAIGUT Index", "PX_LAST", "OAS IG Utilities", "bps"),
+    ("Credit_Spreads", "oas_ig_tecnologia", "USOAIGTC Index", "PX_LAST", "OAS IG Tecnologia", "bps"),
+    ("Credit_Spreads", "oas_ig_salud", "USOAIGHC Index", "PX_LAST", "OAS IG Salud", "bps"),
+    ("Credit_Spreads", "oas_ig_energia", "USOAIGEN Index", "PX_LAST", "OAS IG Energia", "bps"),
+    # HY Sector
+    ("Credit_Spreads", "oas_hy_total", "USOHHYTO Index", "PX_LAST", "OAS HY Total (US)", "bps"),
+    ("Credit_Spreads", "oas_hy_financiero", "USOHHYFI Index", "PX_LAST", "OAS HY Financiero", "bps"),
+    ("Credit_Spreads", "oas_hy_industrial", "USOHHYIN Index", "PX_LAST", "OAS HY Industrial", "bps"),
+    ("Credit_Spreads", "oas_hy_utilities", "USOHHYUT Index", "PX_LAST", "OAS HY Utilities", "bps"),
+    ("Credit_Spreads", "oas_hy_tecnologia", "USOHHYTC Index", "PX_LAST", "OAS HY Tecnologia", "bps"),
+    ("Credit_Spreads", "oas_hy_salud", "USOHHYHC Index", "PX_LAST", "OAS HY Salud", "bps"),
+    ("Credit_Spreads", "oas_hy_energia", "USOHHYEN Index", "PX_LAST", "OAS HY Energia", "bps"),
+    # Aggregate / Ratings
     ("Credit_Spreads", "oas_bbb", "LUACBBB Index", "PX_LAST", "OAS BBB", "bps"),
     ("Credit_Spreads", "oas_bb", "LF98BB Index", "PX_LAST", "OAS BB", "bps"),
-    ("Credit_Spreads", "oas_financiero", "LUACFN Index", "PX_LAST", "OAS Financiero", "bps"),
-    ("Credit_Spreads", "oas_industrial", "LUACIN Index", "PX_LAST", "OAS Industrial", "bps"),
-    ("Credit_Spreads", "oas_utilities", "LUACUT Index", "PX_LAST", "OAS Utilities", "bps"),
-    ("Credit_Spreads", "oas_tecnologia", "LUACTC Index", "PX_LAST", "OAS Tecnologia", "bps"),
-    ("Credit_Spreads", "oas_salud", "LUACHC Index", "PX_LAST", "OAS Salud/Healthcare", "bps"),
-    ("Credit_Spreads", "oas_energia", "LUACEN Index", "PX_LAST", "OAS Energia", "bps"),
     ("Credit_Spreads", "oas_consumo", "LUACCS Index", "PX_LAST", "OAS Consumo", "bps"),
     ("Credit_Spreads", "oas_telecom", "LUACTM Index", "PX_LAST", "OAS Telecom", "bps"),
     ("Credit_Spreads", "oas_ig_eur", "ER00OAS Index", "PX_LAST", "OAS IG Europa", "bps"),
@@ -139,26 +149,29 @@ CATALOG = [
     # ── Real Yields & Breakevens (8 series) ─────────────────────────────
     ("Real_Yields", "tips_5y", "H15T5Y Index", "PX_LAST", "US TIPS 5Y Real Yield", "%"),
     ("Real_Yields", "tips_10y", "H15T10Y Index", "PX_LAST", "US TIPS 10Y Real Yield", "%"),
-    ("Real_Yields", "real_yield_de_10y", "GTDEM10YR Govt", "PX_LAST", "Bund Real Yield 10Y", "%"),
-    ("Real_Yields", "real_yield_uk_10y", "GUKG10R Index", "PX_LAST", "Gilt Real Yield 10Y", "%"),
+    ("Real_Yields", "real_yield_de_10y", "GTDEMII10YR Govt", "PX_LAST", "Bund Real Yield 10Y", "%"),
+    ("Real_Yields", "real_yield_uk_10y", "GTGBPII10Y GOVT", "PX_LAST", "Gilt Real Yield 10Y", "%"),
     ("Real_Yields", "breakeven_us_10y", "USGGBE10 Index", "PX_LAST", "Breakeven US 10Y", "%"),
     ("Real_Yields", "breakeven_us_5y", "USGGBE05 Index", "PX_LAST", "Breakeven US 5Y", "%"),
     ("Real_Yields", "breakeven_de_10y", "DEGGBE10 Index", "PX_LAST", "Breakeven Alemania 10Y", "%"),
     ("Real_Yields", "breakeven_uk_10y", "UKGGBE10 Index", "PX_LAST", "Breakeven UK 10Y", "%"),
 
-    # ── CPI Componentes USA (6 series) ──────────────────────────────────
+    # ── CPI Componentes USA (8 series) ──────────────────────────────────
     ("CPI_Componentes", "cpi_headline_yoy", "CPI YOY Index", "PX_LAST", "CPI Headline YoY", "%"),
     ("CPI_Componentes", "cpi_core_yoy", "CPI XYOY Index", "PX_LAST", "CPI Core YoY", "%"),
     ("CPI_Componentes", "pce_headline_yoy", "PCE DEFY Index", "PX_LAST", "PCE Headline YoY", "%"),
     ("CPI_Componentes", "pce_core_yoy", "PCE CYOY Index", "PX_LAST", "PCE Core YoY", "%"),
-    ("CPI_Componentes", "cpi_shelter_yoy", "CPI SHLT Index", "PX_LAST", "CPI Shelter YoY", "%"),
+    ("CPI_Componentes", "cpi_shelter_yoy", "CPSHSHLT Index", "PX_LAST", "CPI Shelter YoY", "%"),
     ("CPI_Componentes", "cpi_energy_yoy", "CPI ENRG Index", "PX_LAST", "CPI Energy YoY", "%"),
+    ("CPI_Componentes", "cpi_svc_ex_housing", "CPUPAXFE Index", "PX_LAST", "CPI Svc ex Housing YoY", "%"),
+    ("CPI_Componentes", "cpi_goods_yoy", "CPUPCXFE Index", "PX_LAST", "CPI Goods YoY", "%"),
 
-    # ── EPFR Flows (7 series) ───────────────────────────────────────────
+    # ── EPFR Flows (8 series) ───────────────────────────────────────────
     ("EPFR_Flows", "flujo_equity_usa", "EPFRUSEA Index", "PX_LAST", "EPFR Equity USA", "USD mn"),
     ("EPFR_Flows", "flujo_equity_europa", "EPFREQEU Index", "PX_LAST", "EPFR Equity Europa", "USD mn"),
     ("EPFR_Flows", "flujo_equity_em", "EPFREQEM Index", "PX_LAST", "EPFR Equity EM", "USD mn"),
     ("EPFR_Flows", "flujo_equity_japan", "EPFREQJP Index", "PX_LAST", "EPFR Equity Japon", "USD mn"),
+    ("EPFR_Flows", "flujo_equity_latam", "EPFREQLA Index", "PX_LAST", "EPFR Equity LatAm", "USD mn"),
     ("EPFR_Flows", "flujo_bond_ig", "EPFRBDIG Index", "PX_LAST", "EPFR Bond IG", "USD mn"),
     ("EPFR_Flows", "flujo_bond_hy", "EPFRBDHY Index", "PX_LAST", "EPFR Bond HY", "USD mn"),
     ("EPFR_Flows", "flujo_bond_em", "EPFRBDEM Index", "PX_LAST", "EPFR Bond EM", "USD mn"),
@@ -171,12 +184,14 @@ CATALOG = [
     ("Positioning", "inv_intel_bulls", "INELBULL Index", "PX_LAST", "Investors Intel Bulls", "%"),
     ("Positioning", "inv_intel_bears", "INELBEAR Index", "PX_LAST", "Investors Intel Bears", "%"),
 
-    # ── Valuaciones (14 series) ─────────────────────────────────────────
+    # ── Valuaciones (30 series) ─────────────────────────────────────────
+    # PE Forward by region/sector
     ("Valuaciones", "pe_spx", "SPX Index", "BEST_PE_RATIO", "PE Fwd S&P 500", "x"),
     ("Valuaciones", "pe_ndx", "NDX Index", "BEST_PE_RATIO", "PE Fwd Nasdaq 100", "x"),
     ("Valuaciones", "pe_stoxx600", "SXXP Index", "BEST_PE_RATIO", "PE Fwd STOXX 600", "x"),
     ("Valuaciones", "pe_topix", "TPX Index", "BEST_PE_RATIO", "PE Fwd TOPIX", "x"),
     ("Valuaciones", "pe_msci_em", "MXEF Index", "BEST_PE_RATIO", "PE Fwd MSCI EM", "x"),
+    ("Valuaciones", "pe_ipsa", "IPSA Index", "BEST_PE_RATIO", "PE Fwd IPSA", "x"),
     ("Valuaciones", "pe_tech", "S5INFT Index", "BEST_PE_RATIO", "PE Fwd Tech (S&P)", "x"),
     ("Valuaciones", "pe_healthcare", "S5HLTH Index", "BEST_PE_RATIO", "PE Fwd Healthcare", "x"),
     ("Valuaciones", "pe_financials", "S5FINL Index", "BEST_PE_RATIO", "PE Fwd Financials", "x"),
@@ -186,6 +201,24 @@ CATALOG = [
     ("Valuaciones", "pe_consumer_stap", "S5CONS Index", "BEST_PE_RATIO", "PE Fwd Consumer Stap", "x"),
     ("Valuaciones", "pe_comm_svcs", "S5TELS Index", "BEST_PE_RATIO", "PE Fwd Comm Services", "x"),
     ("Valuaciones", "pe_materials", "S5MATR Index", "BEST_PE_RATIO", "PE Fwd Materials", "x"),
+    # P/E 10Y Average by region (BEst LT PE Ratio = consensus 10Y trailing avg)
+    ("Valuaciones", "pe_10y_spx", "SPX Index", "BEST_PE_RATIO_10YR_AVG", "PE 10Y Avg S&P 500", "x"),
+    ("Valuaciones", "pe_10y_stoxx600", "SXXP Index", "BEST_PE_RATIO_10YR_AVG", "PE 10Y Avg STOXX 600", "x"),
+    ("Valuaciones", "pe_10y_msci_em", "MXEF Index", "BEST_PE_RATIO_10YR_AVG", "PE 10Y Avg MSCI EM", "x"),
+    ("Valuaciones", "pe_10y_topix", "TPX Index", "BEST_PE_RATIO_10YR_AVG", "PE 10Y Avg TOPIX", "x"),
+    ("Valuaciones", "pe_10y_ipsa", "IPSA Index", "BEST_PE_RATIO_10YR_AVG", "PE 10Y Avg IPSA", "x"),
+    # EV/EBITDA by region
+    ("Valuaciones", "ev_ebitda_spx", "SPX Index", "BEST_EV_TO_BEST_EBITDA", "EV/EBITDA S&P 500", "x"),
+    ("Valuaciones", "ev_ebitda_stoxx600", "SXXP Index", "BEST_EV_TO_BEST_EBITDA", "EV/EBITDA STOXX 600", "x"),
+    ("Valuaciones", "ev_ebitda_msci_em", "MXEF Index", "BEST_EV_TO_BEST_EBITDA", "EV/EBITDA MSCI EM", "x"),
+    ("Valuaciones", "ev_ebitda_topix", "TPX Index", "BEST_EV_TO_BEST_EBITDA", "EV/EBITDA TOPIX", "x"),
+    ("Valuaciones", "ev_ebitda_ipsa", "IPSA Index", "BEST_EV_TO_BEST_EBITDA", "EV/EBITDA IPSA", "x"),
+    # Dividend Yield (STOXX 600 was missing)
+    ("Valuaciones", "dy_spx", "SPX Index", "BEST_DIV_YLD", "Div Yield S&P 500", "%"),
+    ("Valuaciones", "dy_stoxx600", "SXXP Index", "BEST_DIV_YLD", "Div Yield STOXX 600", "%"),
+    ("Valuaciones", "dy_topix", "TPX Index", "BEST_DIV_YLD", "Div Yield TOPIX", "%"),
+    ("Valuaciones", "dy_msci_em", "MXEF Index", "BEST_DIV_YLD", "Div Yield MSCI EM", "%"),
+    ("Valuaciones", "dy_ipsa", "IPSA Index", "BEST_DIV_YLD", "Div Yield IPSA", "%"),
 
     # ── Volatility (7 series) ───────────────────────────────────────────
     ("Volatility", "vix", "VIX Index", "PX_LAST", "VIX (S&P 500 Vol)", "indice"),
@@ -210,6 +243,48 @@ CATALOG = [
     ("Chile", "bcp_10y", "GICL10YR Index", "PX_LAST", "BCP Chile 10Y", "%"),
     ("Chile", "chile_cpi_yoy", "CLCPIYOY Index", "PX_LAST", "Chile CPI YoY", "%"),
     ("Chile", "tpm_chile", "CHBCRF Index", "PX_LAST", "TPM Chile", "%"),
+
+    # ── Factor Returns (5 series) ─────────────────────────────────────
+    ("Factor_Returns", "factor_quality", "M1USQU Index", "PX_LAST", "MSCI USA Quality YTD", "%"),
+    ("Factor_Returns", "factor_momentum", "MTUM US Equity", "PX_LAST", "MSCI USA Momentum YTD", "%"),
+    ("Factor_Returns", "factor_value", "M1USEV Index", "PX_LAST", "MSCI USA Enh Value YTD", "%"),
+    ("Factor_Returns", "factor_growth", "M1US000G Index", "PX_LAST", "MSCI USA Growth YTD", "%"),
+    ("Factor_Returns", "factor_size", "M1USSC Index", "PX_LAST", "MSCI USA Small Cap YTD", "%"),
+
+    # ── SOFR Swap Curve (19 series) ────────────────────────────────────
+    ("SOFR", "sofr_rate", "SOFRRATE Index", "PX_LAST", "SOFR Overnight Rate", "%"),
+    ("SOFR", "sofr_1w", "USOSFR1Z Curncy", "PX_LAST", "SOFR Swap 1W", "%"),
+    ("SOFR", "sofr_1m", "USOSFRA Curncy", "PX_LAST", "SOFR Swap 1M", "%"),
+    ("SOFR", "sofr_3m", "USOSFRC Curncy", "PX_LAST", "SOFR Swap 3M", "%"),
+    ("SOFR", "sofr_6m", "USOSFRF Curncy", "PX_LAST", "SOFR Swap 6M", "%"),
+    ("SOFR", "sofr_1y", "USOSFR1 Curncy", "PX_LAST", "SOFR Swap 1Y", "%"),
+    ("SOFR", "sofr_2y", "USOSFR2 Curncy", "PX_LAST", "SOFR Swap 2Y", "%"),
+    ("SOFR", "sofr_3y", "USOSFR3 Curncy", "PX_LAST", "SOFR Swap 3Y", "%"),
+    ("SOFR", "sofr_4y", "USOSFR4 Curncy", "PX_LAST", "SOFR Swap 4Y", "%"),
+    ("SOFR", "sofr_5y", "USOSFR5 Curncy", "PX_LAST", "SOFR Swap 5Y", "%"),
+    ("SOFR", "sofr_6y", "USOSFR6 Curncy", "PX_LAST", "SOFR Swap 6Y", "%"),
+    ("SOFR", "sofr_7y", "USOSFR7 Curncy", "PX_LAST", "SOFR Swap 7Y", "%"),
+    ("SOFR", "sofr_8y", "USOSFR8 Curncy", "PX_LAST", "SOFR Swap 8Y", "%"),
+    ("SOFR", "sofr_9y", "USOSFR9 Curncy", "PX_LAST", "SOFR Swap 9Y", "%"),
+    ("SOFR", "sofr_10y", "USOSFR10 Curncy", "PX_LAST", "SOFR Swap 10Y", "%"),
+    ("SOFR", "sofr_15y", "USOSFR15 Curncy", "PX_LAST", "SOFR Swap 15Y", "%"),
+    ("SOFR", "sofr_20y", "USOSFR20 Curncy", "PX_LAST", "SOFR Swap 20Y", "%"),
+    ("SOFR", "sofr_25y", "USOSFR25 Curncy", "PX_LAST", "SOFR Swap 25Y", "%"),
+    ("SOFR", "sofr_30y", "USOSFR30 Curncy", "PX_LAST", "SOFR Swap 30Y", "%"),
+
+    # ── Intl Sovereign Curves (9 series) ──────────────────────────────
+    # German Bund
+    ("Intl_Curves", "bund_2y", "GTDEM2Y Govt", "PX_LAST", "Bund 2Y Yield", "%"),
+    ("Intl_Curves", "bund_5y", "GTDEM5Y Govt", "PX_LAST", "Bund 5Y Yield", "%"),
+    ("Intl_Curves", "bund_30y", "GTDEM30Y Govt", "PX_LAST", "Bund 30Y Yield", "%"),
+    # UK Gilt
+    ("Intl_Curves", "gilt_2y", "GUKG2 Index", "PX_LAST", "Gilt 2Y Yield", "%"),
+    ("Intl_Curves", "gilt_5y", "GUKG5 Index", "PX_LAST", "Gilt 5Y Yield", "%"),
+    ("Intl_Curves", "gilt_30y", "GUKG30 Index", "PX_LAST", "Gilt 30Y Yield", "%"),
+    # JGB
+    ("Intl_Curves", "jgb_2y", "GJGB2 Index", "PX_LAST", "JGB 2Y Yield", "%"),
+    ("Intl_Curves", "jgb_5y", "GJGB5 Index", "PX_LAST", "JGB 5Y Yield", "%"),
+    ("Intl_Curves", "jgb_30y", "GJGB30 Index", "PX_LAST", "JGB 30Y Yield", "%"),
 ]
 
 # Sheet display order and tab colors
@@ -227,6 +302,9 @@ SHEET_CONFIG = [
     ("Volatility", "8B5CF6"),
     ("Macro_Conditions", "2B6CB0"),
     ("Chile", "0066CC"),
+    ("Factor_Returns", "8B5CF6"),
+    ("SOFR", "DD6B20"),
+    ("Intl_Curves", "DD6B20"),
 ]
 
 
@@ -310,7 +388,7 @@ def create_template(path: str):
         ("GREYBARK RESEARCH - Bloomberg Data Template v2.0", title_font),
         ("", normal_font),
         ("Este archivo es el puente entre Bloomberg y el sistema de reportes.", subtitle_font),
-        ("Contiene 116 series de tiempo con 10 anos de historia mensual.", normal_font),
+        ("Contiene 148 series de tiempo con 10 anos de historia mensual.", normal_font),
         ("", normal_font),
         ("COMO ACTUALIZAR (1 click):", subtitle_font),
         ("", normal_font),
@@ -564,7 +642,7 @@ def create_live_template(path: str):
 
     instructions += [
         ("", normal_font),
-        (f"  116 series | 10 anos | Generado: {today.strftime('%Y-%m-%d')}", note_font),
+        (f"  148 series | 10 anos | Generado: {today.strftime('%Y-%m-%d')}", note_font),
     ]
 
     for i, (text, font) in enumerate(instructions, 1):

@@ -266,17 +266,20 @@ class AICouncilRunner:
         # Extraer bloomberg_context ANTES de serializar a JSON
         bloomberg_context = agent_data.pop('bloomberg_context', '')
 
-        # Serializar datos cuantitativos (sin bloomberg — va en sección aparte)
-        data_json = json.dumps(agent_data, indent=2, ensure_ascii=False, default=str)
+        # Build structured data inventory (DATOS DISPONIBLES / NO DISPONIBLES)
+        data_inventory = self._build_data_inventory(agent, agent_data)
 
-        # Limitar tamaño
-        if len(data_json) > 8000:
-            data_json = data_json[:8000] + "\n... [truncado]"
+        # Also keep a compact JSON of complex structures the inventory can't fully show
+        data_json = json.dumps(agent_data, indent=2, ensure_ascii=False, default=str)
+        if len(data_json) > 6000:
+            data_json = data_json[:6000] + "\n... [truncado]"
 
         prompt = f"""
 Aquí tienes la información para tu análisis:
 
-## DATOS CUANTITATIVOS
+{data_inventory}
+
+## DATOS CUANTITATIVOS COMPLETOS (referencia — los datos clave ya están arriba)
 ```json
 {data_json}
 ```
@@ -362,6 +365,60 @@ Limita tu respuesta a 400-500 palabras máximo.
 """
         return prompt
 
+    def _build_cio_data_inventory(self, council_input: Dict) -> str:
+        """Build a consolidated data inventory for the CIO to cross-check panel claims.
+
+        Includes data from ALL 5 panel agents so CIO can verify panelist numbers.
+        """
+        try:
+            from data_completeness_validator import DataCompletenessValidator
+            validator = DataCompletenessValidator(verbose=False)
+            agent_data_map = council_input.get('agent_data', {})
+            sections = [
+                "## DATOS VERIFICADOS DE TODAS LAS FUENTES (para validar citas de panelistas)",
+                "Usa esta referencia para verificar que los números citados por los panelistas son correctos.",
+                ""
+            ]
+            for agent_name in ['macro', 'rv', 'rf', 'riesgo', 'geo']:
+                data = agent_data_map.get(agent_name, {})
+                ac = validator.validate_agent(agent_name, data)
+                present = ac.present_fields
+                if present:
+                    sections.append(f"### {agent_name.upper()}")
+                    for fs in present:
+                        display = validator._format_value(fs.value, fs.field.unit)
+                        sections.append(f"- {fs.field.label}: {display} [{fs.field.source}]")
+                    sections.append("")
+            return "\n".join(sections)
+        except Exception as e:
+            self._print(f"  [WARN] CIO data inventory fallback: {e}")
+            return ""
+
+    def _build_data_inventory(self, agent: str, agent_data: Dict) -> str:
+        """Build structured DATOS DISPONIBLES / NO DISPONIBLES inventory for an agent.
+
+        Uses DataCompletenessValidator to check manifest fields against actual data
+        and formats as a human-readable inventory for the agent prompt.
+        """
+        try:
+            from data_completeness_validator import DataCompletenessValidator
+            validator = DataCompletenessValidator(verbose=False)
+            return validator.build_data_inventory(agent, agent_data)
+        except Exception as e:
+            self._print(f"  [WARN] Data inventory fallback for {agent}: {e}")
+            # Fallback: simple list of top-level keys with values
+            lines = ["## DATOS DISPONIBLES"]
+            for k, v in agent_data.items():
+                if isinstance(v, (int, float)):
+                    lines.append(f"- {k}: {v}")
+                elif isinstance(v, str) and len(v) < 100:
+                    lines.append(f"- {k}: {v}")
+                elif isinstance(v, dict) and 'error' not in v:
+                    lines.append(f"- {k}: <disponible>")
+            lines.append("\n## REGLA ESTRICTA DE DATOS")
+            lines.append("Solo cita numeros que aparecen en tu input. No inventes datos.")
+            return "\n".join(lines)
+
     # =========================================================================
     # CAPA 2: SÍNTESIS VERTICAL
     # =========================================================================
@@ -414,10 +471,15 @@ Limita tu respuesta a 400-500 palabras máximo.
         user_directives = council_input.get('user_directives', '')
         external_research = council_input.get('external_research', '')
 
+        # Build consolidated data inventory for CIO cross-checking
+        data_inventory_cio = self._build_cio_data_inventory(council_input)
+
         prompt = f"""
 Aquí tienes las opiniones del panel de especialistas:
 
 {chr(10).join(opinions)}
+
+{data_inventory_cio}
 """
 
         if external_research:

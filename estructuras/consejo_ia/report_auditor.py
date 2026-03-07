@@ -148,6 +148,9 @@ Reglas de coherencia:
 3. DATOS: Tasas (Fed, TPM, 10Y), spreads, e indicadores deben coincidir entre reportes.
 4. RIESGOS: Los principales riesgos deben ser consistentes (mismos temas, similar probabilidad).
 5. NARRATIVA: La tesis central debe ser coherente — no puede haber mensajes contradictorios.
+6. DATA FABRICATION: ¿Hay datos que parezcan inventados? (números redondos sin fuente, \
+forecasts específicos no respaldados por datos cuantitativos, performance attribution sin base real). \
+Flag como HIGH si detectas datos sin fuente evidente en el input cuantitativo.
 
 Combinaciones válidas:
 - Macro CAUTELOSO + RV CAUTELOSO + RF CONSTRUCTIVO (flight to quality) = OK

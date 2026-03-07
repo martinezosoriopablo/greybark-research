@@ -23,6 +23,7 @@ COUNTRY_MAP = {
     'eurozone': 'EURO',
     'china': 'CHN',
     'chile': 'CHL',
+    'world': 'WEOWORLD',
 }
 
 INDICATORS = {
