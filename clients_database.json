@@ -1,7 +1,7 @@
 {
   "metadata": {
     "created": "2026-01-27T18:37:35.691675",
-    "last_updated": "2026-03-05T19:24:48.358319",
+    "last_updated": "2026-01-27T18:37:35.691675",
     "version": "1.0"
   },
   "clients": [
@@ -71,34 +71,6 @@
       "active": true,
       "podcast": false,
       "notes": "Cliente de prueba - versión general"
-    },
-    {
-      "id": 6,
-      "name": "Felipe Luttges",
-      "email": "fluttges@waop.cl",
-      "type": "professional",
-      "reports": [
-        "AM_pro",
-        "AM_general",
-        "PM_pro",
-        "PM_general"
-      ],
-      "active": true,
-      "notes": ""
-    },
-    {
-      "id": 7,
-      "name": "Juan Pablo Velasco",
-      "email": "jpvelasco@waop.cl",
-      "type": "professional",
-      "reports": [
-        "AM_pro",
-        "AM_general",
-        "PM_pro",
-        "PM_general"
-      ],
-      "active": true,
-      "notes": ""
     }
   ]
 }
