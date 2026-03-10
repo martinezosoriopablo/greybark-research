@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Daily Report{% endblock %}
+{% block nav_daily %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Reporte Diario</h1>
+    <p class="subtitle">Generar reporte AM/PM y podcast</p>
+</div>
+
+{% if request.query_params.get('error') == 'no_product' %}
+<div class="alert alert-error">El cliente no tiene habilitado el producto seleccionado.</div>
+{% endif %}
+
+<!-- Config form -->
+<section class="card">
+    <h2>Configuracion</h2>
+    <form action="/daily/run" method="post" id="daily-form">
+        <div class="pipeline-config">
+            <div class="config-section">
+                <h3>Periodo</h3>
+                {% if client.product_daily_am %}
+                <label class="checkbox-label">
+                    <input type="radio" name="period" value="am" checked>
+                    <span class="report-badge badge-macro">AM (Matutino)</span>
+                </label>
+                {% endif %}
+                {% if client.product_daily_pm %}
+                <label class="checkbox-label">
+                    <input type="radio" name="period" value="pm" {{ "checked" if not client.product_daily_am else "" }}>
+                    <span class="report-badge badge-rv">PM (Vespertino)</span>
+                </label>
+                {% endif %}
+            </div>
+
+            <div class="config-section">
+                <h3>Opciones</h3>
+                {% if client.product_podcast %}
+                <label class="checkbox-label">
+                    <input type="checkbox" name="include_podcast" value="true" checked>
+                    Generar podcast
+                </label>
+                {% endif %}
+                <label class="checkbox-label">
+                    <input type="checkbox" name="send_email" value="true">
+                    Enviar por email
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="skip_collect" value="true">
+                    Saltar recopilacion (usar datos existentes)
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="dry_run" value="true">
+                    Dry Run (simular sin APIs)
+                </label>
+            </div>
+
+            <div class="config-section config-run">
+                <button type="submit" class="btn btn-primary btn-lg" id="run-btn">
+                    Generar Reporte
+                </button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<!-- Recent daily reports -->
+{% if daily_reports %}
+<section class="card">
+    <div class="card-header">
+        <h2>Reportes diarios recientes</h2>
+        <a href="/reports" class="btn btn-outline btn-sm">Ver todos</a>
+    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Fecha</th>
+                <th>Tamano</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in daily_reports %}
+            <tr>
+                <td>{{ r.name }}</td>
+                <td>{{ r.modified.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ r.size_fmt }}</td>
+                <td>
+                    <a href="/reports/{{ r.rel_path }}" class="btn btn-sm">Ver</a>
+                    <a href="/download/{{ r.rel_path }}" class="btn btn-sm btn-outline">Descargar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var form = document.getElementById('daily-form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            var btn = document.getElementById('run-btn');
+            btn.disabled = true;
+            btn.textContent = 'Iniciando...';
+        });
+    }
+})();
+</script>
+{% endblock %}

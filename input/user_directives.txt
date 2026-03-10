@@ -1,0 +1,11 @@
+# =============================================================
+# DIRECTIVAS DEL USUARIO PARA EL AI COUNCIL
+# =============================================================
+#
+# Edita este archivo ANTES de correr el consejo IA.
+# Todo lo que escribas aqui sera leido por TODOS los agentes
+# del panel y por el CIO/Refinador.
+#
+# Las lineas que empiezan con # son ignoradas.
+# =============================================================
+

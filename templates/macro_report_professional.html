@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ company_name|default('Research') }} - Reporte Macro</title>
+    <style>
+        :root {
+            --primary-blue: {{ primary_color|default('#1a1a1a') }};
+            --secondary-blue: #3a3a3a;
+            --accent-orange: {{ accent_color|default('#dd6b20') }};
+            --text-dark: {{ primary_color|default('#1a1a1a') }};
+            --text-medium: #4a4a4a;
+            --text-light: #717171;
+            --bg-light: #f7f7f7;
+            --border-color: #e0e0e0;
+            --positive: {{ green_color|default('#276749') }};
+            --negative: {{ red_color|default('#c53030') }};
+            --neutral: #744210;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: {{ font_family|default("'Segoe UI', 'Helvetica Neue', Arial, sans-serif") }};
+            font-size: 10pt;
+            line-height: 1.5;
+            color: var(--text-dark);
+            background: white;
+        }
+
+        .report-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 40px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid var(--primary-blue);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .logo-section h1 {
+            font-family: {{ header_font_family|default("'Archio Black', 'Archio', 'Arial Black', 'Segoe UI', sans-serif") }};
+            font-size: 24pt;
+            color: var(--primary-blue);
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .logo-section .subtitle {
+            font-size: 14pt;
+            color: var(--accent-orange);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .report-info {
+            text-align: right;
+            font-size: 9pt;
+            color: var(--text-medium);
+        }
+
+        .report-info .date {
+            font-size: 11pt;
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        /* Section styling */
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 14pt;
+            color: var(--primary-blue);
+            font-weight: 700;
+            border-bottom: 2px solid var(--accent-orange);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        .subsection-title {
+            font-size: 11pt;
+            color: var(--secondary-blue);
+            font-weight: 600;
+            margin: 15px 0 10px 0;
+            padding-left: 10px;
+            border-left: 3px solid var(--accent-orange);
+        }
+
+        /* Executive Summary */
+        .exec-summary {
+            background: linear-gradient(135deg, var(--bg-light) 0%, #f0f0f0 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .exec-summary .intro {
+            font-size: 11pt;
+            line-height: 1.6;
+            color: var(--text-dark);
+            margin-bottom: 15px;
+        }
+
+        .key-takeaways {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid var(--accent-orange);
+        }
+
+        .key-takeaways h4 {
+            font-size: 10pt;
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .key-takeaways ul {
+            margin-left: 20px;
+        }
+
+        .key-takeaways li {
+            margin-bottom: 5px;
+            color: var(--text-medium);
+        }
+
+        /* Stance Spectrum */
+        .stance-spectrum { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 18px 24px; margin: 20px 0; }
+        .stance-spectrum-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #718096; margin-bottom: 14px; }
+        .stance-spectrum-bar { display: flex; align-items: stretch; height: 38px; border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+        .stance-spectrum-segment { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; position: relative; transition: all 0.2s; }
+        .spectrum-cauteloso { background: #fed7d7; color: #9b2c2c; }
+        .spectrum-neutral { background: #e2e8f0; color: #4a5568; }
+        .spectrum-constructivo { background: #c6f6d5; color: #276749; }
+        .spectrum-agresivo { background: #fefcbf; color: #975a16; }
+        .spectrum-active { outline: 3px solid #2d3748; outline-offset: -3px; z-index: 1; font-size: 12px; }
+        .spectrum-active::after { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 7px solid #2d3748; }
+        .stance-spectrum-labels { display: flex; font-size: 9px; color: #a0aec0; margin-top: 10px; }
+        .stance-spectrum-labels span { flex: 1; text-align: center; }
+
+        /* Forecasts Table */
+        .forecasts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 9pt;
+        }
+
+        .forecasts-table th {
+            background: var(--primary-blue);
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .forecasts-table th.center {
+            text-align: center;
+        }
+
+        .forecasts-table td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .forecasts-table tr:nth-child(even):not(.region-header) {
+            background: var(--bg-light);
+        }
+
+        .forecasts-table .region-header {
+            background: var(--primary-blue) !important;
+            color: white;
+            font-weight: 600;
+        }
+
+        .forecasts-table .vs-positive {
+            color: var(--positive);
+            font-weight: 600;
+        }
+
+        .forecasts-table .vs-negative {
+            color: var(--negative);
+            font-weight: 600;
+        }
+
+        .forecasts-table .vs-neutral {
+            color: var(--text-light);
+        }
+
+        /* Data Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 9pt;
+        }
+
+        .data-table th {
+            background: var(--bg-light);
+            padding: 8px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-dark);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .data-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table tr:hover {
+            background: #f0f4f8;
+        }
+
+        .trend-up {
+            color: var(--positive);
+        }
+
+        .trend-down {
+            color: var(--negative);
+        }
+
+        .trend-neutral {
+            color: var(--neutral);
+        }
+
+        /* Narrative Boxes */
+        .narrative-box {
+            background: white;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .narrative-box p {
+            line-height: 1.6;
+            color: var(--text-medium);
+        }
+
+        /* Country/Región Cards */
+        .region-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .region-card-header {
+            background: var(--primary-blue);
+            color: white;
+            padding: 12px 15px;
+            font-size: 12pt;
+            font-weight: 600;
+        }
+
+        .region-card-body {
+            padding: 15px;
+        }
+
+        /* Indicators Grid */
+        .indicators-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .indicator-card {
+            background: var(--bg-light);
+            padding: 12px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .indicator-card .label {
+            font-size: 8pt;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .indicator-card .value {
+            font-size: 16pt;
+            font-weight: 700;
+            color: var(--primary-blue);
+            margin: 5px 0;
+        }
+
+        .indicator-card .change {
+            font-size: 9pt;
+        }
+
+        /* Scenario Cards */
+        .scenarios-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .scenario-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .scenario-card.base {
+            border: 2px solid var(--positive);
+        }
+
+        .scenario-card.upside {
+            border: 2px solid var(--secondary-blue);
+        }
+
+        .scenario-card.downside {
+            border: 2px solid var(--negative);
+        }
+
+        .scenario-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .scenario-name {
+            font-weight: 700;
+            color: var(--primary-blue);
+        }
+
+        .scenario-prob {
+            background: var(--accent-orange);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 9pt;
+            font-weight: 600;
+        }
+
+        .scenario-desc {
+            font-size: 9pt;
+            color: var(--text-medium);
+            line-height: 1.5;
+        }
+
+        /* Risk Cards */
+        .risk-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--negative);
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+
+        .risk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .risk-name {
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .risk-metrics {
+            font-size: 9pt;
+            color: var(--text-light);
+        }
+
+        .risk-metrics span {
+            margin-left: 10px;
+        }
+
+        /* Calendar Table */
+        .calendar-table {
+            width: 100%;
+            font-size: 9pt;
+        }
+
+        .calendar-table th {
+            background: var(--primary-blue);
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .calendar-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .relevancia-alta {
+            color: var(--negative);
+            font-weight: 600;
+        }
+
+        .relevancia-media {
+            color: var(--neutral);
+        }
+
+        /* Charts placeholder */
+        .chart-placeholder {
+            background: var(--bg-light);
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: var(--text-light);
+            margin: 15px 0;
+        }
+
+        /* Glossary */
+        .glossary-section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .glossary-section .section-title {
+            font-size: 14pt;
+            color: var(--primary-blue);
+            font-weight: 700;
+            border-bottom: 2px solid var(--accent-orange);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        .glossary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 24px;
+        }
+
+        @media (max-width: 768px) {
+            .glossary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .glossary-item {
+            background: var(--bg-light);
+            border-left: 3px solid var(--accent-orange);
+            border-radius: 0 5px 5px 0;
+            padding: 10px 14px;
+        }
+
+        .glossary-term {
+            font-weight: 700;
+            font-size: 9pt;
+            color: var(--primary-blue);
+            margin-bottom: 3px;
+        }
+
+        .glossary-def {
+            font-size: 8.5pt;
+            color: var(--text-medium);
+            line-height: 1.45;
+        }
+
+        @media print {
+            .glossary-section {
+                page-break-before: always;
+            }
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 2px solid var(--primary-blue);
+            font-size: 8pt;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .disclaimer {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-light);
+            border-radius: 5px;
+            font-size: 7pt;
+            line-height: 1.4;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                font-size: 9pt;
+            }
+            .report-container {
+                padding: 0;
+            }
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Two column layout for some sections */
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+            .indicators-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .scenarios-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-section">
+                {% if logo_path %}<img src="{{ logo_path }}" alt="{{ company_name|default('GREYBARK RESEARCH') }}" style="max-height:40px;margin-bottom:5px;">{% endif %}
+                <h1>{{ company_name|default('GREYBARK RESEARCH') }}</h1>
+                <div class="subtitle">Reporte Macro Mensual</div>
+            </div>
+            <div class="report-info">
+                <div class="date">{{fecha_reporte}}</div>
+                <div>Perspectivas Económicas Globales</div>
+            </div>
+        </header>
+
+        <!-- 1. RESUMEN EJECUTIVO Y FORECASTS -->
+        <section class="section">
+            <h2 class="section-title">1. Resumen Ejecutivo</h2>
+
+            <div class="exec-summary">
+                <p class="intro">{{parrafo_intro}}</p>
+
+                <div class="key-takeaways">
+                    <h4>Key Takeaways</h4>
+                    <ul>
+                        {{key_takeaways_html}}
+                    </ul>
+                </div>
+
+                <div class="stance-spectrum">
+                    <div class="stance-spectrum-title">Espectro de Posturas del Comite</div>
+                    <div class="stance-spectrum-bar">
+                        <div class="stance-spectrum-segment spectrum-cauteloso {{spectrum_active_cauteloso}}">CAUTELOSO</div>
+                        <div class="stance-spectrum-segment spectrum-neutral {{spectrum_active_neutral}}">NEUTRAL</div>
+                        <div class="stance-spectrum-segment spectrum-constructivo {{spectrum_active_constructivo}}">CONSTRUCTIVO</div>
+                        <div class="stance-spectrum-segment spectrum-agresivo {{spectrum_active_agresivo}}">AGRESIVO</div>
+                    </div>
+                    <div class="stance-spectrum-labels">
+                        <span title="Postura defensiva: prioriza preservacion de capital, reduce exposicion a activos de riesgo">Defensivo / Risk-Off</span>
+                        <span title="Postura neutral: sin sesgo direccional, seleccion caso a caso">Selectivo / Sin sesgo</span>
+                        <span title="Postura constructiva: favorece activos de riesgo de forma selectiva con cobertura">Risk-On selectivo</span>
+                        <span title="Postura agresiva: maxima exposicion a activos de riesgo, conviccion alta en el ciclo">Full Risk-On</span>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="subsection-title">Tabla de Forecasts Global</h3>
+            <table class="forecasts-table">
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th class="center">2025</th>
+                        <th class="center">2026F</th>
+                        <th class="center">Consenso</th>
+                        <th class="center">vs Ant.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="region-header">
+                        <td colspan="5">GDP Growth</td>
+                    </tr>
+                    {{gdp_forecasts_rows}}
+                    <tr class="region-header">
+                        <td colspan="5">Inflation (Core)</td>
+                    </tr>
+                    {{inflation_forecasts_rows}}
+                    <tr class="region-header">
+                        <td colspan="5">Policy Rates (End of Period)</td>
+                    </tr>
+                    {{rates_forecasts_rows}}
+                </tbody>
+            </table>
+
+            <!-- Time Series Charts: Inflation & Policy Rates -->
+            <div class="two-column" style="margin: 20px 0;">
+                <div style="text-align: center;">
+                    <img src="{{chart_inflation_evolution}}" style="width:100%; max-width:480px; border-radius:5px;" alt="Inflación Core">
+                </div>
+                <div style="text-align: center;">
+                    <img src="{{chart_fed_vs_ecb_bcch}}" style="width:100%; max-width:480px; border-radius:5px;" alt="Tasas de Política">
+                </div>
+            </div>
+
+            <!-- Probability-Weighted Forecasts -->
+            <h3 class="subsection-title">Pronóstico Ponderado por Escenarios</h3>
+            <div class="narrative-box">
+                <p><strong>Metodologia:</strong> {{weighted_metodologia}}</p>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Escenario</th>
+                        <th class="center">Probabilidad</th>
+                        <th class="center">GDP USA</th>
+                        <th class="center">GDP World</th>
+                        <th class="center">S&P 500</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{weighted_scenarios_rows}}
+                    <tr style="background: var(--bg-light); font-weight: 700;">
+                        <td>PRONOSTICO PONDERADO</td>
+                        <td class="center">100%</td>
+                        <td class="center">{{weighted_gdp_us}}</td>
+                        <td class="center">{{weighted_gdp_world}}</td>
+                        <td class="center">{{weighted_sp500}}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="narrative-box" style="margin-top: 10px;">
+                <p>{{weighted_implicancia}}</p>
+            </div>
+
+            <!-- Vs Previous Forecast -->
+            <h3 class="subsection-title">Cambios vs Reporte Anterior ({{previous_fecha}})</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th class="center">Anterior</th>
+                        <th class="center">Actual</th>
+                        <th class="center">Cambio</th>
+                        <th>Razon</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{vs_previous_rows}}
+                </tbody>
+            </table>
+            <div class="two-column" style="margin-top: 15px;">
+                <div class="narrative-box" style="border-left: 4px solid var(--positive);">
+                    <h4 style="color: var(--positive); margin-bottom: 8px;">Aciertos del Reporte Anterior</h4>
+                    <ul style="margin-left: 20px; font-size: 9pt;">
+                        {{track_record_aciertos}}
+                    </ul>
+                </div>
+                <div class="narrative-box" style="border-left: 4px solid var(--negative);">
+                    <h4 style="color: var(--negative); margin-bottom: 8px;">Errores</h4>
+                    <ul style="margin-left: 20px; font-size: 9pt;">
+                        {{track_record_errores}}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Proyecciones Cuantitativas -->
+            <h3 class="subsection-title">Proyecciones Cuantitativas</h3>
+            {{econometric_projections_table}}
+        </section>
+
+        <!-- 2. ESTADOS UNIDOS -->
+        <section class="section">
+            <h2 class="section-title">2. Estados Unidos</h2>
+
+            <h3 class="subsection-title">Crecimiento Económico</h3>
+            <div class="narrative-box">
+                <p>{{usa_growth_narrative}}</p>
+            </div>
+
+            <!-- USA Leading Indicators Chart (120m) -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_usa_leading_indicators}}" style="width:100%; max-width:850px; border-radius:5px;" alt="USA Leading Indicators">
+            </div>
+
+            <h3 class="subsection-title">Mercado Laboral</h3>
+            <div class="narrative-box">
+                <p>{{usa_labor_narrative}}</p>
+            </div>
+
+            <!-- Unemployment U3/U6 + NFP -->
+            <div class="two-column" style="margin: 15px 0;">
+                <div style="text-align: center;">
+                    <img src="{{chart_labor_unemployment}}" style="width:100%; max-width:480px; border-radius:5px;" alt="Desempleo U3/U6">
+                </div>
+                <div style="text-align: center;">
+                    <img src="{{chart_labor_nfp}}" style="width:100%; max-width:480px; border-radius:5px;" alt="Non-Farm Payrolls">
+                </div>
+            </div>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Actual</th>
+                        <th>Anterior</th>
+                        <th>Tendencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{usa_labor_rows}}
+                </tbody>
+            </table>
+
+            <!-- JOLTS -->
+            <h3 class="subsection-title">JOLTS — Dinamica del Mercado Laboral</h3>
+            <div class="narrative-box">
+                <p>{{usa_jolts_narrative}}</p>
+            </div>
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_labor_jolts}}" style="width:100%; max-width:850px; border-radius:5px;" alt="JOLTS">
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador JOLTS</th>
+                        <th>Actual</th>
+                        <th>Anterior</th>
+                        <th>Tendencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{usa_jolts_rows}}
+                </tbody>
+            </table>
+
+            <!-- Salarios y Participacion -->
+            <h3 class="subsection-title">Salarios y Participacion Laboral</h3>
+            <div class="narrative-box">
+                <p>{{usa_wages_narrative}}</p>
+            </div>
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_labor_wages}}" style="width:100%; max-width:850px; border-radius:5px;" alt="Salarios y Participacion">
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Actual</th>
+                        <th>Anterior</th>
+                        <th>Tendencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{usa_wages_rows}}
+                </tbody>
+            </table>
+
+            <h3 class="subsection-title">Inflación</h3>
+            <div class="narrative-box">
+                <p>{{usa_inflation_narrative}}</p>
+            </div>
+
+            <!-- Inflation Heatmap: global -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_inflation_heatmap}}" style="width:100%; max-width:900px; border-radius:5px;" alt="Inflation Heatmap">
+            </div>
+
+            <div class="two-column">
+                <div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Indicador</th>
+                                <th>a/a</th>
+                                <th>m/m</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{usa_inflation_rows}}
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Componente</th>
+                                <th>Valor</th>
+                                <th>Tendencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{usa_inflation_components}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Inflation Components Time Series -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_inflation_components_ts}}" style="width:100%; max-width:850px; border-radius:5px;" alt="Componentes Inflación USA">
+            </div>
+
+            <h3 class="subsection-title">Política Monetaria - Federal Reserve</h3>
+            <div class="narrative-box">
+                <p>{{fed_narrative}}</p>
+            </div>
+            <div class="indicators-grid">
+                <div class="indicator-card">
+                    <div class="label">Fed Funds Actual</div>
+                    <div class="value">{{fed_actual}}</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="label">Neutral Estimada</div>
+                    <div class="value">{{fed_neutral}}</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="label">Proyección 2026</div>
+                    <div class="value">{{fed_proyección}}</div>
+                </div>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Proxima Reunion</th>
+                        <th>Expectativa</th>
+                        <th>Probabilidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{fed_meetings_rows}}
+                </tbody>
+            </table>
+
+            <!-- Yield Curve Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_yield_curve}}" style="width:100%; max-width:750px; border-radius:5px;" alt="US Treasury Yield Curve">
+            </div>
+
+            <!-- Yield Curve Spreads -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_yield_spreads}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Yield Curve Spreads - Recession Indicators">
+            </div>
+
+            <h3 class="subsection-title">Política Fiscal</h3>
+            <div class="narrative-box">
+                <p>{{usa_fiscal_narrative}}</p>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Valor</th>
+                        <th>Anterior</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{usa_fiscal_rows}}
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 3. EUROPA -->
+        <section class="section">
+            <h2 class="section-title">3. Europa</h2>
+
+            <h3 class="subsection-title">Crecimiento</h3>
+            <div class="narrative-box">
+                <p>{{europe_growth_narrative}}</p>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Pais</th>
+                        <th>GDP 2025</th>
+                        <th>GDP 2026F</th>
+                        <th>Consenso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{europe_gdp_rows}}
+                </tbody>
+            </table>
+
+            <!-- Europe Dashboard Chart (real BCCh data) -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_europe_dashboard}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Europa Dashboard">
+            </div>
+
+            <!-- Europe PMI Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_europe_pmi}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Europa PMI">
+            </div>
+
+            <h3 class="subsection-title">Inflación</h3>
+            <div class="narrative-box">
+                <p>{{europe_inflation_narrative}}</p>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Valor</th>
+                        <th>Anterior</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{europe_inflation_rows}}
+                </tbody>
+            </table>
+
+            <h3 class="subsection-title">Política Monetaria - BCE</h3>
+            <div class="narrative-box">
+                <p>{{ecb_narrative}}</p>
+            </div>
+            <div class="indicators-grid">
+                <div class="indicator-card">
+                    <div class="label">Tasa Deposito</div>
+                    <div class="value">{{ecb_actual}}</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="label">Proyección 2026</div>
+                    <div class="value">{{ecb_proyección}}</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="label">Neutral</div>
+                    <div class="value">{{ecb_neutral}}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. CHINA -->
+        <section class="section">
+            <h2 class="section-title">4. China</h2>
+
+            <h3 class="subsection-title">Crecimiento</h3>
+            <div class="narrative-box">
+                <p>{{china_growth_narrative}}</p>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Valor</th>
+                        <th>Comentario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{china_growth_rows}}
+                </tbody>
+            </table>
+
+            <!-- China Dashboard Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_china_dashboard}}" style="width:100%; max-width:750px; border-radius:5px;" alt="China Dashboard">
+            </div>
+
+            <h3 class="subsection-title">Sector Inmobiliario</h3>
+            <div class="narrative-box">
+                <p>{{china_property_narrative}}</p>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Valor</th>
+                        <th>Anterior</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{china_property_rows}}
+                </tbody>
+            </table>
+
+            <h3 class="subsection-title">Impulso Crediticio</h3>
+            <div class="narrative-box">
+                <p>{{china_credit_narrative}}</p>
+            </div>
+
+            <h3 class="subsection-title">Comercio Exterior</h3>
+            <div class="narrative-box">
+                <p>{{china_trade_narrative}}</p>
+            </div>
+
+            <!-- China Trade Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_china_trade}}" style="width:100%; max-width:750px; border-radius:5px;" alt="China Comercio Exterior">
+            </div>
+        </section>
+
+        <!-- 5. CHILE Y LATAM -->
+        <section class="section">
+            <h2 class="section-title">5. Chile y LatAm</h2>
+
+            <div class="region-card">
+                <div class="region-card-header">Chile - Crecimiento</div>
+                <div class="region-card-body">
+                    <p>{{chile_growth_narrative}}</p>
+                    <table class="data-table" style="margin-top: 10px;">
+                        <thead>
+                            <tr>
+                                <th>Indicador</th>
+                                <th>Valor</th>
+                                <th>Anterior</th>
+                                <th>Tendencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{chile_growth_rows}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Chile Dashboard Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_chile_dashboard}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Chile Dashboard">
+            </div>
+
+            <div class="region-card">
+                <div class="region-card-header">Chile - Inflación</div>
+                <div class="region-card-body">
+                    <p>{{chile_inflation_narrative}}</p>
+                    <table class="data-table" style="margin-top: 10px;">
+                        <thead>
+                            <tr>
+                                <th>Indicador</th>
+                                <th>Valor</th>
+                                <th>Anterior</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{chile_inflation_rows}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Chile Inflation Components Stacked Bar -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_chile_inflation_components}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Chile IPC Componentes">
+            </div>
+
+            <div class="region-card">
+                <div class="region-card-header">Chile - Política Monetaria — Banco Central de Chile (BCCh)</div>
+                <div class="region-card-body">
+                    <p>{{bcch_narrative}}</p>
+                    <div class="indicators-grid" style="margin-top: 10px;">
+                        <div class="indicator-card">
+                            <div class="label">TPM Actual</div>
+                            <div class="value">{{tpm_actual}}</div>
+                        </div>
+                        <div class="indicator-card">
+                            <div class="label">Neutral</div>
+                            <div class="value">{{tpm_neutral}}</div>
+                        </div>
+                        <div class="indicator-card">
+                            <div class="label">Proyección 2026</div>
+                            <div class="value">{{tpm_proyección}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chile External Accounts Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_chile_external}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Chile Cuentas Externas vs Cobre">
+            </div>
+
+            <h3 class="subsection-title">Commodities Relevantes</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Commodity</th>
+                        <th>Precio</th>
+                        <th>Cambio</th>
+                        <th>Outlook</th>
+                        <th>Drivers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{commodities_rows}}
+                </tbody>
+            </table>
+
+            <!-- Commodities Performance Table (real BCCh data) -->
+            {{commodities_performance_table}}
+
+            <!-- Commodity Charts -->
+            <div class="two-column" style="margin: 20px 0;">
+                <div style="text-align: center;">
+                    <img src="{{chart_commodity_prices}}" style="width:100%; max-width:480px; border-radius:5px;" alt="Commodities">
+                </div>
+                <div style="text-align: center;">
+                    <img src="{{chart_energy_food}}" style="width:100%; max-width:480px; border-radius:5px;" alt="Energía y Alimentos">
+                </div>
+            </div>
+
+            <h3 class="subsection-title">Contexto LatAm</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Pais</th>
+                        <th>GDP</th>
+                        <th>Inflación</th>
+                        <th>Tasa</th>
+                        <th>Riesgo Principal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{latam_rows}}
+                </tbody>
+            </table>
+
+            <!-- LatAm Rates Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_latam_rates}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Tasas LatAm">
+            </div>
+        </section>
+
+        <!-- 6. TEMAS MACRO CLAVE -->
+        <section class="section">
+            <h2 class="section-title">6. Temas Macro Clave</h2>
+
+            <!-- Global Equities Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_global_equities}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Bolsas Globales">
+            </div>
+
+            <!-- PMI Global Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_pmi_global}}" style="width:100%; max-width:750px; border-radius:5px;" alt="PMI Global">
+            </div>
+
+            <!-- EPU Geopolitics Chart -->
+            <div style="text-align: center; margin: 15px 0;">
+                <img src="{{chart_epu_geopolitics}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Incertidumbre Política (EPU)">
+            </div>
+
+            {{macro_themes_html}}
+
+            <h3 class="subsection-title">Calendario de Eventos Clave</h3>
+            <table class="calendar-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Evento</th>
+                        <th>Relevancia</th>
+                        <th>Impacto Potencial</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{calendar_rows}}
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 7. ESCENARIOS Y RIESGOS -->
+        <section class="section">
+            <h2 class="section-title">7. Escenarios y Riesgos</h2>
+
+            <div class="scenarios-container">
+                {{scenarios_html}}
+            </div>
+
+            <h3 class="subsection-title">Top 3 Riesgos Macro</h3>
+            {{risks_html}}
+
+            <!-- Risk Matrix Chart -->
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="{{chart_risk_matrix}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Risk Matrix">
+            </div>
+        </section>
+
+        <!-- 8. CONCLUSIONES -->
+        <section class="section">
+            <h2 class="section-title">8. Conclusiones y Vista del Comite</h2>
+
+            <div class="narrative-box" style="background: #f0f0f0; border-left: 4px solid var(--primary-blue); padding: 15px; margin-bottom: 20px;">
+                <p>{{conclusiones_intro}}</p>
+            </div>
+
+            {{conclusiones_vistas_html}}
+
+            <h3 class="subsection-title">Posicionamiento General</h3>
+            <div class="narrative-box" style="background: #fffff0; border-left: 4px solid var(--accent-orange); padding: 15px;">
+                <p>{{conclusiones_posicionamiento}}</p>
+            </div>
+
+            <div class="narrative-box" style="margin-top: 15px; font-size: 9pt; color: var(--text-light);">
+                <p><em>{{conclusiones_proximo}}</em></p>
+            </div>
+        </section>
+
+        <!-- Glosario -->
+        <section class="glossary-section">
+            <h2 class="section-title">Glosario de Términos</h2>
+            <div class="glossary-grid">
+                <div class="glossary-item">
+                    <div class="glossary-term">PMI (Purchasing Managers' Index)</div>
+                    <div class="glossary-def">Indicador de actividad económica basado en encuestas a gerentes de compra. PMI &gt; 50 = expansión, &lt; 50 = contracción.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">GDP / PIB</div>
+                    <div class="glossary-def">Gross Domestic Product / Producto Interno Bruto — valor total de bienes y servicios producidos. QoQ = trimestre sobre trimestre (anualizado en EE.UU.).</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">Core CPI</div>
+                    <div class="glossary-def">Índice de Precios al Consumidor subyacente — excluye alimentos y energía para medir la tendencia inflacionaria de fondo.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">TPM (Tasa de Política Monetaria)</div>
+                    <div class="glossary-def">Tasa de referencia del Banco Central de Chile (BCCh). Herramienta principal de política monetaria.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">BCCh</div>
+                    <div class="glossary-def">Banco Central de Chile — autoridad monetaria que fija la TPM y supervisa la estabilidad financiera.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">FRED</div>
+                    <div class="glossary-def">Federal Reserve Economic Data — base de datos pública de la Reserva Federal de EE.UU. con indicadores económicos.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">EPU (Economic Policy Uncertainty)</div>
+                    <div class="glossary-def">Índice de incertidumbre de política económica — mide incertidumbre basándose en cobertura de prensa, vencimiento de leyes fiscales y dispersión de pronósticos.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">EEE</div>
+                    <div class="glossary-def">Encuesta de Expectativas Económicas del BCCh — encuesta mensual a analistas sobre proyecciones de inflación, crecimiento y TPM.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">IMCE (Índice Mensual de Confianza Empresarial)</div>
+                    <div class="glossary-def">Indicador de confianza del sector empresarial chileno. IMCE &gt; 50 = optimismo.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">IPC (Índice de Precios al Consumidor)</div>
+                    <div class="glossary-def">Medida oficial de inflación en Chile. IPC YoY = variación anual.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">Risk-On / Risk-Off</div>
+                    <div class="glossary-def">Postura favorable (Risk-On) o defensiva (Risk-Off) del mercado respecto a activos de riesgo.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">VIX</div>
+                    <div class="glossary-def">Índice de volatilidad implícita del S&amp;P 500. VIX &gt; 30 indica estrés de mercado significativo.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">Percentil</div>
+                    <div class="glossary-def">Posición de un dato respecto a su distribución histórica. Percentil 80 = superior al 80% de las observaciones.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">Credit Impulse (Impulso Crediticio)</div>
+                    <div class="glossary-def">Cambio en el flujo de nuevo crédito como % del PIB. Anticipa actividad económica futura.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">Tasa Neutral (R-Star / r*)</div>
+                    <div class="glossary-def">Tasa de interés teórica que ni estimula ni restringe la economía. Referencia para evaluar si la política monetaria es expansiva o restrictiva.</div>
+                </div>
+                <div class="glossary-item">
+                    <div class="glossary-term">SAAR</div>
+                    <div class="glossary-def">Seasonally Adjusted Annual Rate — tasa anualizada con ajuste estacional, usada en datos trimestrales de EE.UU.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Macro | {{fecha_reporte}}</div>
+            <div class="disclaimer">
+                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion. Las proyecciónes y estimaciónes contenidas en este reporte estan basadas en supuestos que pueden no materializarse. El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

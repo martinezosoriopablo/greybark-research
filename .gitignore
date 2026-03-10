@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Output (generated reports, data, logs)
+output/
+cache/
+*.mp3
+*.wav
+
+# Environment
+.env
+*.env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+
+# Temp
+*.tmp
+*.bak
+
+# Bloomberg data (large Excel files)
+input/bloomberg/*.xlsx
+input/bloomberg/*.xls
+
+# Logs
+*.log

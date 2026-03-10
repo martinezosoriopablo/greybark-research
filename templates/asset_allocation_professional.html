@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ company_name|default('Research') }} - Asset Allocation</title>
+    <style>
+        /* =====================================================
+           Asset Allocation Report Template
+           Matching Macro Report design system
+           ===================================================== */
+
+        :root {
+            --primary: {{ primary_color|default('#1a1a1a') }};
+            --secondary: #3a3a3a;
+            --accent: {{ accent_color|default('#dd6b20') }};
+            --text: {{ primary_color|default('#1a1a1a') }};
+            --text-medium: #4a4a4a;
+            --text-light: #717171;
+            --border: #e0e0e0;
+            --bg-light: #f7f7f7;
+            --success: {{ green_color|default('#276749') }};
+            --warning: {{ accent_color|default('#dd6b20') }};
+            --danger: {{ red_color|default('#c53030') }};
+            --neutral-badge: #744210;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: {{ font_family|default("'Segoe UI', 'Helvetica Neue', Arial, sans-serif") }};
+            font-size: 10pt;
+            line-height: 1.5;
+            color: var(--text);
+            background: white;
+        }
+
+        .report-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 40px;
+        }
+
+        /* Header — matches Macro Report */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .logo-section h1 {
+            font-family: {{ header_font_family|default("'Archio Black', 'Archio', 'Arial Black', 'Segoe UI', sans-serif") }};
+            font-size: 24pt;
+            color: var(--primary);
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .logo-section .subtitle {
+            font-size: 14pt;
+            color: var(--accent);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .report-info {
+            text-align: right;
+            font-size: 9pt;
+            color: var(--text-medium);
+        }
+
+        .report-info .date {
+            font-size: 11pt;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Sections — matches Macro Report */
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 14pt;
+            color: var(--primary);
+            font-weight: 700;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        .section-number {
+            color: var(--accent);
+            margin-right: 10px;
+        }
+
+        h3 {
+            font-size: 11pt;
+            color: var(--secondary);
+            font-weight: 600;
+            margin: 15px 0 10px 0;
+            padding-left: 10px;
+            border-left: 3px solid var(--accent);
+        }
+
+        /* Key Points Box — matches Macro key-takeaways */
+        .key-points {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid var(--accent);
+            margin: 15px 0;
+        }
+
+        .key-points h4 {
+            font-size: 10pt;
+            color: var(--primary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .key-points ul {
+            margin-left: 20px;
+        }
+
+        .key-points li {
+            margin-bottom: 5px;
+            color: var(--text-medium);
+        }
+
+        /* Tables — matches Macro Report */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 9pt;
+        }
+
+        th {
+            background: var(--primary);
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        /* View Cards */
+        .view-card {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+
+        .view-header {
+            background: var(--bg-light);
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .view-region {
+
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .view-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 3px;
+        }
+
+        .badge-constructivo { background: #c6f6d5; color: var(--success); }
+        .badge-neutral { background: #fefce8; color: var(--neutral-badge); }
+        .badge-cauteloso { background: #fed7d7; color: var(--danger); }
+        .badge-ow { background: #c6f6d5; color: var(--success); cursor: help; }
+        .badge-uw { background: #fed7d7; color: var(--danger); cursor: help; }
+        .badge-n { background: #fefce8; color: var(--neutral-badge); }
+
+        .view-body {
+            padding: 15px;
+        }
+
+        .view-tesis {
+            font-style: italic;
+            color: var(--text);
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .arguments-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .arguments-column h4 {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin: 0 0 10px 0;
+        }
+
+        .arguments-column.pro h4 { color: var(--success); }
+        .arguments-column.contra h4 { color: var(--danger); }
+
+        .arguments-column ul {
+            margin: 0;
+            padding-left: 15px;
+            font-size: 10pt;
+        }
+
+        .arguments-column li {
+            margin-bottom: 8px;
+        }
+
+        .argument-dato {
+            font-size: 9pt;
+            color: var(--text-light);
+            display: block;
+            margin-top: 2px;
+        }
+
+        .trigger-box {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 3px;
+            padding: 10px 15px;
+            margin-top: 15px;
+            font-size: 10pt;
+        }
+
+        .trigger-box strong {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        /* Scenario Cards */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .scenario-card {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 15px;
+        }
+
+        .scenario-card.base {
+            border-color: var(--accent);
+            border-width: 2px;
+        }
+
+        .scenario-name {
+
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .scenario-prob {
+
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .scenario-desc {
+            font-size: 10pt;
+            color: var(--text-light);
+            margin: 10px 0;
+        }
+
+        /* Risk Cards */
+        .risk-card {
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--danger);
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .risk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .risk-name {
+
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .risk-metrics {
+
+            font-size: 11px;
+            color: var(--text-light);
+        }
+
+        .risk-metrics span {
+            margin-left: 15px;
+        }
+
+        .risk-body {
+            font-size: 10pt;
+        }
+
+        .risk-hedge {
+            background: var(--bg-light);
+            padding: 10px;
+            border-radius: 3px;
+            margin-top: 10px;
+            font-size: 10pt;
+        }
+
+        .risk-hedge strong {
+
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        /* Calendar */
+        .calendar-table th {
+            background: var(--secondary);
+        }
+
+        .relevancia-alta { color: var(--danger); font-weight: 600; }
+        .relevancia-media { color: var(--warning); }
+
+        /* Triggers List */
+        .triggers-list {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 15px 20px;
+        }
+
+        .triggers-list h4 {
+
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--danger);
+            margin: 0 0 10px 0;
+        }
+
+        .triggers-list ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 10pt;
+        }
+
+        .triggers-list li {
+            margin-bottom: 5px;
+        }
+
+        /* Footer — matches Macro Report */
+        .footer {
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 2px solid var(--primary);
+            font-size: 8pt;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .disclaimer {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-light);
+            border-radius: 5px;
+            font-size: 7pt;
+            line-height: 1.4;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                padding: 20px;
+                font-size: 10pt;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+
+            .view-card, .risk-card, .scenario-card {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Postura Badge */
+        .postura-badge {
+            display: inline-block;
+
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 3px;
+            margin: 10px 0;
+        }
+
+        .postura-neutral { background: #e2e8f0; color: var(--text); }
+        .postura-constructivo { background: #c6f6d5; color: var(--success); }
+        .postura-cauteloso { background: #fed7d7; color: var(--danger); }
+        .postura-agresivo { background: #fefcbf; color: #975a16; }
+
+        /* Stance Spectrum */
+        .stance-spectrum {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 18px 24px;
+            margin: 20px 0;
+        }
+        .stance-spectrum-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #718096;
+            margin-bottom: 14px;
+        }
+        .stance-spectrum-bar {
+            display: flex;
+            align-items: stretch;
+            height: 38px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .stance-spectrum-segment {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .spectrum-cauteloso { background: #fed7d7; color: #9b2c2c; }
+        .spectrum-neutral { background: #e2e8f0; color: #4a5568; }
+        .spectrum-constructivo { background: #c6f6d5; color: #276749; }
+        .spectrum-agresivo { background: #fefcbf; color: #975a16; }
+        .spectrum-active {
+            outline: 3px solid #2d3748;
+            outline-offset: -3px;
+            z-index: 1;
+            font-size: 12px;
+        }
+        .spectrum-active::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 7px solid #2d3748;
+        }
+        .stance-spectrum-labels {
+            display: flex;
+            font-size: 9px;
+            color: #a0aec0;
+            margin-top: 10px;
+        }
+        .stance-spectrum-labels span {
+            flex: 1;
+            text-align: center;
+        }
+
+        /* Conviction Meter */
+        .conviction-meter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .conviction-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .conviction-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+        }
+
+        .conviction-label {
+
+            font-size: 10px;
+            color: var(--text-light);
+            min-width: 60px;
+        }
+
+        /* Positioning Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .dashboard-panel {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .dashboard-panel-title {
+
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            background: var(--primary);
+            color: white;
+            padding: 8px 12px;
+        }
+
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 0.5fr 1fr;
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10pt;
+            align-items: center;
+        }
+
+        .dashboard-row:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        .dashboard-asset {
+
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .dash-ow { color: var(--success); font-weight: 600; cursor: help; }
+        .dash-uw { color: var(--danger); font-weight: 600; cursor: help; }
+        .dash-n { color: var(--text-light); }
+
+        .dash-arrow {
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .dash-arrow-up { color: var(--success); }
+        .dash-arrow-down { color: var(--danger); }
+        .dash-arrow-flat { color: var(--text-light); }
+
+        .dash-conviction {
+
+            font-size: 9px;
+            color: var(--text-light);
+        }
+
+        .dashboard-postura-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .dashboard-postura-label {
+
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-light);
+            margin-bottom: 10px;
+        }
+
+        .dashboard-postura-sesgo {
+
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .dashboard-postura-conv {
+
+            font-size: 10px;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        /* Model Portfolios */
+        .portfolios-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 9.5pt;
+        }
+
+        .portfolios-table th {
+
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            background: var(--primary);
+            color: white;
+            padding: 8px 10px;
+            text-align: center;
+        }
+
+        .portfolios-table th:first-child {
+            text-align: left;
+        }
+
+        .portfolios-table td {
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+
+            font-size: 10px;
+        }
+
+        .portfolios-table td:first-child {
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .portfolios-table tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        .portfolios-table .total-row td {
+            font-weight: 700;
+            border-top: 2px solid var(--primary);
+            background: var(--bg-light);
+        }
+
+        .port-risk-score {
+
+            font-size: 9px;
+            color: var(--text-light);
+        }
+
+        .pct-change-up { color: var(--success); font-size: 9px; }
+        .pct-change-down { color: var(--danger); font-size: 9px; }
+        .pct-change-flat { color: var(--text-light); font-size: 9px; }
+
+        /* Focus List */
+        .focus-category {
+            margin-bottom: 20px;
+        }
+
+        .focus-category-title {
+
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--secondary);
+            margin-bottom: 8px;
+        }
+
+        .focus-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+        }
+
+        .focus-table th {
+            font-size: 9px;
+            padding: 8px 10px;
+        }
+
+        .focus-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .focus-table tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        .focus-ticker {
+
+            font-weight: 600;
+            font-size: 11px;
+            color: var(--primary);
+        }
+
+        .focus-name {
+            font-size: 10px;
+            color: var(--text-light);
+        }
+
+        /* Glossary Section */
+        .glossary-section {
+            margin-top: 40px;
+            margin-bottom: 10px;
+            page-break-inside: avoid;
+        }
+
+        .glossary-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 4px 4px 0 0;
+            padding: 10px 16px;
+            user-select: none;
+        }
+
+        .glossary-toggle h2 {
+            font-size: 11pt;
+            color: var(--text-medium);
+            font-weight: 600;
+            margin: 0;
+            letter-spacing: 0.3px;
+        }
+
+        .glossary-toggle-icon {
+            font-size: 14px;
+            color: var(--text-light);
+            transition: transform 0.2s;
+        }
+
+        .glossary-content {
+            display: none;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            padding: 16px 20px;
+            background: white;
+        }
+
+        .glossary-content.open {
+            display: block;
+        }
+
+        .glossary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 28px;
+        }
+
+        .glossary-item {
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 9pt;
+            line-height: 1.45;
+        }
+
+        .glossary-term {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 9.5pt;
+        }
+
+        .glossary-def {
+            color: var(--text-medium);
+        }
+
+        @media print {
+            .glossary-content {
+                display: block !important;
+            }
+            .glossary-toggle-icon {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header — matches Macro Report -->
+        <header class="header">
+            <div class="logo-section">
+                {% if logo_path %}<img src="{{ logo_path }}" alt="{{ company_name|default('GREYBARK RESEARCH') }}" style="max-height:40px;margin-bottom:5px;">{% endif %}
+                <h1>{{ company_name|default('GREYBARK RESEARCH') }}</h1>
+                <div class="subtitle">Reporte Asset Allocation</div>
+            </div>
+            <div class="report-info">
+                <div class="date">{{fecha_reporte}}</div>
+                <div>Comite de Inversion</div>
+            </div>
+        </header>
+
+    <!-- 1. RESUMEN EJECUTIVO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">1.</span> Resumen Ejecutivo</h2>
+
+        <p>{{intro_paragraph}}</p>
+
+        <div style="margin: 20px 0;">
+            <span class="postura-badge postura-{{postura_class}}">{{postura_view}} con sesgo {{postura_sesgo}}</span>
+            <div class="conviction-meter">
+                <span class="conviction-label">Conviccion:</span>
+                <div class="conviction-bar">
+                    <div class="conviction-fill" style="width: {{conviccion_pct}}%;"></div>
+                </div>
+                <span class="conviction-label">{{conviccion_text}}</span>
+            </div>
+        </div>
+
+        <div class="stance-spectrum">
+            <div class="stance-spectrum-title">Espectro de Posturas del Comite</div>
+            <div class="stance-spectrum-bar">
+                <div class="stance-spectrum-segment spectrum-cauteloso {{spectrum_active_cauteloso}}">CAUTELOSO</div>
+                <div class="stance-spectrum-segment spectrum-neutral {{spectrum_active_neutral}}">NEUTRAL</div>
+                <div class="stance-spectrum-segment spectrum-constructivo {{spectrum_active_constructivo}}">CONSTRUCTIVO</div>
+                <div class="stance-spectrum-segment spectrum-agresivo {{spectrum_active_agresivo}}">AGRESIVO</div>
+            </div>
+            <div class="stance-spectrum-labels">
+                <span title="Postura defensiva: reduce exposicion a activos de riesgo">Defensivo / Risk-Off <small style="display:block;font-size:7px;color:#c0c0c0;">(postura defensiva)</small></span>
+                <span>Selectivo / Sin sesgo</span>
+                <span title="Postura favorable selectiva hacia activos de riesgo">Risk-On selectivo <small style="display:block;font-size:7px;color:#c0c0c0;">(favorable selectivo)</small></span>
+                <span title="Postura plenamente favorable a activos de riesgo">Full Risk-On <small style="display:block;font-size:7px;color:#c0c0c0;">(plena exposicion)</small></span>
+            </div>
+        </div>
+
+        <div class="key-points">
+            <h4>Key Points</h4>
+            <ul>
+                {{key_points_html}}
+            </ul>
+        </div>
+
+        <p><strong>Principal catalizador a monitorear:</strong> {{catalizador}}</p>
+    </section>
+
+    <!-- 2. DASHBOARD DE POSICIONAMIENTO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">2.</span> Dashboard de Posicionamiento</h2>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-panel">
+                <div class="dashboard-panel-title">Renta Variable</div>
+                {{dashboard_rv_rows}}
+            </div>
+            <div class="dashboard-panel">
+                <div class="dashboard-panel-title">Renta Fija</div>
+                {{dashboard_rf_rows}}
+            </div>
+        </div>
+        <div class="dashboard-grid">
+            <div class="dashboard-panel">
+                <div class="dashboard-panel-title">Commodities &amp; FX</div>
+                {{dashboard_comm_rows}}
+            </div>
+            <div class="dashboard-panel dashboard-postura-panel">
+                <div class="dashboard-postura-label">Postura General</div>
+                <span class="postura-badge postura-{{postura_class}}">{{postura_view}}</span>
+                <div class="dashboard-postura-sesgo">{{postura_sesgo}}</div>
+                <div class="dashboard-postura-conv">Conviccion: {{conviccion_text}}</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. EL MES EN REVISION -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">3.</span> El Mes en Revision</h2>
+
+        <h3>3.1 Economia Global</h3>
+        <p>{{economia_global_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Indicador</th>
+                    <th>Actual</th>
+                    <th>Anterior</th>
+                    <th>Sorpresa</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{economia_global_tabla}}
+            </tbody>
+        </table>
+
+        <h3>3.2 Mercados Financieros</h3>
+        <p>{{mercados_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset</th>
+                    <th>Retorno Mes</th>
+                    <th>YTD / Cambio</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{mercados_tabla}}
+            </tbody>
+        </table>
+
+        <h3>3.3 Politica y Geopolitica</h3>
+        <p>{{geopolitica_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Evento</th>
+                    <th>Impacto</th>
+                    <th>Prob. Escalacion</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{geopolitica_tabla}}
+            </tbody>
+        </table>
+
+        <h3>3.4 Chile y Economia Local</h3>
+        <p>{{chile_narrativa}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Indicador</th>
+                    <th>Valor</th>
+                    <th>Tendencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{chile_tabla}}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- 4. ESCENARIOS MACRO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">4.</span> Escenarios Macro</h2>
+
+        <p><strong>Escenario Base:</strong> {{escenario_base}} ({{escenario_base_prob}}%) - {{escenario_base_desc}}</p>
+
+        <div class="scenario-grid">
+            {{scenarios_html}}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Escenario</th>
+                    <th>Prob</th>
+                    <th>Equities</th>
+                    <th>Bonds</th>
+                    <th>USD</th>
+                    <th>Commodities</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{scenarios_table}}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- 5. VIEWS POR REGION -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">5.</span> Views por Region</h2>
+
+        {{regional_views_html}}
+    </section>
+
+    <!-- 6. IMPLICANCIAS POR ASSET CLASS -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">6.</span> Implicancias por Asset Class</h2>
+
+        <h3>6.1 Renta Variable</h3>
+        <p><strong>View Global:</strong> {{equity_view_global}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Region</th>
+                    <th>View</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{equity_regions_table}}
+            </tbody>
+        </table>
+
+        <p><strong>Sectores preferidos:</strong> {{sectores_preferidos}}<br>
+        <strong>Sectores a evitar:</strong> {{sectores_evitar}}<br>
+        <strong>Factor tilt:</strong> {{factor_tilt}}</p>
+
+        <h3>6.2 Renta Fija</h3>
+        <p><strong>View Tasas:</strong> {{rf_view_tasas}} | <strong>Duration <span style="font-weight:400;font-size:9pt;color:var(--text-light);">(sensibilidad a tasas)</span>:</strong> {{rf_view_duration}} | <strong>Credito:</strong> {{rf_view_credito}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tramo</th>
+                    <th>View</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{rf_curva_table}}
+            </tbody>
+        </table>
+
+        <div class="key-points">
+            <h4>Chile Especifico</h4>
+            <ul>
+                <li><strong>TPM Path:</strong> {{chile_tpm_path}}</li>
+                <li><strong>Carry Trade:</strong> {{chile_carry_trade}}</li>
+                <li><strong>Recomendacion:</strong> {{chile_rf_recomendacion}}</li>
+            </ul>
+        </div>
+
+        <h3>6.3 Monedas</h3>
+        <p><strong>View USD:</strong> {{fx_view_usd}}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Par</th>
+                    <th>View</th>
+                    <th>Target 3M</th>
+                    <th>Target 12M</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{fx_table}}
+            </tbody>
+        </table>
+
+        <h3>6.4 Commodities</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Commodity</th>
+                    <th>View</th>
+                    <th>Target</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{commodities_table}}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- 7. RIESGOS Y MONITOREO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">7.</span> Riesgos y Que Monitorear</h2>
+
+        <h3>Top 3 Riesgos</h3>
+        {{risks_html}}
+
+        <h3>Calendario de Eventos Clave</h3>
+        <table class="calendar-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Evento</th>
+                    <th>Relevancia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{calendar_table}}
+            </tbody>
+        </table>
+
+        <div class="triggers-list">
+            <h4>Triggers para Reconvocar Comite</h4>
+            <ul>
+                {{triggers_html}}
+            </ul>
+        </div>
+    </section>
+
+    <!-- 8. PORTAFOLIOS MODELO -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">8.</span> Portafolios Modelo</h2>
+
+        <table class="portfolios-table">
+            <thead>
+                <tr>
+                    <th>Asset Class</th>
+                    {{portfolios_header_html}}
+                </tr>
+            </thead>
+            <tbody>
+                {{portfolios_body_html}}
+            </tbody>
+        </table>
+
+        <p style="font-size: 9pt; color: var(--text-light); margin-top: 10px;">
+            Las flechas indican cambios vs mes anterior: <span class="pct-change-up">&#9650;</span> aumento,
+            <span class="pct-change-down">&#9660;</span> reduccion, <span class="pct-change-flat">&#8594;</span> sin cambio.
+            Porcentajes suman 100% por perfil.
+        </p>
+    </section>
+
+    <!-- 9. FOCUS LIST -->
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">9.</span> Focus List — Instrumentos Recomendados</h2>
+
+        {{focus_list_html}}
+
+        <p style="font-size: 9pt; color: var(--text-light); margin-top: 15px;">
+            <strong>Nota:</strong> Los instrumentos listados son recomendaciones del Comite de Inversion y no constituyen asesoría personalizada.
+            <span title="Overweight — sobreponderacion">OW</span> = Overweight, N = Neutral, <span title="Underweight — subponderacion">UW</span> = Underweight. Consulte con su asesor antes de operar.
+        </p>
+    </section>
+
+    <!-- Glossary -->
+    <section class="glossary-section">
+        <div class="glossary-toggle" onclick="var c=this.nextElementSibling;c.classList.toggle('open');this.querySelector('.glossary-toggle-icon').textContent=c.classList.contains('open')?'\u25B2':'\u25BC';">
+            <h2>Glosario de Terminos</h2>
+            <span class="glossary-toggle-icon">&#9660;</span>
+        </div>
+        <div class="glossary-content">
+            <div class="glossary-grid">
+                <div class="glossary-item">
+                    <span class="glossary-term">OW / UW</span><br>
+                    <span class="glossary-def">Overweight (sobreponderacion) / Underweight (subponderacion) — indica si un activo tiene mayor o menor peso que su benchmark.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Duration</span><br>
+                    <span class="glossary-def">Sensibilidad del precio de un bono a cambios en tasas de interes. Mayor duracion = mayor sensibilidad.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Carry / Carry Trade</span><br>
+                    <span class="glossary-def">Rendimiento que se obtiene por mantener una posicion. En renta fija, diferencia entre la tasa del activo y el costo de financiamiento.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Spread</span><br>
+                    <span class="glossary-def">Diferencial de rendimiento entre un bono corporativo (o emergente) y el bono soberano equivalente, medido en puntos base (bps).</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">bps (puntos base)</span><br>
+                    <span class="glossary-def">Centesimas de punto porcentual. 100 bps = 1%.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">VIX</span><br>
+                    <span class="glossary-def">Indice de volatilidad implicita del S&amp;P 500. Mide la expectativa de volatilidad del mercado a 30 dias. VIX &gt; 30 indica estres.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">DXY</span><br>
+                    <span class="glossary-def">Dollar Index — indice que mide el valor del dolar estadounidense frente a una canasta de 6 monedas principales.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Factor Tilt</span><br>
+                    <span class="glossary-def">Inclinacion del portafolio hacia factores de inversion especificos (Quality, Value, Momentum) que historicamente generan retorno adicional.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Risk-On / Risk-Off</span><br>
+                    <span class="glossary-def">Postura favorable (Risk-On) o defensiva (Risk-Off) respecto a activos de riesgo como acciones, credito y commodities.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">TPM</span><br>
+                    <span class="glossary-def">Tasa de Politica Monetaria — tasa de referencia fijada por el Banco Central de Chile (BCCh).</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">BCCh</span><br>
+                    <span class="glossary-def">Banco Central de Chile.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">ERP</span><br>
+                    <span class="glossary-def">Equity Risk Premium — prima de riesgo de las acciones, calculada como rendimiento esperado de equity menos tasa libre de riesgo.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">P/E</span><br>
+                    <span class="glossary-def">Price-to-Earnings — relacion entre el precio de una accion y sus ganancias por accion. P/E alto puede indicar sobrevaluacion.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Percentil</span><br>
+                    <span class="glossary-def">Posicion de un dato respecto a su historia. Percentil 80 significa que el 80% de las observaciones historicas fueron menores.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Drawdown</span><br>
+                    <span class="glossary-def">Caida maxima desde un maximo anterior. Mide la perdida maxima que habria sufrido un inversionista.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Breakeven de Inflacion</span><br>
+                    <span class="glossary-def">Expectativa de inflacion implicita en el diferencial entre bonos nominales e indexados a inflacion.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">BCP / BCU</span><br>
+                    <span class="glossary-def">Bonos del Banco Central en Pesos (BCP) y en UF (BCU) — instrumentos soberanos de Chile.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">UF</span><br>
+                    <span class="glossary-def">Unidad de Fomento — unidad de cuenta indexada a la inflacion en Chile.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">EMBI</span><br>
+                    <span class="glossary-def">Emerging Markets Bond Index — indice de spread de bonos soberanos de mercados emergentes vs Treasuries de EE.UU.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">IG / HY</span><br>
+                    <span class="glossary-def">Investment Grade (grado de inversion, BBB+ o superior) / High Yield (alto rendimiento, BB+ o inferior, mayor riesgo crediticio).</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">CDS</span><br>
+                    <span class="glossary-def">Credit Default Swap — contrato de proteccion contra incumplimiento crediticio. CDS mas alto = mayor riesgo percibido.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">SOFR</span><br>
+                    <span class="glossary-def">Secured Overnight Financing Rate — tasa de referencia interbancaria de EE.UU. que reemplazo al LIBOR.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">OAS</span><br>
+                    <span class="glossary-def">Option-Adjusted Spread — spread de un bono ajustado por opcionalidad (call/put), medido en bps.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">DAP</span><br>
+                    <span class="glossary-def">Deposito a Plazo — instrumento de renta fija de corto plazo emitido por bancos.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">PMI</span><br>
+                    <span class="glossary-def">Purchasing Managers' Index — indice de actividad manufacturera/servicios. PMI &gt; 50 = expansion, &lt; 50 = contraccion.</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer — matches Macro Report -->
+    <footer class="footer">
+        <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Asset Allocation | {{fecha_reporte}}</div>
+        <div class="disclaimer">
+            {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion. Las opiniones expresadas son las del Comite de Inversion a la fecha indicada y estan sujetas a cambios sin previo aviso. El rendimiento pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
+        </div>
+    </footer>
+    </div>
+</body>
+</html>
