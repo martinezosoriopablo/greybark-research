@@ -7,9 +7,9 @@ Field-by-field validation of council input data against the data manifest.
 Replaces the module-level preflight with granular per-field checks.
 
 Gate logic:
-- Required coverage < 80% for ANY agent → NO_GO (abort)
+- Required coverage < 95% for ANY agent → NO_GO (abort)
 - Required coverage < 100% → CAUTION (continue but document)
-- Important coverage < 50% → CAUTION
+- Important coverage < 70% → CAUTION
 - Else → GO
 """
 
@@ -91,8 +91,12 @@ class AgentCompleteness:
                 if f.field.priority == FieldPriority.IMPORTANT and f.status != 'PRESENT']
 
     @property
+    def out_of_range(self) -> List[DataField]:
+        return [f.field for f in self.fields if f.status == 'OUT_OF_RANGE']
+
+    @property
     def present_fields(self) -> List[FieldStatus]:
-        return [f for f in self.fields if f.status == 'PRESENT']
+        return [f for f in self.fields if f.status in ('PRESENT', 'OUT_OF_RANGE')]
 
 
 @dataclass
@@ -189,6 +193,21 @@ class DataCompletenessValidator:
             return False
         return True
 
+    def _check_range(self, value: Any, df) -> bool:
+        """Check if a numeric value is within the field's plausible range.
+
+        Returns True if in range or if no range defined. False if out of range.
+        """
+        if df.min_value is None and df.max_value is None:
+            return True
+        if not isinstance(value, (int, float)):
+            return True  # Non-numeric values skip range check
+        if df.min_value is not None and value < df.min_value:
+            return False
+        if df.max_value is not None and value > df.max_value:
+            return False
+        return True
+
     def validate_agent(self, agent: str, agent_data: Dict) -> AgentCompleteness:
         """Validate completeness for one agent."""
         manifest = get_manifest(agent)
@@ -199,8 +218,16 @@ class DataCompletenessValidator:
             is_ok = self._is_present(value)
 
             if is_ok:
-                status = 'PRESENT'
-                stored_value = value
+                # Check range validity for numeric values
+                if not self._check_range(value, df):
+                    status = 'OUT_OF_RANGE'
+                    stored_value = value
+                    self._print(
+                        f"  [RANGE] {df.label}: {value} outside [{df.min_value}, {df.max_value}]"
+                    )
+                else:
+                    status = 'PRESENT'
+                    stored_value = value
             elif value is _MISSING:
                 status = 'MISSING'
                 stored_value = None
@@ -211,7 +238,7 @@ class DataCompletenessValidator:
             field_statuses.append(FieldStatus(
                 field=df,
                 status=status,
-                value=stored_value if status == 'PRESENT' else None,
+                value=stored_value if status in ('PRESENT', 'OUT_OF_RANGE') else None,
             ))
 
         return AgentCompleteness(agent=agent, fields=field_statuses)
@@ -252,20 +279,28 @@ class DataCompletenessValidator:
                 for mf in ac.missing_important:
                     issues.append(f"{agent_name}: IMPORTANT faltante — {mf.label} [{mf.source}]")
 
+            if ac.out_of_range:
+                for orf in ac.out_of_range:
+                    issues.append(f"{agent_name}: OUT_OF_RANGE — {orf.label} [{orf.source}] (range: {orf.min_value}..{orf.max_value})")
+
         # Determine verdict
         verdict = 'GO'
 
         for agent_name, ac in agents.items():
-            if ac.required_coverage < 0.80:
+            if ac.required_coverage < 0.95:
                 verdict = 'NO_GO'
-                self._print(f"  [NO_GO] {agent_name}: required coverage {ac.required_coverage*100:.0f}% < 80%")
+                self._print(f"  [NO_GO] {agent_name}: required coverage {ac.required_coverage*100:.0f}% < 95%")
                 break
             if ac.required_coverage < 1.0:
                 if verdict != 'NO_GO':
                     verdict = 'CAUTION'
-            if ac.important_coverage < 0.50:
+            if ac.important_coverage < 0.70:
                 if verdict != 'NO_GO':
                     verdict = 'CAUTION'
+            # Out-of-range on any field triggers CAUTION
+            if ac.out_of_range and verdict == 'GO':
+                verdict = 'CAUTION'
+                self._print(f"  [CAUTION] {agent_name}: {len(ac.out_of_range)} field(s) out of range")
 
         self._print(f"  Veredicto completitud: {verdict}")
         if issues:
