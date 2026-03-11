@@ -1088,3 +1088,90 @@ def generate_narrative(
     except Exception as e:
         logger.error(f"narrative_engine: {section_name} failed — {e}")
         return ""
+
+
+def generate_data_driven_narrative(
+    section_name: str,
+    prompt: str,
+    quant_context: str,
+    company_name: str = "",
+    max_tokens: int = 800,
+    temperature: float = 0.3,
+    verified_data: Dict[str, float] = None,
+) -> str:
+    """Generate narrative using ONLY quantitative data — no council required.
+
+    Use this as replacement for hardcoded _default_*() fallbacks. Instead of
+    returning 'N/D' or 'Sin recomendación', this calls Claude Sonnet with
+    whatever quantitative data IS available to produce professional analysis.
+
+    The system prompt adds an extra constraint: the model must explicitly state
+    when data is insufficient and avoid making recommendations without data support.
+    """
+    if not quant_context or quant_context.strip() == '':
+        logger.warning(f"generate_data_driven_narrative: {section_name} — no quant data, skipping")
+        return ""
+
+    data_only_addendum = (
+        "\n\nCONTEXTO ESPECIAL — ANÁLISIS BASADO SOLO EN DATOS:\n"
+        "No tienes contexto de deliberación interna. Genera análisis profesional "
+        "basado EXCLUSIVAMENTE en los datos cuantitativos proporcionados.\n"
+        "- Describe lo que MUESTRAN los datos (niveles, tendencias, cambios).\n"
+        "- Interpreta las implicancias para inversión usando lógica financiera estándar.\n"
+        "- Si los datos son insuficientes para una recomendación firme, indica "
+        "'los datos disponibles no permiten una recomendación con alta convicción' "
+        "en lugar de inventar una postura.\n"
+        "- Mantén el mismo tono profesional, directo y fundamentado."
+    )
+
+    return generate_narrative(
+        section_name=f"dd_{section_name}",
+        prompt=prompt + data_only_addendum,
+        council_context="",
+        quant_context=quant_context,
+        company_name=company_name,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        verified_data=verified_data,
+    )
+
+
+def generate_structured_json(
+    section_name: str,
+    prompt: str,
+    context: str,
+    company_name: str = "",
+    max_tokens: int = 1500,
+) -> Optional[dict]:
+    """Generate structured JSON via Claude — for scenarios, views, dashboards.
+
+    Returns parsed dict/list or None on failure.
+    """
+    import json as _json
+
+    result = generate_narrative(
+        section_name=f"json_{section_name}",
+        prompt=(
+            f"{prompt}\n\n"
+            "FORMATO: Responde SOLO con JSON válido. Sin explicación, sin markdown, "
+            "sin ```json```. Solo el JSON puro."
+        ),
+        council_context="",
+        quant_context=context,
+        company_name=company_name,
+        max_tokens=max_tokens,
+        temperature=0.2,
+    )
+    if not result:
+        return None
+    try:
+        cleaned = result.strip()
+        if cleaned.startswith('```'):
+            cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+            if cleaned.endswith('```'):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+        return _json.loads(cleaned)
+    except (_json.JSONDecodeError, Exception) as e:
+        logger.error(f"generate_structured_json: {section_name} parse failed — {e}")
+        return None

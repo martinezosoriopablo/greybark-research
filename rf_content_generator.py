@@ -1025,33 +1025,53 @@ class RFContentGenerator:
                 'posicion_curva': cr.get('trade_expression', ''),
                 'confianza': cr.get('confidence', 'MEDIUM'),
                 'rationale': cr.get('rationale', 'Ver análisis del comité para fundamento de duration.'),
-                'riesgos': [
-                    'Reflación por estímulos fiscales',
-                    'Term premium sube por oferta de Treasuries'
-                ],
+                'riesgos': cr.get('risks', ['Monitorear evolución de tasas soberanas y term premium']),
                 '_real': True
             }
 
         # Use council parser for duration stance
         stance_data = self.parser.get_duration_stance()
         if stance_data:
-            duration_text = stance_data.get('stance', 'Sin recomendación')
+            duration_text = stance_data.get('stance', 'N')
             benchmark = stance_data.get('benchmark')
             recommendation = stance_data.get('recommendation')
         else:
-            duration_text = 'Sin recomendación del comité'
+            duration_text = 'NEUTRAL — datos insuficientes para recomendación activa'
             benchmark = None
             recommendation = None
+
+        # Generate risks dynamically
+        from narrative_engine import generate_data_driven_narrative
+        import json as _json
+        us_10y = self._val('yield_curve', 'us_10y') or self._val('chile_rates', 'ust_10y')
+        quant_ctx = f"UST 10Y: {us_10y}%" if us_10y else "Datos de tasas limitados"
+        risks_result = generate_data_driven_narrative(
+            section_name="rf_duration_risks",
+            prompt='Genera 2 riesgos de duration basados en datos. JSON: ["riesgo 1", "riesgo 2"]. SOLO JSON.',
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=200,
+        )
+        riesgos = ['Monitorear niveles de tasas soberanas para ajustar duration']
+        if risks_result:
+            try:
+                cleaned = risks_result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                parsed = _json.loads(cleaned.strip())
+                if isinstance(parsed, list) and len(parsed) >= 1:
+                    riesgos = parsed
+            except (_json.JSONDecodeError, Exception):
+                pass
 
         return {
             'stance': duration_text,
             'benchmark_duration': f"{benchmark:.1f} años" if benchmark else 'N/D',
             'recomendacion': f"{recommendation:.1f} años" if recommendation else 'N/D',
-            'rationale': 'Ver análisis del comité para fundamento de duration.',
-            'riesgos': [
-                'Reflación por estímulos fiscales',
-                'Term premium sube por oferta de Treasuries'
-            ]
+            'rationale': f'Basado en UST 10Y {us_10y}%' if us_10y else 'Datos insuficientes',
+            'riesgos': riesgos
         }
 
     def _generate_duration_by_market(self) -> List[Dict[str, Any]]:
@@ -1253,30 +1273,93 @@ class RFContentGenerator:
         }
 
     def _generate_liquidity_analysis(self) -> Dict[str, Any]:
-        """Genera analisis de liquidez y bid-ask spreads (proprietary data — no public API)."""
+        """Genera analisis de liquidez — datos propietarios, recomendaciones via Sonnet."""
+        from narrative_engine import generate_data_driven_narrative
+        import json as _json
+
+        # Generate recommendations dynamically based on available spread data
+        ig_bps = self._val('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
+        hy_bps = self._val('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
+        vix = self._val('chile_rates', 'vix') or self._val('risk', 'vix')
+        quant_ctx = f"IG spread: {ig_bps:.0f}bps" if ig_bps else ""
+        if hy_bps:
+            quant_ctx += f" | HY spread: {hy_bps:.0f}bps"
+        if vix:
+            quant_ctx += f" | VIX: {vix}"
+
+        recs = []
+        if quant_ctx:
+            result = generate_data_driven_narrative(
+                section_name="rf_liquidity_recs",
+                prompt='Genera 3 recomendaciones de liquidez para RF basadas en spreads y VIX. JSON: ["rec1", "rec2", "rec3"]. SOLO JSON.',
+                quant_context=quant_ctx,
+                company_name=self.company_name,
+                max_tokens=300,
+            )
+            if result:
+                try:
+                    cleaned = result.strip()
+                    if cleaned.startswith('```'):
+                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                        if cleaned.endswith('```'):
+                            cleaned = cleaned[:-3]
+                    parsed = _json.loads(cleaned.strip())
+                    if isinstance(parsed, list):
+                        recs = parsed
+                except (_json.JSONDecodeError, Exception):
+                    pass
+        if not recs:
+            recs = ['Monitorear condiciones de liquidez y spreads de crédito']
+
         return {
             'titulo': 'Análisis de Liquidez por Segmento (facilidad de compra/venta sin impacto en precio)',
             'nota': 'Datos de liquidez/bid-ask requieren suscripción Bloomberg/Refinitiv — no disponible via API pública.',
             'datos': [],
-            'recomendaciones': [
-                'Mantener 10-15% del portfolio en activos muy liquidos (Treasuries, Bunds)',
-                'Staged entry para posiciones Chile corporativo',
-                'Evitar HY iliquido en tamanos que no se puedan salir en 3 dias',
-                'Monitorear bid-ask como early warning de stress'
-            ]
+            'recomendaciones': recs
         }
 
     def _generate_refinancing_calendar(self) -> Dict[str, Any]:
-        """Genera calendario de vencimientos y refinanciamiento (manual/proprietary — no API)."""
+        """Genera calendario de vencimientos — datos propietarios, observaciones via Sonnet."""
+        from narrative_engine import generate_data_driven_narrative
+        import json as _json
+
+        ig_bps = self._val('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
+        hy_bps = self._val('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
+        quant_ctx = ""
+        if ig_bps:
+            quant_ctx += f"IG spread: {ig_bps:.0f}bps"
+        if hy_bps:
+            quant_ctx += f" | HY spread: {hy_bps:.0f}bps"
+
+        obs = ['Monitorear condiciones de refinanciamiento corporativo']
+        if quant_ctx:
+            result = generate_data_driven_narrative(
+                section_name="rf_refi_obs",
+                prompt='Genera 2 observaciones sobre refinanciamiento basadas en spreads. JSON: ["obs1", "obs2"]. SOLO JSON.',
+                quant_context=quant_ctx,
+                company_name=self.company_name,
+                max_tokens=200,
+            )
+            if result:
+                try:
+                    cleaned = result.strip()
+                    if cleaned.startswith('```'):
+                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                        if cleaned.endswith('```'):
+                            cleaned = cleaned[:-3]
+                    parsed = _json.loads(cleaned.strip())
+                    if isinstance(parsed, list):
+                        obs = parsed
+                except (_json.JSONDecodeError, Exception):
+                    pass
+
         return {
             'titulo': 'Calendario de Refinanciamiento',
             'nota': 'Datos de vencimientos requieren suscripción Bloomberg/Refinitiv — no disponible via API pública.',
             'global_maturity_wall': {},
             'chile_vencimientos': [],
             'emisores_monitoreados': [],
-            'observaciones': [
-                'Monitorear spreads de emisores con vencimientos 2026-2027'
-            ]
+            'observaciones': obs
         }
 
     def _generate_ig_analysis(self) -> Dict[str, Any]:

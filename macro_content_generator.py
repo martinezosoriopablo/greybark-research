@@ -861,8 +861,8 @@ class MacroContentGenerator:
         fc = self._fc_pct('rate_forecasts', 'fed_funds', 'terminal')
         if fc != 'N/D':
             return fc
-        # Cleveland Fed reference (2025:Q2)
-        return "~3.7% (Cleveland Fed i* 2025:Q2)"
+        # No hardcoded fallback — return N/D if all sources unavailable
+        return "N/D — fuentes de tasa neutral no disponibles"
 
     def _generate_fed_policy(self) -> Dict[str, Any]:
         """Genera seccion de política monetaria Fed."""
@@ -913,13 +913,59 @@ class MacroContentGenerator:
             },
             'dot_plot': dot_plot,
             'taylor_rule': self._build_taylor_rule(ff),
-            'riesgos': [
-                'Reaceleración de inflación servicios forzaria pausa prolongada',
-                'Debilidad inesperada en empleo aceleraria recortes',
-                'Incertidumbre geopolítica y política comercial'
-            ],
+            'riesgos': self._generate_fed_risks(ff, pce_core, real_rate),
             'proximas_reuniones': self._build_fed_meetings()
         }
+
+    def _generate_fed_risks(self, ff, pce_core, real_rate) -> List[str]:
+        """Generate Fed policy risks via Sonnet — no hardcoded opinions."""
+        from narrative_engine import generate_data_driven_narrative
+        import json as _json
+
+        quant_parts = []
+        if ff is not None:
+            quant_parts.append(f"Fed Funds: {ff}%")
+        if pce_core is not None:
+            quant_parts.append(f"Core PCE: {pce_core}%")
+        if real_rate is not None:
+            quant_parts.append(f"Tasa real: {real_rate}%")
+        unemployment = self._q('macro_usa', 'unemployment')
+        if unemployment is not None:
+            quant_parts.append(f"Desempleo: {unemployment}%")
+
+        council_text = self.council.get('panel_outputs', {}).get('macro', '')
+        if council_text:
+            quant_parts.append(f"Council macro: {council_text[:500]}")
+
+        quant_ctx = " | ".join(quant_parts) if quant_parts else ""
+        if not quant_ctx:
+            return ['Datos insuficientes para evaluación de riesgos']
+
+        result = generate_data_driven_narrative(
+            section_name="macro_fed_risks",
+            prompt=(
+                "Genera exactamente 3 riesgos para la política monetaria de la Fed "
+                "basados en los datos disponibles. Formato JSON: "
+                '["riesgo 1 en 1 oración con dato", "riesgo 2", "riesgo 3"]. '
+                "Cada riesgo debe referenciar un dato concreto. SOLO JSON."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=400,
+        )
+        if result:
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                parsed = _json.loads(cleaned.strip())
+                if isinstance(parsed, list) and len(parsed) >= 2:
+                    return parsed
+            except (_json.JSONDecodeError, Exception):
+                pass
+        return ['Evaluar datos macro actualizados para riesgos específicos']
 
     def _build_taylor_rule(self, ff: float = None) -> Dict[str, str]:
         """Build Taylor Rule dict from econometric detail in forecast data."""
@@ -973,6 +1019,40 @@ class MacroContentGenerator:
 
         return meetings
 
+    def _generate_fiscal_risks(self, deficit_str, debt_str, interest_str) -> List[str]:
+        """Generate fiscal risks via Sonnet — no hardcoded opinions."""
+        from narrative_engine import generate_data_driven_narrative
+        import json as _json
+
+        quant_ctx = f"Déficit/PIB: {deficit_str} | Deuda/PIB: {debt_str} | Costo deuda: {interest_str}"
+        council_text = self.council.get('panel_outputs', {}).get('macro', '')
+        if council_text:
+            quant_ctx += f" | Council: {council_text[:300]}"
+
+        result = generate_data_driven_narrative(
+            section_name="macro_fiscal_risks",
+            prompt=(
+                "Genera exactamente 2 riesgos fiscales de EE.UU. basados en los datos. "
+                'Formato JSON: ["riesgo 1 con dato", "riesgo 2 con dato"]. SOLO JSON.'
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=300,
+        )
+        if result:
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                parsed = _json.loads(cleaned.strip())
+                if isinstance(parsed, list) and len(parsed) >= 1:
+                    return parsed
+            except (_json.JSONDecodeError, Exception):
+                pass
+        return [f'Déficit fiscal {deficit_str} requiere monitoreo', f'Costo de deuda {interest_str} en tendencia alcista']
+
     def _generate_usa_fiscal(self) -> Dict[str, Any]:
         """Genera seccion de política fiscal EE.UU."""
         fiscal = {}
@@ -1002,10 +1082,7 @@ class MacroContentGenerator:
                 {'indicador': 'Deuda Publica', 'valor': debt_str, 'anterior': self._fmt(fiscal.get('debt_gdp_prev'))},
                 {'indicador': 'Costo Deuda', 'valor': interest_str, 'anterior': self._fmt(fiscal.get('interest_gdp_prev'))},
             ],
-            'riesgos': [
-                'Politica fiscal expansiva podria ampliar déficit',
-                'Gasto en defensa creciente por tensiones geopolíticas',
-            ]
+            'riesgos': self._generate_fiscal_risks(deficit_str, debt_str, interest_str)
         }
 
     # =========================================================================
@@ -2130,23 +2207,77 @@ class MacroContentGenerator:
         }
 
     def _build_default_conclusions(self) -> Dict[str, Any]:
-        """Conclusiones fallback sin council output."""
-        return {
-            'titulo': 'Conclusiones',
-            'intro': (
-                f"Las conclusiones de {self.month_name} {self.year} reflejan nuestro analisis "
-                f"integrado de las principales variables macro."
+        """Conclusiones generadas por Sonnet usando datos macro disponibles."""
+        from narrative_engine import generate_data_driven_narrative, generate_structured_json
+
+        # Build comprehensive quant context
+        quant_parts = []
+        for key, label in [('gdp', 'GDP US'), ('core_cpi', 'Core CPI'), ('unemployment', 'Desempleo'),
+                           ('fed_rate', 'Fed Funds'), ('recession_prob', 'Prob Recesión')]:
+            val = self._q('macro_usa', key)
+            if val is not None:
+                quant_parts.append(f"{label}: {val}%")
+        regime = self._q('regime', 'current')
+        if regime:
+            quant_parts.append(f"Régimen: {regime}")
+        tpm = self._q('chile', 'tpm')
+        if tpm is not None:
+            quant_parts.append(f"TPM Chile: {tpm}%")
+        quant_ctx = " | ".join(quant_parts) if quant_parts else "Datos macro limitados"
+
+        # Generate intro
+        intro = generate_data_driven_narrative(
+            section_name="macro_conclusions_intro_dd",
+            prompt=(
+                f"Escribe 2 oraciones de introducción para las conclusiones macro de "
+                f"{self.month_name} {self.year}. Resume el panorama macro usando los datos. "
+                "Máximo 50 palabras."
             ),
-            'vistas': [
-                {
-                    'tema': 'N/D',
-                    'vista_grb': 'N/D — council session requerida.',
-                    'vs_consenso': 'N/D',
-                    'vs_detalle': 'N/D'
-                },
-            ],
-            'posicionamiento_resumen': 'N/D — ver council para posicionamiento.',
-            'proximo_reporte': 'Este analisis sirve como input para reportes de Asset Allocation y Renta Fija.'
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=200,
+        )
+        if not intro:
+            intro = f"Las conclusiones de {self.month_name} {self.year} reflejan el análisis de las principales variables macro."
+
+        # Generate vistas
+        vistas_result = generate_structured_json(
+            section_name="macro_conclusions_vistas_dd",
+            prompt=(
+                "Genera 3-4 vistas macro basadas en los datos. Formato JSON: "
+                '[{"tema": "nombre del tema", "vista_grb": "nuestra vista en 1 oración con dato", '
+                '"vs_consenso": "ABOVE/BELOW/IN-LINE", "vs_detalle": "1 oración"}]. '
+                "Temas: Crecimiento, Inflación, Política Monetaria, Chile (si hay datos). SOLO JSON."
+            ),
+            context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=800,
+        )
+        if isinstance(vistas_result, list) and len(vistas_result) >= 2:
+            vistas = vistas_result
+        else:
+            vistas = [{'tema': 'Macro', 'vista_grb': f'Datos: {quant_ctx}', 'vs_consenso': 'N/D', 'vs_detalle': 'Análisis basado en datos cuantitativos'}]
+
+        # Generate posicionamiento
+        pos = generate_data_driven_narrative(
+            section_name="macro_conclusions_pos_dd",
+            prompt=(
+                "Escribe 1 oración resumiendo el posicionamiento macro general basado en los datos. "
+                "Máximo 30 palabras."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=100,
+        )
+        if not pos:
+            pos = f"Posicionamiento basado en: {quant_ctx}."
+
+        return {
+            'titulo': f'Conclusiones — {self.month_name} {self.year}',
+            'intro': intro,
+            'vistas': vistas,
+            'posicionamiento_resumen': pos,
+            'proximo_reporte': 'Este análisis macro sirve como input para los reportes complementarios de Asset Allocation y Renta Fija.'
         }
 
     # =========================================================================
