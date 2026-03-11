@@ -12,9 +12,69 @@ Single Sonnet call: ~$0.02-0.03 per run.
 import json
 import logging
 import os
+import time
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_BASE_DELAY = 1.0
+
+
+def _call_with_retry(fn, *args, retries=MAX_RETRIES, **kwargs):
+    """Call a function with exponential backoff retry on failure."""
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            last_error = e
+            if attempt < retries:
+                delay = min(RETRY_BASE_DELAY * (2 ** attempt), 15.0)
+                logger.warning("Retry %d/%d after %s: %s", attempt + 1, retries, type(e).__name__, e)
+                time.sleep(delay)
+    raise last_error
+
+
+def _parse_and_validate_json(raw: str, required_keys: dict) -> Dict[str, Any]:
+    """Parse JSON and validate required keys exist with correct types.
+
+    Args:
+        raw: Raw JSON string (may have markdown fences).
+        required_keys: Dict mapping key name to expected type or tuple of types.
+
+    Returns:
+        Parsed and validated dict.
+
+    Raises:
+        ValueError: If JSON is invalid or missing required keys.
+    """
+    # Strip markdown fences
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text[:-3].strip()
+    if text.startswith("json"):
+        text = text[4:].strip()
+
+    try:
+        result = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON: {e}") from e
+
+    if not isinstance(result, dict):
+        raise ValueError(f"Expected dict, got {type(result).__name__}")
+
+    for key, expected_types in required_keys.items():
+        if key not in result:
+            raise ValueError(f"Missing required key: '{key}'")
+        if not isinstance(result[key], expected_types):
+            raise ValueError(
+                f"Key '{key}' has unexpected type {type(result[key]).__name__}"
+            )
+
+    return result
 
 
 def _extract_audit_payload(contents: Dict[str, Dict]) -> str:
@@ -213,7 +273,7 @@ def audit_reports(
     if len(payload) < 100:
         return _skipped("Insufficient report data to audit")
 
-    try:
+    def _do_audit():
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -225,25 +285,33 @@ def audit_reports(
                 "content": f"Audita la coherencia de estos 4 reportes de inversión:\n\n{payload}"
             }],
         )
-
         raw = response.content[0].text.strip()
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3].strip()
-        if raw.startswith("json"):
-            raw = raw[4:].strip()
 
-        result = json.loads(raw)
+        # Validate JSON structure
+        result = _parse_and_validate_json(raw, {
+            'coherence_score': (int, float),
+            'flags': list,
+        })
 
-        # Validate structure
-        result.setdefault("coherence_score", 0.0)
+        # Validate coherence_score range
+        score = result['coherence_score']
+        if not (0.0 <= score <= 1.0):
+            raise ValueError(f"coherence_score {score} outside [0, 1]")
+
+        # Validate flags structure
+        for i, flag in enumerate(result['flags']):
+            if not isinstance(flag, dict):
+                raise ValueError(f"flags[{i}] is not a dict")
+            if 'severity' not in flag or 'issue' not in flag:
+                raise ValueError(f"flags[{i}] missing severity or issue")
+
         result.setdefault("stance_alignment", "UNKNOWN")
         result.setdefault("summary", "")
-        result.setdefault("flags", [])
         result["status"] = "completed"
+        return result
 
+    try:
+        result = _call_with_retry(_do_audit)
         logger.info(
             "Audit complete: score=%.2f, alignment=%s, flags=%d",
             result["coherence_score"],
@@ -252,11 +320,8 @@ def audit_reports(
         )
         return result
 
-    except json.JSONDecodeError as e:
-        logger.error("Audit JSON parse error: %s", e)
-        return _skipped(f"JSON parse error: {e}")
     except Exception as e:
-        logger.error("Audit failed: %s", e)
+        logger.error("Audit failed after retries: %s", e)
         return _skipped(str(e))
 
 
@@ -349,7 +414,7 @@ def resolve_flags(
         f"## FLAGS DE INCONSISTENCIA DETECTADAS\n{flags_text}"
     )
 
-    try:
+    def _do_resolve():
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -358,19 +423,26 @@ def resolve_flags(
             system=RESOLVER_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_msg}],
         )
-
         raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3].strip()
-        if raw.startswith("json"):
-            raw = raw[4:].strip()
 
-        result = json.loads(raw)
-        result.setdefault("corrections", [])
+        result = _parse_and_validate_json(raw, {
+            'corrections': list,
+        })
+
+        # Validate corrections structure
+        for i, c in enumerate(result['corrections']):
+            if not isinstance(c, dict):
+                raise ValueError(f"corrections[{i}] is not a dict")
+            if 'report' not in c or 'directive' not in c:
+                raise ValueError(f"corrections[{i}] missing report or directive")
+
+        result.setdefault("resolved_stance", "UNKNOWN")
+        result.setdefault("rationale", "")
         result["status"] = "resolved"
+        return result
 
+    try:
+        result = _call_with_retry(_do_resolve)
         logger.info(
             "Refinador resolved %d flags → %d corrections, stance=%s",
             len(high_flags), len(result["corrections"]),
@@ -379,7 +451,7 @@ def resolve_flags(
         return result
 
     except Exception as e:
-        logger.error("Refinador resolution failed: %s", e)
+        logger.error("Refinador resolution failed after retries: %s", e)
         return {"status": "error", "reason": str(e), "corrections": []}
 
 
