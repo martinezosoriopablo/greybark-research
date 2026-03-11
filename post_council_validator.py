@@ -79,28 +79,139 @@ class PostCouncilValidator:
         return vd
 
     def _manifest_path_to_key(self, path: str, label: str) -> Optional[str]:
-        """Map a manifest path/label to a narrative_engine verified_data key."""
+        """Map a manifest path/label to a narrative_engine verified_data key.
+
+        Comprehensive mapping covering all 178 manifest fields where a
+        corresponding narrative_engine key exists.
+        """
         mapping = {
+            # --- Macro USA ---
             'macro_usa.gdp': 'us_gdp',
             'macro_usa.unemployment': 'us_unemployment',
             'macro_usa.fed_funds': 'fed_rate',
+            'macro_usa.ism_manufacturing': 'ism_manufacturing',
+            'macro_usa.payrolls': 'nfp',
+            'macro_usa.jolts': 'jolts',
+            # --- Inflation ---
             'inflation.cpi_core_yoy': 'core_cpi',
             'inflation.cpi_all_yoy': 'headline_cpi',
             'inflation.breakeven_5y': 'breakeven_5y',
             'inflation.breakeven_10y': 'breakeven_10y',
             'inflation.real_rate_10y': 'tips_10y',
+            # --- Rates ---
+            'rates.terminal_rate': 'fed_rate',
+            'rates.cuts_expected': 'fed_cuts',
+            # --- Chile ---
             'chile.tpm': 'tpm',
+            'chile.ipc': 'chile_ipc',
             'chile.ipc_yoy': 'chile_ipc',
             'chile.imacec': 'chile_imacec',
             'chile.pib_yoy': 'chile_gdp',
+            # --- Chile EEE Expectations ---
+            'chile_eee.ipc_12m': 'eee_ipc_12m',
+            'chile_eee.ipc_24m': 'eee_ipc_24m',
+            'chile_eee.ipc_lp': 'eee_ipc_lp',
+            'chile_eee.tpm_lp': 'eee_tpm_lp',
+            'chile_eee.tpm_11m': 'eee_tpm_11m',
+            'chile_eee.tpm_23m': 'eee_tpm_23m',
+            'chile_eee.tpm_prox_reunion': 'eee_tpm_prox',
+            'chile_eee.pib_actual': 'eee_pib_actual',
+            'chile_eee.pib_lp': 'eee_pib_lp',
+            'chile_eee.tcn_12m': 'eee_tcn_12m',
+            # --- Chile IMCE ---
+            'chile_imce.imce_total': 'imce_total',
+            'chile_imce.imce_sin_mineria': 'imce_sin_mineria',
+            # --- Chile IPC Detail ---
+            'chile_ipc_detail.ipc_sae': 'ipc_sae',
+            'chile_ipc_detail.ipc_servicios': 'ipc_servicios',
+            'chile_ipc_detail.ipc_bienes': 'ipc_bienes',
+            'chile_ipc_detail.ipc_energia': 'ipc_energia',
+            # --- Chile EOF (RF agent) ---
+            'chile_extended.eof_expectations.btp_5y': 'eof_btp_5y',
+            'chile_extended.eof_expectations.btp_10y': 'eof_btp_10y',
+            'chile_extended.eof_expectations.btu_5y': 'eof_btu_5y',
+            'chile_extended.eof_expectations.btu_10y': 'eof_btu_10y',
+            'chile_extended.eof_expectations.tpm_12m': 'eof_tpm_12m',
+            'chile_extended.eof_expectations.ipc_12m': 'eof_ipc_12m',
+            'chile_extended.eof_expectations.tc_28d': 'eof_tc_28d',
+            'chile_extended.eof_expectations.tc_3m': 'eof_tc_3m',
+            'chile_extended.ipc_detail.ipc_sae': 'ipc_sae',
+            # --- Risk ---
             'risk.vix': 'vix',
+            'risk.max_drawdown': 'max_drawdown',
+            'risk.current_drawdown': 'current_drawdown',
+            'risk.diversification_score': 'diversification',
+            # --- Breadth ---
             'breadth.pct_above_50ma': 'breadth_50ma',
             'breadth.cyclical_defensive_spread': 'cyclical_defensive',
+            # --- Equity Valuations ---
             'equity_data.valuations.us.pe_trailing': 'sp500_pe',
             'equity_data.valuations.europe.pe_trailing': 'stoxx600_pe',
             'equity_data.valuations.em.pe_trailing': 'msci_em_pe',
             'equity_data.valuations.chile.pe_trailing': 'ipsa_pe',
             'equity_data.valuations.us.pe_fwd': 'sp500_fwd_pe',
+            # --- Fiscal ---
+            'fiscal.deficit_gdp': 'fiscal_deficit',
+            'fiscal.debt_gdp': 'fiscal_debt',
+            # --- China ---
+            'china.epu_analysis.epu_level': 'epu_china',
+            # --- BEA ---
+            'bea_gdp.gdp_total': 'gdp_qoq',
+            'bea_gdp.pce_total': 'pce_contrib',
+            'bea_gdp.gross_private_investment': 'investment_qoq',
+            'bea_gdp.net_exports': 'net_exports',
+            'bea_gdp.pce_goods': 'pce_goods_qoq',
+            'bea_gdp.pce_services': 'pce_services_qoq',
+            'bea_gdp.residential': 'residential_qoq',
+            'bea_gdp.govt_total': 'govt_qoq',
+            'bea_pce.pce_headline_yoy': 'pce_headline_yoy',
+            'bea_pce.pce_services_yoy': 'pce_services_yoy',
+            'bea_pce.pce_headline_mom': 'pce_headline_mom',
+            'bea_pce.pce_goods_yoy': 'pce_goods_yoy',
+            'bea_pce.pce_services_mom': 'pce_services_mom',
+            'bea_income.saving_rate': 'saving_rate',
+            'bea_income.personal_income': 'personal_income',
+            'bea_profits.profits_total': 'profits_total',
+            'bea_profits.profits_yoy': 'profits_yoy',
+            'bea_profits.profits_financial': 'profits_financial',
+            'bea_profits.profits_nonfinancial': 'profits_nonfinancial',
+            'bea_fiscal.federal_net_lending': 'federal_net_lending',
+            # --- Leading Indicators ---
+            'leading_indicators.lei_usa': 'lei_usa',
+            'leading_indicators.lei_eurozone': 'lei_eurozone',
+            'leading_indicators.cfnai': 'cfnai',
+            'leading_indicators.umich_sentiment': 'umich_sentiment',
+            'leading_indicators.consumer_confidence_ez': 'consumer_confidence_ez',
+            # --- IMF WEO ---
+            'forecasts.gdp.usa.consensus_imf': 'imf_gdp_usa',
+            'forecasts.gdp.chile.consensus_imf': 'imf_gdp_chile',
+            'forecasts.gdp.eurozone.consensus_imf': 'imf_gdp_eurozone',
+            'forecasts.gdp.china.consensus_imf': 'imf_gdp_china',
+            'forecasts.gdp.world.consensus_imf': 'imf_gdp_world',
+            'forecasts.inflation.usa.consensus_imf': 'imf_cpi_usa',
+            'forecasts.inflation.chile.consensus_imf': 'imf_cpi_chile',
+            'forecasts.inflation.eurozone.consensus_imf': 'imf_cpi_eurozone',
+            'forecasts.inflation.china.consensus_imf': 'imf_cpi_china',
+            # --- Volatility / EPU ---
+            'volatility_epu.vix': 'vix',
+            'volatility_epu.move': 'move_index',
+            'volatility_epu.epu_usa': 'epu_usa',
+            'volatility_epu.epu_global': 'epu_global',
+            'volatility_epu.epu_chile': 'epu_chile',
+            'volatility_epu.epu_china': 'epu_china',
+            'volatility_epu.epu_europa': 'epu_europa',
+            'volatility_epu.epu_uk': 'epu_uk',
+            # --- NY Fed ---
+            'nyfed_rates.sofr.rate': 'sofr',
+            'nyfed_rates.effr.rate': 'effr',
+            'nyfed_term_premia.tp_10y': 'tp_10y',
+            'nyfed_term_premia.tp_2y': 'tp_2y',
+            'nyfed_rstar.value': 'rstar',
+            'nyfed_gscpi.value': 'gscpi',
+            # --- SOFR / Credit (Bloomberg structured) ---
+            'bbg_sofr_curve': 'sofr_curve',
+            'bbg_credit_spreads': 'oas_sectors',
+            'bbg_cds': 'cds_sovereign',
         }
         return mapping.get(path)
 
@@ -336,7 +447,7 @@ class PostCouncilValidator:
             'total_flags': total_flags,
             'flags': all_flags,
             'verdict': 'CLEAN' if total_flags == 0 else (
-                'MINOR' if total_flags <= 5 else 'SIGNIFICANT'
+                'MINOR' if total_flags <= 3 else 'SIGNIFICANT'
             ),
         }
 
