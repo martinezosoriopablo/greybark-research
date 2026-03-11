@@ -19,6 +19,8 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 import json
 
+from data_resilience import resilient_fetch, get_cache
+
 # Agregar greybark al path
 GREYBARK_PATH = Path(__file__).parent.parent / "02_greybark_library"
 sys.path.insert(0, str(GREYBARK_PATH))
@@ -55,56 +57,55 @@ class CouncilDataCollector:
     def collect_quantitative_data(self) -> Dict[str, Any]:
         """
         Ejecuta todos los módulos analytics y retorna datos consolidados.
+        Uses resilient_fetch for retry, timeout, and caching on each source.
 
         Returns:
-            Dict con datos de cada módulo:
-                - regime: clasificación de régimen
-                - macro_usa: dashboard macro US
-                - macro_chile: dashboard Chile
-                - china: credit impulse y EPU
-                - inflation: breakevens y real rates
-                - rates: expectativas Fed/BCCh
-                - risk: VaR y stress test
-                - breadth: market breadth
+            Dict con datos de cada módulo
         """
         self._print("[DataCollector] Recopilando datos cuantitativos...")
         data = {}
 
+        # Helper for logging retries
+        def _log(msg):
+            if self.verbose:
+                print(msg)
+
         # 1. Regime Classification
-        try:
+        def _fetch_regime():
             from greybark.analytics.regime_classification import classify_regime
-            self._print("  -> Regime classification...")
             regime = classify_regime()
-            data['regime'] = {
+            return {
                 'current_regime': regime.get('regime', 'UNKNOWN'),
                 'score': regime.get('score', 0),
                 'description': regime.get('description', ''),
                 'probabilities': regime.get('probabilities', {}),
                 'indicators': regime.get('indicator_scores', {})
             }
+        try:
+            self._print("  -> Regime classification...")
+            data['regime'] = resilient_fetch('regime', _fetch_regime, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Regime: {e}")
             data['regime'] = {'error': str(e)}
 
         # 2. Macro USA (FRED)
-        try:
+        def _fetch_macro_usa():
             from greybark.data_sources.fred_client import FREDClient
+            return FREDClient().get_us_macro_dashboard()
+        try:
             self._print("  -> Macro USA (FRED)...")
-            fred = FREDClient()
-            macro_usa = fred.get_us_macro_dashboard()
-            data['macro_usa'] = macro_usa
+            data['macro_usa'] = resilient_fetch('fred', _fetch_macro_usa, cache_key='fred_macro_usa', verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Macro USA: {e}")
             data['macro_usa'] = {'error': str(e)}
 
         # 2b. Leading Indicators (FRED)
+        def _fetch_leading():
+            from greybark.data_sources.fred_client import FREDClient
+            return FREDClient().get_leading_indicators()
         try:
             self._print("  -> Leading indicators (FRED)...")
-            fred_lei = fred if 'fred' in dir() else None
-            if fred_lei is None:
-                from greybark.data_sources.fred_client import FREDClient
-                fred_lei = FREDClient()
-            data['leading_indicators'] = fred_lei.get_leading_indicators()
+            data['leading_indicators'] = resilient_fetch('leading', _fetch_leading, verbose_fn=_log)
             lei_ok = sum(1 for k, v in data['leading_indicators'].items()
                          if v is not None and k != 'timestamp')
             self._print(f"  [OK] Leading indicators: {lei_ok}/5 series")
@@ -113,14 +114,13 @@ class CouncilDataCollector:
             data['leading_indicators'] = {'error': str(e)}
 
         # 3. Inflation Analytics
-        try:
+        def _fetch_inflation():
             from greybark.analytics.macro.inflation_analytics import InflationAnalytics
-            self._print("  -> Inflation analytics...")
             inflation = InflationAnalytics()
             be = inflation.get_breakeven_inflation()
             rr = inflation.get_real_rates()
             cpi = inflation.get_cpi_decomposition()
-            data['inflation'] = {
+            return {
                 'breakeven_5y': be.get('current', {}).get('breakeven_5y'),
                 'breakeven_10y': be.get('current', {}).get('breakeven_10y'),
                 'forward_5y5y': be.get('current', {}).get('forward_5y5y'),
@@ -133,27 +133,29 @@ class CouncilDataCollector:
                 'services_status': cpi.get('analysis', {}).get('services', {}).get('status'),
                 'interpretation': be.get('interpretation', ''),
             }
+        try:
+            self._print("  -> Inflation analytics...")
+            data['inflation'] = resilient_fetch('inflation', _fetch_inflation, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Inflation: {e}")
             data['inflation'] = {'error': str(e)}
 
         # 4. Chile Analytics
-        try:
+        def _fetch_chile():
             from greybark.analytics.chile.chile_analytics import ChileAnalytics
+            return ChileAnalytics().get_macro_snapshot()
+        try:
             self._print("  -> Chile analytics...")
-            chile = ChileAnalytics()
-            snapshot = chile.get_macro_snapshot()
-            data['chile'] = snapshot
+            data['chile'] = resilient_fetch('chile', _fetch_chile, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Chile: {e}")
             data['chile'] = {'error': str(e)}
 
         # 5. Chile Extended (BCCh)
-        try:
+        def _fetch_chile_extended():
             from greybark.data_sources.bcch_extended import BCChExtendedClient
-            self._print("  -> Chile extended (BCCh)...")
             bcch = BCChExtendedClient()
-            data['chile_extended'] = {
+            return {
                 'macro': bcch.get_chile_macro(),
                 'spc_curve': bcch.get_spc_curve(),
                 'credit': bcch.get_credit(),
@@ -163,55 +165,56 @@ class CouncilDataCollector:
                 'imce': bcch.get_imce(),
                 'ipc_detail': bcch.get_ipc_detail(),
             }
+        try:
+            self._print("  -> Chile extended (BCCh)...")
+            data['chile_extended'] = resilient_fetch('bcch_extended', _fetch_chile_extended, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Chile Extended: {e}")
             data['chile_extended'] = {'error': str(e)}
 
         # 6. China Credit
-        try:
+        def _fetch_china():
             from greybark.analytics.china.china_credit import ChinaCreditAnalytics
-            self._print("  -> China credit impulse...")
             china = ChinaCreditAnalytics()
-            data['china'] = {
+            return {
                 'credit_impulse': china.get_credit_impulse_proxy(),
                 'epu_analysis': china.get_china_epu_analysis(),
                 'commodity_demand': china.get_commodity_demand_signals()
             }
+        try:
+            self._print("  -> China credit impulse...")
+            data['china'] = resilient_fetch('china', _fetch_china, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] China: {e}")
             data['china'] = {'error': str(e)}
 
         # 7. Rate Expectations
-        try:
+        def _fetch_rates():
             from greybark.analytics.rate_expectations.usd_expectations import generate_fed_expectations
-            self._print("  -> Rate expectations (Fed)...")
             fed_exp = generate_fed_expectations(current_fed_funds=4.50, num_meetings=6)
             summary = fed_exp.get('summary', {})
-            data['rates'] = {
+            return {
                 'fed_expectations': fed_exp,
                 'cuts_expected': summary.get('cuts_expected', 0),
                 'hikes_expected': summary.get('hikes_expected', 0),
                 'terminal_rate': summary.get('terminal_rate', None),
                 'direction': summary.get('direction', 'UNKNOWN')
             }
+        try:
+            self._print("  -> Rate expectations (Fed)...")
+            data['rates'] = resilient_fetch('fred', _fetch_rates, cache_key='rate_expectations', verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Rates: {e}")
             data['rates'] = {'error': str(e)}
 
         # 8. Risk Metrics
-        try:
+        def _fetch_risk():
             from greybark.analytics.risk.metrics import generate_risk_dashboard
-            self._print("  -> Risk metrics...")
-            # Default portfolio for risk analysis
             default_weights = {
-                'SPY': 0.40,  # US Equities
-                'EEM': 0.15,  # EM Equities
-                'TLT': 0.20,  # US Long Bonds
-                'GLD': 0.10,  # Gold
-                'HYG': 0.15,  # High Yield
+                'SPY': 0.40, 'EEM': 0.15, 'TLT': 0.20, 'GLD': 0.10, 'HYG': 0.15,
             }
             risk_dashboard = generate_risk_dashboard(default_weights, portfolio_value=1000000)
-            data['risk'] = {
+            result = {
                 'var_95_daily': risk_dashboard['var'].get('var_95_daily'),
                 'var_99_daily': risk_dashboard['var'].get('var_99_daily'),
                 'es_95': risk_dashboard['var'].get('es_95'),
@@ -222,22 +225,26 @@ class CouncilDataCollector:
                 'scorecard': risk_dashboard['scorecard'],
             }
             if risk_dashboard.get('data_status'):
-                data['risk']['data_status'] = risk_dashboard['data_status']
-                self._print(f"  [WARN] Risk: {risk_dashboard['data_status']}")
+                result['data_status'] = risk_dashboard['data_status']
+            return result
+        try:
+            self._print("  -> Risk metrics...")
+            data['risk'] = resilient_fetch('risk', _fetch_risk, verbose_fn=_log)
+            if data['risk'].get('data_status'):
+                self._print(f"  [WARN] Risk: {data['risk']['data_status']}")
         except Exception as e:
             self._print(f"  [ERR] Risk: {e}")
             data['risk'] = {'error': str(e)}
 
         # 9. Market Breadth
-        try:
+        def _fetch_breadth():
             from greybark.analytics.breadth.market_breadth import MarketBreadthAnalytics
-            self._print("  -> Market breadth...")
             breadth = MarketBreadthAnalytics()
             sb = breadth.get_sector_breadth()
             ra = breadth.get_risk_appetite_indicator()
             cd = breadth.get_cyclical_defensive_ratio()
             sf = breadth.get_size_factor_signal()
-            data['breadth'] = {
+            return {
                 'pct_above_50ma': sb.get('metrics', {}).get('pct_above_50ma'),
                 'breadth_signal': sb.get('metrics', {}).get('breadth_signal'),
                 'breadth_interpretation': sb.get('interpretation', ''),
@@ -248,16 +255,18 @@ class CouncilDataCollector:
                 'size_factor_signal': sf.get('signal'),
                 'size_factor_interpretation': sf.get('interpretation', ''),
             }
+        try:
+            self._print("  -> Market breadth...")
+            data['breadth'] = resilient_fetch('breadth', _fetch_breadth, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Breadth: {e}")
             data['breadth'] = {'error': str(e)}
 
         # 10. International Data (BCCh)
-        try:
+        def _fetch_international():
             from greybark.data_sources.bcch_extended import BCChExtendedClient
-            self._print("  -> International data...")
             bcch = BCChExtendedClient()
-            data['international'] = {
+            return {
                 'inflation': bcch.get_international_inflation(),
                 'core_inflation': bcch.get_international_core_inflation(),
                 'bonds_10y': bcch.get_international_bonds(),
@@ -267,11 +276,14 @@ class CouncilDataCollector:
                 'unemployment': bcch.get_international_unemployment(),
                 'volatility_epu': bcch.get_volatility(),
             }
+        try:
+            self._print("  -> International data...")
+            data['international'] = resilient_fetch('bcch', _fetch_international, cache_key='bcch_international', verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] International: {e}")
             data['international'] = {'error': str(e)}
 
-        # 11. Bloomberg Data (Excel time series)
+        # 11. Bloomberg Data (Excel time series — local, no retry needed)
         try:
             if self.bloomberg.available:
                 self._print("  -> Bloomberg data (Excel)...")
@@ -296,13 +308,20 @@ class CouncilDataCollector:
             data['bloomberg'] = {'error': str(e)}
 
         # 12. CPI Components, Fiscal, LatAm (ChartDataProvider)
-        try:
+        def _fetch_cpi_fiscal():
             from chart_data_provider import ChartDataProvider
-            self._print("  -> CPI components, fiscal, LatAm macro...")
             cdp = ChartDataProvider(lookback_months=36)
-            data['cpi_components'] = cdp.get_usa_cpi_components()
-            data['fiscal'] = cdp.get_usa_fiscal()
-            data['latam_macro'] = cdp.get_latam_macro()
+            return {
+                'cpi_components': cdp.get_usa_cpi_components(),
+                'fiscal': cdp.get_usa_fiscal(),
+                'latam_macro': cdp.get_latam_macro(),
+            }
+        try:
+            self._print("  -> CPI components, fiscal, LatAm macro...")
+            cpi_fiscal = resilient_fetch('cpi_fiscal', _fetch_cpi_fiscal, verbose_fn=_log)
+            data['cpi_components'] = cpi_fiscal['cpi_components']
+            data['fiscal'] = cpi_fiscal['fiscal']
+            data['latam_macro'] = cpi_fiscal['latam_macro']
         except Exception as e:
             self._print(f"  [ERR] CPI/Fiscal/LatAm: {e}")
             data['cpi_components'] = {'error': str(e)}
@@ -310,28 +329,30 @@ class CouncilDataCollector:
             data['latam_macro'] = {'error': str(e)}
 
         # 13. BEA (Bureau of Economic Analysis)
-        try:
+        def _fetch_bea():
             from greybark.data_sources.bea_client import BEAClient
-            self._print("  -> BEA (GDP, PCE, profits, fiscal)...")
             bea = BEAClient()
-            if bea.api_key:
-                data['bea'] = bea.get_full_dashboard()
+            if not bea.api_key:
+                return {'available': False}
+            return bea.get_full_dashboard()
+        try:
+            self._print("  -> BEA (GDP, PCE, profits, fiscal)...")
+            data['bea'] = resilient_fetch('bea', _fetch_bea, verbose_fn=_log)
+            if data['bea'].get('available') is False:
+                self._print("  [SKIP] BEA: no API key")
+            else:
                 ok_count = sum(1 for v in data['bea'].values()
                                if isinstance(v, dict) and '_source' in v)
                 self._print(f"  [OK] BEA: {ok_count}/6 modules")
-            else:
-                data['bea'] = {'available': False}
-                self._print("  [SKIP] BEA: no API key")
         except Exception as e:
             self._print(f"  [ERR] BEA: {e}")
             data['bea'] = {'error': str(e)}
 
-        # 14. OECD KEI (CLI, unemployment, CPI, GDP, rates, confidence)
-        try:
+        # 14. OECD KEI
+        def _fetch_oecd():
             from greybark.data_sources.oecd_client import OECDClient
-            self._print("  -> OECD KEI (CLI, confidence, macro)...")
             oecd = OECDClient()
-            data['oecd'] = {
+            return {
                 'cli': oecd.get_cli(),
                 'cci': oecd.get_consumer_confidence(),
                 'bci': oecd.get_business_confidence(),
@@ -339,6 +360,9 @@ class CouncilDataCollector:
                 'cpi_inflation': oecd.get_cpi_inflation(),
                 'interest_rates': oecd.get_interest_rates(),
             }
+        try:
+            self._print("  -> OECD KEI (CLI, confidence, macro)...")
+            data['oecd'] = resilient_fetch('oecd', _fetch_oecd, verbose_fn=_log)
             ok_count = sum(1 for v in data['oecd'].values()
                            if isinstance(v, dict) and len(v) > 1)
             self._print(f"  [OK] OECD: {ok_count}/6 series")
@@ -346,12 +370,13 @@ class CouncilDataCollector:
             self._print(f"  [ERR] OECD: {e}")
             data['oecd'] = {'error': str(e)}
 
-        # 15. NY Fed (SOFR/EFFR/OBFR, GSCPI, R-star, Term Premia)
-        try:
+        # 15. NY Fed
+        def _fetch_nyfed():
             from greybark.data_sources.nyfed_client import NYFedClient
+            return NYFedClient().get_full_dashboard()
+        try:
             self._print("  -> NY Fed (rates, GSCPI, R-star, term premia)...")
-            nyfed = NYFedClient()
-            data['nyfed'] = nyfed.get_full_dashboard()
+            data['nyfed'] = resilient_fetch('nyfed', _fetch_nyfed, verbose_fn=_log)
             ok_count = sum(1 for v in data['nyfed'].values()
                            if isinstance(v, dict) and len(v) > 1)
             self._print(f"  [OK] NY Fed: {ok_count}/5 modules")
@@ -359,25 +384,26 @@ class CouncilDataCollector:
             self._print(f"  [ERR] NY Fed: {e}")
             data['nyfed'] = {'error': str(e)}
 
-        # 16. AKShare/NBS China monthly (PMI, prices, credit, trade, policy, property, activity)
-        try:
+        # 16. AKShare/NBS China monthly
+        def _fetch_akshare():
             from greybark.data_sources.akshare_client import AKShareClient
+            return AKShareClient().get_china_monthly()
+        try:
             self._print("  -> AKShare China monthly (NBS)...")
-            akshare = AKShareClient()
-            ak_data = akshare.get_china_monthly()
-            data['akshare_china'] = ak_data
-            ok_count = sum(1 for v in ak_data.values() if v is not None)
-            self._print(f"  [OK] AKShare: {ok_count}/{len(ak_data)} fields")
+            data['akshare_china'] = resilient_fetch('akshare', _fetch_akshare, verbose_fn=_log)
+            ok_count = sum(1 for v in data['akshare_china'].values() if v is not None)
+            self._print(f"  [OK] AKShare: {ok_count}/{len(data['akshare_china'])} fields")
         except Exception as e:
             self._print(f"  [ERR] AKShare: {e}")
             data['akshare_china'] = {'error': str(e)}
 
-        # 17. IMF WEO consensus (GDP + inflation forecasts)
-        try:
+        # 17. IMF WEO consensus
+        def _fetch_imf():
             from imf_weo_client import IMFWEOClient
+            return IMFWEOClient().fetch_consensus()
+        try:
             self._print("  -> IMF WEO consensus forecasts...")
-            imf = IMFWEOClient()
-            data['imf_weo'] = imf.fetch_consensus()
+            data['imf_weo'] = resilient_fetch('imf', _fetch_imf, verbose_fn=_log)
             if 'error' not in data['imf_weo']:
                 gdp_count = len(data['imf_weo'].get('gdp', {}))
                 inf_count = len(data['imf_weo'].get('inflation', {}))
@@ -388,14 +414,13 @@ class CouncilDataCollector:
             self._print(f"  [ERR] IMF WEO: {e}")
             data['imf_weo'] = {'error': str(e)}
 
-        # 18. AlphaVantage (sentiment, market movers)
-        try:
+        # 18. AlphaVantage
+        def _fetch_alphavantage():
             from greybark.data_sources.alphavantage_client import AlphaVantageClient
-            self._print("  -> AlphaVantage (sentiment, movers)...")
             av = AlphaVantageClient()
             av_sentiment = av.get_all_sectors_sentiment(days_back=7)
             av_movers = av.get_top_gainers_losers()
-            data['alphavantage'] = {
+            return {
                 'sector_sentiment': av_sentiment,
                 'market_movers': {
                     'top_gainers': av_movers.get('top_gainers', [])[:5],
@@ -403,53 +428,66 @@ class CouncilDataCollector:
                     'most_active': av_movers.get('most_actively_traded', [])[:5],
                 },
             }
-            self._print(f"  [OK] AlphaVantage: {len(av_sentiment)} sectors + movers")
+        try:
+            self._print("  -> AlphaVantage (sentiment, movers)...")
+            data['alphavantage'] = resilient_fetch('alphavantage', _fetch_alphavantage, verbose_fn=_log)
+            self._print(f"  [OK] AlphaVantage: {len(data['alphavantage'].get('sector_sentiment', {}))} sectors + movers")
         except Exception as e:
             self._print(f"  [ERR] AlphaVantage: {e}")
             data['alphavantage'] = {'error': str(e)}
 
-        # 19. ECB + BCRP EMBI (structured data)
-        try:
+        # 19. ECB
+        def _fetch_ecb():
             from ecb_client import ECBClient
+            return ECBClient().fetch_euro_macro()
+        try:
             self._print("  -> ECB (DFR, HICP, EA 10Y, EUR/USD, M3)...")
-            ecb = ECBClient()
-            data['ecb'] = ecb.fetch_euro_macro()
+            data['ecb'] = resilient_fetch('ecb', _fetch_ecb, verbose_fn=_log)
             ok_count = sum(1 for v in data['ecb'].values() if v is not None)
             self._print(f"  [OK] ECB: {ok_count}/{len(data['ecb'])} series")
         except Exception as e:
             self._print(f"  [ERR] ECB: {e}")
             data['ecb'] = {'error': str(e)}
 
-        try:
+        # 20. BCRP EMBI
+        def _fetch_bcrp():
             from bcrp_embi_client import BCRPEmbiClient
-            self._print("  -> BCRP EMBI spreads...")
             bcrp = BCRPEmbiClient()
             embi_series = bcrp.fetch_embi_series()
-            # Convert pd.Series to latest values for JSON serialization
-            data['bcrp_embi'] = {}
+            result = {}
             for campo, s in embi_series.items():
                 if len(s) > 0:
-                    data['bcrp_embi'][campo] = {
+                    result[campo] = {
                         'latest': round(float(s.iloc[-1]), 0),
                         'prev': round(float(s.iloc[-2]), 0) if len(s) > 1 else None,
                         'date': s.index[-1].strftime('%Y-%m'),
                         'chg': round(float(s.iloc[-1] - s.iloc[-2]), 0) if len(s) > 1 else None,
                     }
+            return result
+        try:
+            self._print("  -> BCRP EMBI spreads...")
+            data['bcrp_embi'] = resilient_fetch('bcrp', _fetch_bcrp, verbose_fn=_log)
             self._print(f"  [OK] BCRP EMBI: {len(data['bcrp_embi'])} spreads")
         except Exception as e:
             self._print(f"  [ERR] BCRP EMBI: {e}")
             data['bcrp_embi'] = {'error': str(e)}
 
-        # 18. Sovereign Yield Curves (ECB, BoE, MoF Japan)
-        try:
+        # 21. Sovereign Yield Curves (ECB, BoE, MoF Japan)
+        def _fetch_sovereign():
             from data_fetchers.curvas_soberanas import get_yield_curves, format_for_council_prompt
-            self._print("  -> Sovereign yield curves (ECB/BoE/MoF)...")
             yield_data = get_yield_curves(use_cache=True, cache_hours=4)
-            data['sovereign_curves'] = yield_data
-            data['sovereign_curves_text'] = format_for_council_prompt(yield_data)
+            return {
+                'curves': yield_data,
+                'text': format_for_council_prompt(yield_data),
+            }
+        try:
+            self._print("  -> Sovereign yield curves (ECB/BoE/MoF)...")
+            sov = resilient_fetch('sovereign', _fetch_sovereign, verbose_fn=_log)
+            data['sovereign_curves'] = sov['curves']
+            data['sovereign_curves_text'] = sov['text']
             tenors = sum(
-                len(yield_data.get(k, {}).get('datos', {}))
-                for k in ('alemania', 'uk', 'japon') if yield_data.get(k)
+                len(data['sovereign_curves'].get(k, {}).get('datos', {}))
+                for k in ('alemania', 'uk', 'japon') if data['sovereign_curves'].get(k)
             )
             self._print(f"  [OK] Sovereign curves: {tenors} tenors total")
         except Exception as e:

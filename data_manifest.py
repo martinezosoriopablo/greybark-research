@@ -17,7 +17,7 @@ Each DataField specifies:
 
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class FieldPriority(Enum):
@@ -33,6 +33,8 @@ class DataField:
     source: str         # API source: "FRED:GDPC1" or "BCCh:F032..." or "yfinance:SPY"
     unit: str           # "%", "bps", "level", "x", "index"
     priority: FieldPriority
+    min_value: Optional[float] = None   # Minimum plausible value (None = no check)
+    max_value: Optional[float] = None   # Maximum plausible value (None = no check)
 
 
 # =============================================================================
@@ -42,26 +44,26 @@ class DataField:
 MACRO_MANIFEST: List[DataField] = [
     # --- REQUIRED ---
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
-    DataField("macro_usa.gdp", "GDP USA Real QoQ", "FRED:GDPC1", "%", FieldPriority.REQUIRED),
-    DataField("macro_usa.unemployment", "Desempleo USA U3", "FRED:UNRATE", "%", FieldPriority.REQUIRED),
-    DataField("inflation.cpi_core_yoy", "CPI Core USA YoY", "FRED:CPILFESL", "%", FieldPriority.REQUIRED),
-    DataField("inflation.cpi_all_yoy", "CPI Headline USA YoY", "FRED:CPIAUCSL", "%", FieldPriority.REQUIRED),
-    DataField("rates.terminal_rate", "Fed Funds Rate (terminal)", "internal:rate_expectations", "%", FieldPriority.REQUIRED),
-    DataField("chile.tpm", "TPM Chile", "BCCh:TPM", "%", FieldPriority.REQUIRED),
-    DataField("chile.imacec", "IMACEC Chile", "BCCh:IMACEC", "%", FieldPriority.REQUIRED),
-    DataField("chile.ipc", "IPC Chile YoY", "BCCh:IPC", "%", FieldPriority.REQUIRED),
+    DataField("macro_usa.gdp", "GDP USA Real QoQ", "FRED:GDPC1", "%", FieldPriority.REQUIRED, min_value=-15.0, max_value=20.0),
+    DataField("macro_usa.unemployment", "Desempleo USA U3", "FRED:UNRATE", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=30.0),
+    DataField("inflation.cpi_core_yoy", "CPI Core USA YoY", "FRED:CPILFESL", "%", FieldPriority.REQUIRED, min_value=-5.0, max_value=25.0),
+    DataField("inflation.cpi_all_yoy", "CPI Headline USA YoY", "FRED:CPIAUCSL", "%", FieldPriority.REQUIRED, min_value=-5.0, max_value=25.0),
+    DataField("rates.terminal_rate", "Fed Funds Rate (terminal)", "internal:rate_expectations", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
+    DataField("chile.tpm", "TPM Chile", "BCCh:TPM", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
+    DataField("chile.imacec", "IMACEC Chile", "BCCh:IMACEC", "%", FieldPriority.REQUIRED, min_value=-20.0, max_value=30.0),
+    DataField("chile.ipc", "IPC Chile YoY", "BCCh:IPC", "%", FieldPriority.REQUIRED, min_value=-5.0, max_value=30.0),
     # --- IMPORTANT ---
-    DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT),
-    DataField("inflation.breakeven_10y", "Breakeven 10Y USA", "FRED:T10YIE", "%", FieldPriority.IMPORTANT),
-    DataField("macro_usa.ism_manufacturing", "ISM Manufacturing", "FRED:ISM/PMI", "index", FieldPriority.IMPORTANT),
-    DataField("macro_usa.payrolls", "ADP/NFP Employment", "FRED:PAYEMS", "K", FieldPriority.IMPORTANT),
-    DataField("macro_usa.jolts", "JOLTS Job Openings", "FRED:JTSJOL", "M", FieldPriority.IMPORTANT),
+    DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT, min_value=-2.0, max_value=10.0),
+    DataField("inflation.breakeven_10y", "Breakeven 10Y USA", "FRED:T10YIE", "%", FieldPriority.IMPORTANT, min_value=-1.0, max_value=8.0),
+    DataField("macro_usa.ism_manufacturing", "ISM Manufacturing", "FRED:ISM/PMI", "index", FieldPriority.IMPORTANT, min_value=20.0, max_value=80.0),
+    DataField("macro_usa.payrolls", "ADP/NFP Employment", "FRED:PAYEMS", "K", FieldPriority.IMPORTANT, min_value=-2000.0, max_value=5000.0),
+    DataField("macro_usa.jolts", "JOLTS Job Openings", "FRED:JTSJOL", "M", FieldPriority.IMPORTANT, min_value=0.0, max_value=15.0),
     DataField("rates.direction", "Expectativa de tasas Fed", "internal:rate_expectations", "label", FieldPriority.IMPORTANT),
-    DataField("rates.cuts_expected", "Cortes esperados Fed", "internal:rate_expectations", "#", FieldPriority.IMPORTANT),
-    DataField("fiscal.deficit_gdp", "Deficit fiscal USA (% GDP)", "FRED:fiscal", "%", FieldPriority.IMPORTANT),
-    DataField("fiscal.debt_gdp", "Deuda publica USA (% GDP)", "FRED:fiscal", "%", FieldPriority.IMPORTANT),
+    DataField("rates.cuts_expected", "Cortes esperados Fed", "internal:rate_expectations", "#", FieldPriority.IMPORTANT, min_value=-5.0, max_value=15.0),
+    DataField("fiscal.deficit_gdp", "Deficit fiscal USA (% GDP)", "FRED:fiscal", "%", FieldPriority.IMPORTANT, min_value=-20.0, max_value=5.0),
+    DataField("fiscal.debt_gdp", "Deuda publica USA (% GDP)", "FRED:fiscal", "%", FieldPriority.IMPORTANT, min_value=30.0, max_value=200.0),
     DataField("china.credit_impulse", "Impulso crediticio China", "internal:china_credit", "index", FieldPriority.IMPORTANT),
-    DataField("china.epu_analysis.epu_level", "China EPU Index", "FRED:CHINAEPUINDXM", "index", FieldPriority.IMPORTANT),
+    DataField("china.epu_analysis.epu_level", "China EPU Index", "FRED:CHINAEPUINDXM", "index", FieldPriority.IMPORTANT, min_value=0.0, max_value=2000.0),
     # EEE Expectations (BCCh Encuesta de Expectativas Economicas)
     DataField("chile_eee.ipc_12m", "Exp. inflacion Chile 12M (EEE)", "BCCh:F089.IPC.V12.Z.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.tpm_11m", "Exp. TPM 11 meses (EEE)", "BCCh:F089.TPM.TAS.14.M", "%", FieldPriority.IMPORTANT),
@@ -142,15 +144,15 @@ RV_MANIFEST: List[DataField] = [
     # --- REQUIRED ---
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
     DataField("indices", "Indices equity internacionales", "BCCh:stock_indices", "dict", FieldPriority.REQUIRED),
-    DataField("breadth.pct_above_50ma", "% acciones sobre 50MA", "yfinance:breadth", "%", FieldPriority.REQUIRED),
+    DataField("breadth.pct_above_50ma", "% acciones sobre 50MA", "yfinance:breadth", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=100.0),
     DataField("breadth.breadth_signal", "Senal de breadth", "yfinance:breadth", "label", FieldPriority.REQUIRED),
-    DataField("breadth.cyclical_defensive_spread", "Spread ciclicos vs defensivos", "yfinance:breadth", "%", FieldPriority.REQUIRED),
+    DataField("breadth.cyclical_defensive_spread", "Spread ciclicos vs defensivos", "yfinance:breadth", "%", FieldPriority.REQUIRED, min_value=-50.0, max_value=50.0),
     # --- IMPORTANT ---
-    DataField("equity_data.valuations.us.pe_trailing", "P/E trailing S&P 500", "yfinance:SPY", "x", FieldPriority.IMPORTANT),
-    DataField("equity_data.valuations.europe.pe_trailing", "P/E trailing STOXX 600", "yfinance:VGK", "x", FieldPriority.IMPORTANT),
-    DataField("equity_data.valuations.em.pe_trailing", "P/E trailing MSCI EM", "yfinance:EEM", "x", FieldPriority.IMPORTANT),
-    DataField("equity_data.valuations.chile.pe_trailing", "P/E trailing IPSA", "yfinance:ECH", "x", FieldPriority.IMPORTANT),
-    DataField("equity_data.valuations.us.pe_fwd", "P/E forward S&P 500", "yfinance:SPY", "x", FieldPriority.IMPORTANT),
+    DataField("equity_data.valuations.us.pe_trailing", "P/E trailing S&P 500", "yfinance:SPY", "x", FieldPriority.IMPORTANT, min_value=5.0, max_value=60.0),
+    DataField("equity_data.valuations.europe.pe_trailing", "P/E trailing STOXX 600", "yfinance:VGK", "x", FieldPriority.IMPORTANT, min_value=3.0, max_value=50.0),
+    DataField("equity_data.valuations.em.pe_trailing", "P/E trailing MSCI EM", "yfinance:EEM", "x", FieldPriority.IMPORTANT, min_value=3.0, max_value=50.0),
+    DataField("equity_data.valuations.chile.pe_trailing", "P/E trailing IPSA", "yfinance:ECH", "x", FieldPriority.IMPORTANT, min_value=3.0, max_value=50.0),
+    DataField("equity_data.valuations.us.pe_fwd", "P/E forward S&P 500", "yfinance:SPY", "x", FieldPriority.IMPORTANT, min_value=5.0, max_value=50.0),
     DataField("equity_data.earnings", "Earnings data (beat rate, revisions)", "AlphaVantage/yfinance", "dict", FieldPriority.IMPORTANT),
     DataField("equity_data.factors", "Factor returns (value, growth, momentum)", "yfinance:factors", "dict", FieldPriority.IMPORTANT),
     DataField("equity_data.sectors", "Sector returns (11 GICS)", "yfinance:sectors", "dict", FieldPriority.IMPORTANT),
@@ -168,14 +170,14 @@ RF_MANIFEST: List[DataField] = [
     DataField("rates.fed_expectations", "Expectativas Fed", "internal:rate_expectations", "dict", FieldPriority.REQUIRED),
     DataField("rf_data.credit_spreads", "IG spread + HY spread", "FRED:BAMLC0A0CM/HY", "bps", FieldPriority.REQUIRED),
     DataField("chile_extended.spc_curve", "BCP + BCU curva Chile", "BCCh:SPC", "dict", FieldPriority.REQUIRED),
-    DataField("chile.tpm", "TPM Chile", "BCCh:TPM", "%", FieldPriority.REQUIRED),
+    DataField("chile.tpm", "TPM Chile", "BCCh:TPM", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
     # --- IMPORTANT ---
-    DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT),
-    DataField("inflation.breakeven_10y", "Breakeven 10Y USA", "FRED:T10YIE", "%", FieldPriority.IMPORTANT),
-    DataField("inflation.real_rate_10y", "TIPS real yield 10Y", "FRED:DFII10", "%", FieldPriority.IMPORTANT),
+    DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT, min_value=-2.0, max_value=10.0),
+    DataField("inflation.breakeven_10y", "Breakeven 10Y USA", "FRED:T10YIE", "%", FieldPriority.IMPORTANT, min_value=-1.0, max_value=8.0),
+    DataField("inflation.real_rate_10y", "TIPS real yield 10Y", "FRED:DFII10", "%", FieldPriority.IMPORTANT, min_value=-3.0, max_value=8.0),
     DataField("rf_data.inflation", "Inflation analytics RF", "FRED:inflation", "dict", FieldPriority.IMPORTANT),
     DataField("bonds_intl", "Bonos 10Y internacionales", "BCCh:international_bonds", "dict", FieldPriority.IMPORTANT),
-    DataField("fiscal.deficit_gdp", "Deficit fiscal USA", "FRED:fiscal", "%", FieldPriority.IMPORTANT),
+    DataField("fiscal.deficit_gdp", "Deficit fiscal USA", "FRED:fiscal", "%", FieldPriority.IMPORTANT, min_value=-20.0, max_value=5.0),
     # BCRP EMBI + Bloomberg curves (via bloomberg_reader → bcrp_embi_client.py + Bloomberg)
     DataField("bloomberg_context", "EMBI spreads (BCRP) + Bund/Gilt/JGB curvas + EM credit", "BCRP:EMBI+Bloomberg:intl_curves", "text", FieldPriority.IMPORTANT),
     # EOF Bond Expectations (BCCh Encuesta Operadores Financieros)
@@ -208,10 +210,10 @@ RF_MANIFEST: List[DataField] = [
 RIESGO_MANIFEST: List[DataField] = [
     # --- REQUIRED ---
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
-    DataField("risk.vix", "VIX actual", "yfinance:^VIX", "index", FieldPriority.REQUIRED),
+    DataField("risk.vix", "VIX actual", "yfinance:^VIX", "index", FieldPriority.REQUIRED, min_value=5.0, max_value=100.0),
     DataField("risk.scorecard", "Risk scorecard (percentiles)", "internal:risk_metrics", "dict", FieldPriority.REQUIRED),
-    DataField("risk.max_drawdown", "Max drawdown portfolio", "internal:risk_metrics", "%", FieldPriority.REQUIRED),
-    DataField("risk.current_drawdown", "Drawdown actual", "internal:risk_metrics", "%", FieldPriority.REQUIRED),
+    DataField("risk.max_drawdown", "Max drawdown portfolio", "internal:risk_metrics", "%", FieldPriority.REQUIRED, min_value=-100.0, max_value=0.0),
+    DataField("risk.current_drawdown", "Drawdown actual", "internal:risk_metrics", "%", FieldPriority.REQUIRED, min_value=-100.0, max_value=0.0),
     # --- IMPORTANT ---
     DataField("equity_risk", "Equity risk metrics", "yfinance:equity_risk", "dict", FieldPriority.IMPORTANT),
     DataField("equity_credit", "Credit spread metrics", "yfinance/FRED:credit", "dict", FieldPriority.IMPORTANT),
