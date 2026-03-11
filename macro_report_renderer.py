@@ -26,6 +26,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 from macro_content_generator import MacroContentGenerator
 from chart_generator import MacroChartsGenerator
 from chart_data_provider import ChartDataProvider
+from table_builder import (
+    build_indicator_rows, build_forecast_rows, build_calendar_rows,
+    build_commodity_rows, fmt_bold, fmt_small, fmt_change, Badge, Trend
+)
 
 
 class MacroReportRenderer:
@@ -173,44 +177,13 @@ class MacroReportRenderer:
         # Forecasts tables
         forecasts = resumen['forecasts_table']
 
-        # GDP
-        gdp_rows = ''
-        for f in forecasts['gdp_growth']:
-            vs_class = self._get_vs_class(f['vs_anterior'])
-            gdp_rows += f'''<tr>
-                <td>{f['region']}</td>
-                <td style="text-align:center">{f['actual_2025']}</td>
-                <td style="text-align:center"><strong>{f['forecast_2026']}</strong></td>
-                <td style="text-align:center">{f['consenso']}</td>
-                <td style="text-align:center" class="{vs_class}">{f['vs_anterior']}</td>
-            </tr>'''
-        replacements['{{gdp_forecasts_rows}}'] = gdp_rows
-
-        # Inflation
-        inf_rows = ''
-        for f in forecasts['inflation_core']:
-            vs_class = self._get_vs_class(f['vs_anterior'])
-            inf_rows += f'''<tr>
-                <td>{f['region']}</td>
-                <td style="text-align:center">{f['actual_2025']}</td>
-                <td style="text-align:center"><strong>{f['forecast_2026']}</strong></td>
-                <td style="text-align:center">{f['consenso']}</td>
-                <td style="text-align:center" class="{vs_class}">{f['vs_anterior']}</td>
-            </tr>'''
-        replacements['{{inflation_forecasts_rows}}'] = inf_rows
-
-        # Rates
-        rates_rows = ''
-        for f in forecasts['policy_rates']:
-            vs_class = self._get_vs_class(f['vs_anterior'])
-            rates_rows += f'''<tr>
-                <td>{f['banco']}</td>
-                <td style="text-align:center">{f['actual']}</td>
-                <td style="text-align:center"><strong>{f['forecast_2026']}</strong></td>
-                <td style="text-align:center">{f['consenso']}</td>
-                <td style="text-align:center" class="{vs_class}">{f['vs_anterior']}</td>
-            </tr>'''
-        replacements['{{rates_forecasts_rows}}'] = rates_rows
+        # GDP, Inflation, Rates — all use the same forecast row pattern
+        replacements['{{gdp_forecasts_rows}}'] = build_forecast_rows(
+            forecasts['gdp_growth'], vs_class_fn=self._get_vs_class)
+        replacements['{{inflation_forecasts_rows}}'] = build_forecast_rows(
+            forecasts['inflation_core'], vs_class_fn=self._get_vs_class)
+        replacements['{{rates_forecasts_rows}}'] = build_forecast_rows(
+            forecasts['policy_rates'], vs_class_fn=self._get_vs_class)
 
         # Econometric Projections Table
         replacements['{{econometric_projections_table}}'] = self._generate_econometric_projections_table()
@@ -269,42 +242,15 @@ class MacroReportRenderer:
         labor = usa['mercado_laboral']
         replacements['{{usa_labor_narrative}}'] = labor['narrativa']
 
-        labor_rows = ''
-        for d in labor['datos']:
-            trend_class = self._get_trend_class(d['tendencia'])
-            labor_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['anterior']}</td>
-                <td class="{trend_class}">{d['tendencia']}</td>
-            </tr>'''
-        replacements['{{usa_labor_rows}}'] = labor_rows
+        replacements['{{usa_labor_rows}}'] = build_indicator_rows(labor['datos'])
 
         # JOLTS
         replacements['{{usa_jolts_narrative}}'] = labor.get('narrativa_jolts', '')
-        jolts_rows = ''
-        for d in labor.get('jolts', []):
-            trend_class = self._get_trend_class(d['tendencia'])
-            jolts_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['anterior']}</td>
-                <td class="{trend_class}">{d['tendencia']}</td>
-            </tr>'''
-        replacements['{{usa_jolts_rows}}'] = jolts_rows
+        replacements['{{usa_jolts_rows}}'] = build_indicator_rows(labor.get('jolts', []))
 
         # Wages
         replacements['{{usa_wages_narrative}}'] = labor.get('narrativa_salarios', '')
-        wages_rows = ''
-        for d in labor.get('salarios', []):
-            trend_class = self._get_trend_class(d['tendencia'])
-            wages_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['anterior']}</td>
-                <td class="{trend_class}">{d['tendencia']}</td>
-            </tr>'''
-        replacements['{{usa_wages_rows}}'] = wages_rows
+        replacements['{{usa_wages_rows}}'] = build_indicator_rows(labor.get('salarios', []))
 
         # Inflation
         inflation = usa['inflación']
@@ -437,16 +383,7 @@ class MacroReportRenderer:
         ch_growth = chile['chile_crecimiento']
         replacements['{{chile_growth_narrative}}'] = ch_growth['narrativa']
 
-        chile_growth_rows = ''
-        for d in ch_growth['datos']:
-            trend_class = self._get_trend_class(d['tendencia'])
-            chile_growth_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['anterior']}</td>
-                <td class="{trend_class}">{d['tendencia']}</td>
-            </tr>'''
-        replacements['{{chile_growth_rows}}'] = chile_growth_rows
+        replacements['{{chile_growth_rows}}'] = build_indicator_rows(ch_growth['datos'])
 
         # Chile Inflation
         ch_inf = chile['chile_inflación']
@@ -487,43 +424,9 @@ class MacroReportRenderer:
             try:
                 comm_data = self._data_provider.get_commodities_table()
                 if comm_data:
-                    comm_perf_table = '''<table class="data-table" style="margin: 15px 0;">
-                <thead>
-                    <tr>
-                        <th>Commodity</th>
-                        <th>Valor Actual</th>
-                        <th>Unidad</th>
-                        <th>1 Mes</th>
-                        <th>3 Meses</th>
-                        <th>1 A&ntilde;o</th>
-                    </tr>
-                </thead>
-                <tbody>'''
-                    for c in comm_data:
-                        def _fmt_chg(v):
-                            if v is None:
-                                return '<td style="color:#718096;">N/D</td>'
-                            color = '#48bb78' if v >= 0 else '#f56565'
-                            return f'<td style="color:{color};font-weight:bold;">{v:+.1f}%</td>'
-                        # Format actual value
-                        val = c['actual']
-                        if val >= 1000:
-                            val_str = f"{val:,.0f}"
-                        elif val >= 10:
-                            val_str = f"{val:.1f}"
-                        else:
-                            val_str = f"{val:.2f}"
-                        comm_perf_table += f'''<tr>
-                    <td><strong>{c['nombre']}</strong></td>
-                    <td>{val_str}</td>
-                    <td style="font-size:8pt;color:#718096;">{c['unidad']}</td>
-                    {_fmt_chg(c.get('chg_1m'))}
-                    {_fmt_chg(c.get('chg_3m'))}
-                    {_fmt_chg(c.get('chg_1y'))}
-                </tr>'''
-                    comm_perf_table += '''</tbody>
-            </table>
-            <p style="font-size:8pt;color:#a0aec0;text-align:right;margin-top:2px;">Fuente: BCCh API (datos reales)</p>'''
+                    from table_builder import commodity_table
+                    comm_perf_table = commodity_table(comm_data)
+                    comm_perf_table += '\n<p style="font-size:8pt;color:#a0aec0;text-align:right;margin-top:2px;">Fuente: BCCh API (datos reales)</p>'
             except Exception:
                 pass
         replacements['{{commodities_performance_table}}'] = comm_perf_table
@@ -556,16 +459,7 @@ class MacroReportRenderer:
         replacements['{{macro_themes_html}}'] = themes_html
 
         # Calendar
-        cal_rows = ''
-        for e in temas['calendario_eventos']:
-            rel_class = 'relevancia-alta' if e['relevancia'] == 'Alta' else 'relevancia-media'
-            cal_rows += f'''<tr>
-                <td>{e['fecha']}</td>
-                <td>{e['evento']}</td>
-                <td class="{rel_class}">{e['relevancia']}</td>
-                <td>{e['impacto_potencial']}</td>
-            </tr>'''
-        replacements['{{calendar_rows}}'] = cal_rows
+        replacements['{{calendar_rows}}'] = build_calendar_rows(temas['calendario_eventos'])
 
         # 7. ESCENARIOS Y RIESGOS
         esc = content['escenarios_riesgos']
@@ -695,7 +589,7 @@ class MacroReportRenderer:
             else:
                 self._print("  [INFO] Sin ChartDataProvider — charts usaran fallback")
 
-            macro_charts = MacroChartsGenerator(data_provider=provider, forecast_data=self.forecast_data)
+            macro_charts = MacroChartsGenerator(data_provider=provider, forecast_data=self.forecast_data, branding=self.branding)
             all_charts = macro_charts.generate_all_charts(content)
             for placeholder, chart_id in chart_map.items():
                 replacements[placeholder] = all_charts.get(chart_id, '')
