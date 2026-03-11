@@ -23,6 +23,10 @@ from jinja2 import Environment, FileSystemLoader, Undefined
 sys.path.insert(0, str(Path(__file__).parent))
 
 from rf_content_generator import RFContentGenerator
+from table_builder import (
+    build_view_rows, build_calendar_rows, build_summary_rows,
+    Badge, fmt_bold, fmt_small
+)
 
 
 def _md_to_html(text: str) -> str:
@@ -102,7 +106,7 @@ class RFReportRenderer:
         charts = {}
         try:
             from rf_chart_generator import RFChartsGenerator
-            charts_gen = RFChartsGenerator(self.market_data)
+            charts_gen = RFChartsGenerator(self.market_data, branding=self.branding)
             charts = charts_gen.generate_all_charts()
             real_count = len([v for v in charts.values() if 'base64' in v])
             self._print(f"  Charts: {real_count}/{len(charts)} generados con datos reales")
@@ -451,13 +455,8 @@ class RFReportRenderer:
         # 8. RESUMEN
         summary = content['resumen_posicionamiento']
 
-        sum_rows = ''
-        for s in summary['tabla_final']:
-            sum_rows += f'''<tr>
-                <th>{s['dimension']}</th>
-                <td>{s['recomendacion']}</td>
-            </tr>'''
-        replacements['{{summary_rows}}'] = sum_rows
+        replacements['{{summary_rows}}'] = build_summary_rows(
+            summary['tabla_final'], key_field='dimension', value_field='recomendacion')
         replacements['{{mensaje_clave}}'] = summary['mensaje_clave']
 
         # Convert {{key}} → key for Jinja2 context

@@ -24,6 +24,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 
 from asset_allocation_content_generator import AssetAllocationContentGenerator
 from council_data_collector import CouncilDataCollector
+from table_builder import (
+    build_calendar_rows, build_view_rows, Badge, fmt_bold, fmt_small
+)
 
 
 class AssetAllocationRenderer:
@@ -406,11 +409,7 @@ class AssetAllocationRenderer:
         replacements['{{risks_html}}'] = risks_html
 
         # Calendar
-        cal_rows = ''
-        for e in risks['calendario_eventos']:
-            rel_class = 'relevancia-alta' if e['relevancia'] == 'Alta' else 'relevancia-media'
-            cal_rows += f"<tr><td>{e['fecha']}</td><td>{e['evento']}</td><td class='{rel_class}'>{e['relevancia']}</td></tr>"
-        replacements['{{calendar_table}}'] = cal_rows
+        replacements['{{calendar_table}}'] = build_calendar_rows(risks['calendario_eventos'])
 
         # Triggers
         triggers_html = ''.join([f'<li>{t}</li>' for t in risks['triggers_reconvocatoria']])

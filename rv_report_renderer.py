@@ -24,6 +24,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from rv_content_generator import RVContentGenerator
 from rv_chart_generator import RVChartsGenerator
 from equity_data_collector import EquityDataCollector
+from table_builder import (
+    build_view_rows, build_calendar_rows, build_summary_rows,
+    Badge, fmt_bold, fmt_small
+)
 
 
 class RVReportRenderer:
@@ -84,7 +88,7 @@ class RVReportRenderer:
 
         # 2. Generar charts
         self._print("[2/4] Generando charts de renta variable...")
-        chart_gen = RVChartsGenerator(market_data=self.market_data)
+        chart_gen = RVChartsGenerator(market_data=self.market_data, branding=self.branding)
         charts = chart_gen.generate_all_charts()
         chart_count = sum(1 for v in charts.values() if v and v.startswith('data:image'))
         self._print(f"  {chart_count}/{len(charts)} charts generados con datos reales")
@@ -468,27 +472,13 @@ class RVReportRenderer:
         catalysts = ''.join([f'<li>{c}</li>' for c in risks['catalizadores_positivos']])
         replacements['{{catalysts_html}}'] = catalysts
 
-        cal_rows = ''
-        for e in risks['calendario']:
-            rel_class = 'val-expensive' if e['relevancia'] == 'Alta' else ''
-            cal_rows += f'''<tr>
-                <td>{e['fecha']}</td>
-                <td>{e['evento']}</td>
-                <td class="center {rel_class}">{e['relevancia']}</td>
-                <td>{e['impacto']}</td>
-            </tr>'''
-        replacements['{{calendar_rows}}'] = cal_rows
+        replacements['{{calendar_rows}}'] = build_calendar_rows(risks['calendario'])
 
         # 9. RESUMEN POSICIONAMIENTO
         summary = content['resumen_posicionamiento']
 
-        sum_rows = ''
-        for s in summary['tabla_final']:
-            sum_rows += f'''<tr>
-                <th>{s['categoria']}</th>
-                <td>{s['recomendacion']}</td>
-            </tr>'''
-        replacements['{{summary_positioning_rows}}'] = sum_rows
+        replacements['{{summary_positioning_rows}}'] = build_summary_rows(
+            summary['tabla_final'], key_field='categoria', value_field='recomendacion')
         replacements['{{mensaje_clave}}'] = summary['mensaje_clave']
 
         # Convert {{key}} → key for Jinja2 context
