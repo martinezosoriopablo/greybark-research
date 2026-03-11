@@ -1278,6 +1278,19 @@ class MonthlyPipeline:
         if self.no_confirm:
             print(f"  Confirmación: deshabilitada")
 
+        # ---- FASE 0: API Health Check ----
+        if not self.skip_collect:
+            try:
+                from api_health_checker import check_all_apis, format_health_report
+                self._print_header("FASE 0", "API HEALTH CHECK")
+                health = check_all_apis(quick=True)
+                print(format_health_report(health))
+                if health["verdict"] == "NO_GO":
+                    print("\n  [ABORT] Critical APIs are down. Fix before running pipeline.")
+                    return 1
+            except Exception as e:
+                print(f"  [SKIP] Health check failed: {e}")
+
         # ---- FASE 1: Recopilación ----
         if self.skip_collect:
             self.data = self._load_existing_data()

@@ -530,32 +530,53 @@ class RFContentGenerator:
         }
 
     def _generate_neutral_rate_section(self) -> Optional[Dict[str, Any]]:
-        """Genera sección de tasa neutral (NY Fed r-star + Cleveland Fed)."""
-        rstar = self._val('nyfed_rstar')
-        if not rstar or (isinstance(rstar, dict) and 'error' in rstar):
+        """Genera sección de tasa neutral (NY Fed r-star + Cleveland Fed + term premia)."""
+        # Try new path (nyfed.rstar) first, then legacy (nyfed_rstar)
+        rstar_data = self._val('nyfed', 'rstar') or self._val('nyfed_rstar')
+        if not rstar_data or (isinstance(rstar_data, dict) and 'error' in rstar_data):
             return None
 
-        rstar_val = rstar.get('rstar') or rstar.get('r_star')
+        rstar_val = rstar_data.get('value') or rstar_data.get('rstar') or rstar_data.get('r_star')
         if rstar_val is None:
             return None
+
+        # Breakeven inflation for nominal estimate
+        be_10y = self._val('inflation', 'breakeven_10y') or self._val('inflation', 'current', 'breakeven_10y')
+        inflation_add = float(be_10y) if be_10y else 2.0
 
         rows = [
             {
                 'fuente': 'NY Fed (Laubach-Williams)',
                 'r_star_real': self._fmt_pct(rstar_val),
-                'i_star_nominal': self._fmt_pct(rstar_val + 2.0) if rstar_val is not None else 'N/D',
-                'nota': 'Modelo dinámico, actualizado trimestralmente',
+                'i_star_nominal': self._fmt_pct(rstar_val + inflation_add),
+                'nota': f'Modelo dinámico, Q: {rstar_data.get("date", "N/D")}',
             },
             {
                 'fuente': 'Cleveland Fed',
                 'r_star_real': '1.50%',
                 'i_star_nominal': '3.70%',
-                'nota': 'Rango 0.8-2.2% real, 2.9-4.5% nominal (2025:Q2)',
+                'nota': 'Rango 0.8-2.2% real, 2.9-4.5% nominal',
             },
         ]
 
+        # Add term premia row if available
+        tp = self._val('nyfed', 'term_premia')
+        if tp and tp.get('tp_10y') is not None:
+            rows.append({
+                'fuente': 'ACM Term Premia (10Y)',
+                'r_star_real': self._fmt_pct(tp['tp_10y']),
+                'i_star_nominal': '—',
+                'nota': f'Modelo Adrian-Crump-Moench, {tp.get("date", "N/D")}',
+            })
+
+        # Add GSCPI context if available
+        gscpi = self._val('nyfed', 'gscpi')
+        gscpi_note = ""
+        if gscpi and gscpi.get('value') is not None:
+            gscpi_note = f" | GSCPI: {gscpi['value']} ({gscpi.get('trend', 'N/D')})"
+
         return {
-            'titulo': 'Tasa Neutral r-star (tasa de interés de equilibrio que no estimula ni restringe la economía)',
+            'titulo': f'Tasa Neutral r-star (equilibrio){gscpi_note}',
             'rows': rows,
             '_real': True,
         }
