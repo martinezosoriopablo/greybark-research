@@ -191,25 +191,124 @@ def _check_anthropic() -> Dict[str, Any]:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return {"status": "FAIL", "reason": "ANTHROPIC_API_KEY not set"}
-    # Just verify the key format (starts with sk-ant-)
     if api_key.startswith("sk-ant-"):
         return {"status": "OK", "sample": f"Key: sk-ant-...{api_key[-4:]}"}
     return {"status": "OK", "sample": f"Key present ({len(api_key)} chars)"}
 
 
+def _check_ecb() -> Dict[str, Any]:
+    """Check ECB API connectivity (free, no key)."""
+    try:
+        from ecb_client import ECBClient
+        client = ECBClient()
+        data = client.fetch_euro_macro()
+        if not data:
+            return {"status": "WARN", "reason": "ECB returned empty"}
+        dfr = data.get("ecb_dfr")
+        sample = f"DFR = {dfr}%" if dfr is not None else "Connected"
+        return {"status": "OK", "sample": sample}
+    except Exception as e:
+        return {"status": "FAIL", "reason": str(e)[:200]}
+
+
+def _check_bcrp() -> Dict[str, Any]:
+    """Check BCRP EMBI API connectivity (free, no key)."""
+    try:
+        from bcrp_embi_client import BCRPEmbiClient
+        client = BCRPEmbiClient()
+        series = client.fetch_embi_series()
+        if not series:
+            return {"status": "WARN", "reason": "BCRP returned empty"}
+        # Count available series
+        n = sum(1 for v in series.values() if v is not None and len(v) > 0)
+        return {"status": "OK", "sample": f"{n} EMBI series loaded"}
+    except Exception as e:
+        return {"status": "FAIL", "reason": str(e)[:200]}
+
+
+def _check_bloomberg() -> Dict[str, Any]:
+    """Check Bloomberg Excel data availability (local file)."""
+    try:
+        from bloomberg_reader import BloombergData
+        bbg = BloombergData()
+        if not bbg.available:
+            return {"status": "SKIP", "reason": "bloomberg_data.xlsx not found or empty"}
+        n_series = len(bbg.campo_ids) if hasattr(bbg, 'campo_ids') else 0
+        n_sheets = len(bbg.sheets) if hasattr(bbg, 'sheets') else 0
+        return {"status": "OK", "sample": f"{n_series} series, {n_sheets} sheets"}
+    except Exception as e:
+        return {"status": "SKIP", "reason": str(e)[:200]}
+
+
+def _check_oecd() -> Dict[str, Any]:
+    """Check OECD API connectivity (free, no key)."""
+    try:
+        from greybark.data_sources.oecd_client import OECDClient
+        client = OECDClient()
+        # Quick test: fetch CLI for USA
+        data = client.get_cli(countries=["USA"], months=3)
+        if not data:
+            return {"status": "WARN", "reason": "OECD returned empty"}
+        return {"status": "OK", "sample": "CLI data accessible"}
+    except Exception as e:
+        return {"status": "FAIL", "reason": str(e)[:200]}
+
+
+def _check_akshare() -> Dict[str, Any]:
+    """Check AKShare (China data) connectivity."""
+    try:
+        from greybark.data_sources.akshare_client import AKShareClient
+        client = AKShareClient()
+        data = client.get_china_monthly()
+        if not data:
+            return {"status": "WARN", "reason": "AKShare returned empty"}
+        pmi = data.get("pmi_mfg", {})
+        val = pmi.get("value") if isinstance(pmi, dict) else pmi
+        sample = f"PMI Mfg = {val}" if val else "Connected"
+        return {"status": "OK", "sample": sample}
+    except ImportError:
+        return {"status": "SKIP", "reason": "akshare not installed"}
+    except Exception as e:
+        return {"status": "FAIL", "reason": str(e)[:200]}
+
+
+def _check_commloan() -> Dict[str, Any]:
+    """Check CommLoan SOFR scraper connectivity."""
+    try:
+        from greybark.data_sources.commloan_scraper import CommLoanScraper
+        scraper = CommLoanScraper()
+        rates = scraper.get_sofr_forwards()
+        if not rates:
+            return {"status": "WARN", "reason": "CommLoan returned empty"}
+        tenor_1y = rates.get("1Y", rates.get("12M"))
+        sample = f"SOFR 1Y = {tenor_1y}%" if tenor_1y else f"{len(rates)} tenors"
+        return {"status": "OK", "sample": sample}
+    except Exception as e:
+        return {"status": "FAIL", "reason": str(e)[:200]}
+
+
 # ─────────────────────────────────────────────
-# API Registry
+# API Registry (14 APIs)
 # ─────────────────────────────────────────────
 
 API_CHECKS = {
+    # Critical (pipeline aborts if these fail)
     "Anthropic (Claude)":   {"fn": _check_anthropic,     "critical": True,  "slow": False},
     "FRED":                 {"fn": _check_fred,           "critical": True,  "slow": False},
     "BCCh":                 {"fn": _check_bcch,           "critical": True,  "slow": False},
+    # Important (reports degrade but still run)
     "AlphaVantage":         {"fn": _check_alphavantage,   "critical": False, "slow": False},
     "NY Fed":               {"fn": _check_nyfed,          "critical": False, "slow": False},
     "IMF WEO":              {"fn": _check_imf,            "critical": False, "slow": False},
+    "ECB":                  {"fn": _check_ecb,            "critical": False, "slow": False},
+    "BCRP (EMBI)":          {"fn": _check_bcrp,           "critical": False, "slow": False},
+    "CommLoan (SOFR)":      {"fn": _check_commloan,       "critical": False, "slow": False},
+    # Optional / Slow
     "yfinance":             {"fn": _check_yfinance,       "critical": False, "slow": True},
     "BEA":                  {"fn": _check_bea,            "critical": False, "slow": True},
+    "OECD":                 {"fn": _check_oecd,           "critical": False, "slow": True},
+    "AKShare (China)":      {"fn": _check_akshare,        "critical": False, "slow": True},
+    "Bloomberg (Excel)":    {"fn": _check_bloomberg,      "critical": False, "slow": False},
 }
 
 
