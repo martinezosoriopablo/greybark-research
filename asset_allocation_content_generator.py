@@ -185,6 +185,53 @@ class AssetAllocationContentGenerator:
         """Verifica si hay datos del council disponibles."""
         return bool(self.council.get('final_recommendation', ''))
 
+    def _build_quant_summary(self) -> str:
+        """Build a compact summary of all available quantitative data for LLM context."""
+        parts = []
+        # Macro
+        for key, label in [('gdp', 'GDP US'), ('core_cpi', 'Core CPI'), ('unemployment', 'Desempleo'),
+                           ('fed_rate', 'Fed Funds'), ('recession_prob', 'Prob Recesión')]:
+            val = self._q('macro_usa', key)
+            if val is not None:
+                parts.append(f"{label}: {val}%")
+        # Regime
+        regime = self._q('regime', 'current')
+        if regime:
+            parts.append(f"Régimen: {regime}")
+        # Chile
+        for key, label in [('tpm', 'TPM'), ('ipc_yoy', 'IPC Chile')]:
+            val = self._q('chile', key)
+            if val is not None:
+                parts.append(f"{label}: {val}%")
+        # Equity valuations
+        for key, label in [('us', 'S&P 500'), ('europe', 'Europa'), ('chile', 'Chile'), ('em', 'EM')]:
+            val = self._q('equity', 'valuations', key)
+            if val and isinstance(val, dict):
+                pe = val.get('pe')
+                if pe is not None:
+                    parts.append(f"{label} P/E: {pe:.1f}x")
+        # Rates
+        for key, label in [('us_2y', 'UST 2Y'), ('us_10y', 'UST 10Y')]:
+            val = self._q('yield_curve', key) or self._q('chile_rates', f'ust_{key.split("_")[1]}')
+            if val is not None:
+                parts.append(f"{label}: {val}%")
+        # Spreads
+        ig = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
+        hy = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
+        if ig:
+            parts.append(f"IG spread: {ig:.0f}bps")
+        if hy:
+            parts.append(f"HY spread: {hy:.0f}bps")
+        # Commodities
+        copper = self._q('equity', 'bcch_indices', 'copper', 'value')
+        if copper:
+            parts.append(f"Cobre: ${copper}/lb")
+        # VIX
+        vix = self._q('risk', 'vix') or self._q('chile_rates', 'vix')
+        if vix:
+            parts.append(f"VIX: {vix}")
+        return " | ".join(parts) if parts else "Datos cuantitativos limitados"
+
     def _extract_number(self, text: str, pattern: str, default: float = None) -> Optional[float]:
         """Extrae un número de texto usando regex."""
         match = re.search(pattern, text, re.IGNORECASE)
@@ -399,12 +446,30 @@ class AssetAllocationContentGenerator:
         return self._default_intro(postura)
 
     def _default_intro(self, postura: Dict) -> str:
-        """Intro por defecto sin council."""
+        """Intro generada por Sonnet usando datos cuantitativos disponibles."""
+        from narrative_engine import generate_data_driven_narrative
+
+        quant_ctx = self._build_quant_summary()
+        result = generate_data_driven_narrative(
+            section_name="aa_intro_datadriven",
+            prompt=(
+                f"Escribe la introducción del reporte de Asset Allocation de {self.month_name} "
+                f"{self.date.year}. Postura: {postura['view']} con sesgo {postura['sesgo']}. "
+                "3 párrafos: (1) contexto macro y régimen basado en datos, "
+                "(2) postura adoptada y fundamento cuantitativo, "
+                "(3) principales riesgos a monitorear. Máximo 200 palabras."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=1000,
+        )
+        if result:
+            return result
+        # Ultra-minimal fallback: data-only, no opinion
         name = self.company_name or "Nosotros"
         return (
-            f"El mes de {self.month_name} presenta un entorno de mercado con señales mixtas. "
-            f"{name} adopta una postura {postura['view']} con sesgo {postura['sesgo']}. "
-            f"Mantenemos coberturas activas ante la incertidumbre en política monetaria global."
+            f"{name} adopta una postura {postura['view']} con sesgo {postura['sesgo']} "
+            f"para {self.month_name} {self.date.year}."
         )
 
     def _generate_key_points(self) -> List[str]:
@@ -601,25 +666,68 @@ class AssetAllocationContentGenerator:
         return {'titulo': 'Economía Global', 'narrativa': narrativa, 'datos': datos}
 
     def _default_economia_global(self) -> Dict[str, Any]:
-        # Try to get at least CPI from real data
+        """Economía global generada por Sonnet usando datos cuantitativos."""
+        from narrative_engine import generate_data_driven_narrative
+
+        # Gather all available macro data
         cpi_str = 'N/D'
+        gdp_str = 'N/D'
+        unemployment_str = 'N/D'
+        fed_str = 'N/D'
+
         if self.data:
             try:
                 usa = self.data.get_usa_latest()
                 if usa.get('cpi_core') is not None:
                     cpi_str = f"{usa['cpi_core']}%"
+                if usa.get('gdp') is not None:
+                    gdp_str = f"{usa['gdp']}%"
+                if usa.get('unemployment') is not None:
+                    unemployment_str = f"{usa['unemployment']}%"
+                if usa.get('fed_funds') is not None:
+                    fed_str = f"{usa['fed_funds']}%"
             except Exception:
                 pass
+
         if cpi_str == 'N/D':
             cpi_str = self._fmt_pct(self._q('macro_usa', 'core_cpi'))
+        if gdp_str == 'N/D':
+            gdp_str = self._fmt_pct(self._q('macro_usa', 'gdp'))
+        if unemployment_str == 'N/D':
+            unemployment_str = self._fmt_pct(self._q('macro_usa', 'unemployment'))
+        if fed_str == 'N/D':
+            fed_str = self._fmt_pct(self._q('macro_usa', 'fed_rate'))
 
-        return {
-            'titulo': 'Economía Global',
-            'narrativa': 'Los datos macroeconómicos muestran señales mixtas. Sin datos del council para mayor detalle.',
-            'datos': [
-                {'indicador': 'US Core CPI (inflación subyacente EE.UU.)', 'actual': cpi_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
-            ]
-        }
+        regime = self._q('regime', 'current') or 'N/D'
+        recession_prob = self._fmt_pct(self._q('macro_usa', 'recession_prob'))
+
+        quant_ctx = (
+            f"GDP US: {gdp_str} | Core CPI: {cpi_str} | Desempleo: {unemployment_str} | "
+            f"Fed Funds: {fed_str} | Régimen: {regime} | Prob. Recesión: {recession_prob}"
+        )
+
+        narrativa = generate_data_driven_narrative(
+            section_name="aa_economia_global_dd",
+            prompt=(
+                f"Escribe 2 párrafos sobre la economía global para el reporte de asset allocation "
+                f"de {self.month_name} {self.date.year}. Analiza los datos macro disponibles: "
+                "crecimiento, inflación, empleo y política monetaria. Máximo 120 palabras."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=500,
+        )
+        if not narrativa:
+            narrativa = f"Datos macro: GDP US {gdp_str}, Core CPI {cpi_str}, desempleo {unemployment_str}, Fed Funds {fed_str}."
+
+        datos = [
+            {'indicador': 'GDP US QoQ (PIB EE.UU. trimestral)', 'actual': gdp_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
+            {'indicador': 'US Core CPI (inflación subyacente EE.UU.)', 'actual': cpi_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
+            {'indicador': 'Desempleo (tasa de desempleo EE.UU.)', 'actual': unemployment_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
+            {'indicador': 'Fed Funds (tasa de referencia Fed)', 'actual': fed_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
+        ]
+
+        return {'titulo': 'Economía Global', 'narrativa': narrativa, 'datos': datos}
 
     def _generate_mercados_review(self) -> Dict[str, Any]:
         """Mercados via Claude desde council rv + macro."""
@@ -680,8 +788,33 @@ class AssetAllocationContentGenerator:
         return {'titulo': 'Mercados Financieros', 'narrativa': narrativa, 'performance': performance}
 
     def _default_mercados(self) -> Dict[str, Any]:
+        """Mercados generado por Sonnet usando datos de retornos disponibles."""
+        from narrative_engine import generate_data_driven_narrative
+
         performance = []
-        if self.data:
+        perf_lines = []
+
+        # Try BCCh indices first
+        eq = self._q('equity')
+        if eq and isinstance(eq, dict):
+            bcch = eq.get('bcch_indices', {})
+            for name, key in [('S&P 500', 'sp500'), ('Euro Stoxx', 'eurostoxx'),
+                               ('MSCI EM', 'msci_em'), ('IPSA', 'ipsa'),
+                               ('Cobre', 'copper'), ('Oro', 'gold')]:
+                idx = bcch.get(key, {})
+                if isinstance(idx, dict) and 'error' not in idx:
+                    ret_1m = idx.get('returns', {}).get('1m')
+                    ret_ytd = idx.get('returns', {}).get('ytd')
+                    if ret_1m is not None or ret_ytd is not None:
+                        performance.append({
+                            'asset': name,
+                            'retorno': f"{ret_1m:+.1f}%" if ret_1m is not None else 'N/D',
+                            'ytd': f"{ret_ytd:+.1f}%" if ret_ytd is not None else 'N/D',
+                        })
+                        perf_lines.append(f"{name}: 1M {ret_1m:+.1f}%" if ret_1m is not None else f"{name}: N/D")
+
+        # Fallback: yfinance ETFs
+        if not performance and self.data:
             try:
                 returns = self.data.get_previous_month_returns(['SPY', 'QQQ', 'EEM'])
                 labels = {'SPY': 'S&P 500', 'QQQ': 'Nasdaq 100', 'EEM': 'MSCI EM'}
@@ -692,20 +825,28 @@ class AssetAllocationContentGenerator:
                         'retorno': f"{ret:+.1f}%" if ret is not None else 'N/D',
                         'ytd': 'N/D',
                     })
+                    if ret is not None:
+                        perf_lines.append(f"{name}: {ret:+.1f}%")
             except Exception:
                 pass
 
-        if not performance:
-            performance = [
-                {'asset': 'S&P 500', 'retorno': 'N/D', 'ytd': 'N/D'},
-                {'asset': 'Nasdaq 100', 'retorno': 'N/D', 'ytd': 'N/D'},
-            ]
+        quant_ctx = " | ".join(perf_lines) if perf_lines else "Sin datos de retornos disponibles"
+        narrativa = generate_data_driven_narrative(
+            section_name="aa_mercados_dd",
+            prompt=(
+                f"Escribe 2 párrafos sobre el desempeño de mercados financieros en "
+                f"{self.month_name} {self.date.year}. Analiza los retornos disponibles, "
+                "identifica tendencias y divergencias entre equity, commodities y bonos. "
+                "Máximo 120 palabras."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=500,
+        )
+        if not narrativa:
+            narrativa = f"Retornos del período: {quant_ctx}."
 
-        return {
-            'titulo': 'Mercados Financieros',
-            'narrativa': 'Sin datos del council para detalle de mercados.',
-            'performance': performance
-        }
+        return {'titulo': 'Mercados Financieros', 'narrativa': narrativa, 'performance': performance}
 
     def _generate_geopolitica(self) -> Dict[str, Any]:
         """Geopolítica via Claude desde panel geo."""
@@ -751,18 +892,46 @@ class AssetAllocationContentGenerator:
         return {'titulo': 'Política y Geopolítica', 'narrativa': narrativa, 'eventos': eventos}
 
     def _default_geopolitica(self) -> Dict[str, Any]:
+        """Geopolítica generada por Sonnet usando datos de riesgo disponibles."""
+        from narrative_engine import generate_data_driven_narrative
+
         geo_risks = self.parser.get_geopolitical_risks()
         if geo_risks:
             eventos = [{'evento': r['event'], 'impacto': r['impact'], 'probabilidad': r['probability']}
                        for r in geo_risks]
         else:
-            eventos = [
-                {'evento': 'Sin evaluación del comité', 'probabilidad': 'N/D', 'impacto': 'N/D'},
-            ]
+            eventos = []
+
+        # Gather risk indicators
+        vix = self._q('risk', 'vix') or self._q('chile_rates', 'vix')
+        epu = self._q('china', 'epu_analysis', 'current') or self._q('chile_rates', 'epu_global')
+        quant_parts = []
+        if vix is not None:
+            quant_parts.append(f"VIX: {vix}")
+        if epu is not None:
+            quant_parts.append(f"EPU Global: {epu}")
+        for ev in eventos:
+            quant_parts.append(f"{ev['evento']}: prob {ev['probabilidad']}, impacto {ev['impacto']}")
+
+        quant_ctx = " | ".join(quant_parts) if quant_parts else "VIX y EPU no disponibles"
+        narrativa = generate_data_driven_narrative(
+            section_name="aa_geopolitica_dd",
+            prompt=(
+                f"Escribe 2 párrafos sobre el entorno geopolítico para {self.month_name} "
+                f"{self.date.year}. Analiza los indicadores de riesgo disponibles (VIX, EPU) "
+                "y eventos geopolíticos identificados. Máximo 120 palabras."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=500,
+        )
+        if not narrativa:
+            narrativa = f"Indicadores de riesgo: {quant_ctx}."
+
         return {
             'titulo': 'Política y Geopolítica',
-            'narrativa': 'El entorno geopolítico presenta riesgos elevados que requieren monitoreo activo.',
-            'eventos': eventos,
+            'narrativa': narrativa,
+            'eventos': eventos if eventos else [{'evento': 'Datos insuficientes', 'probabilidad': 'N/D', 'impacto': 'N/D'}],
         }
 
     def _generate_chile_review(self) -> Dict[str, Any]:
@@ -866,8 +1035,14 @@ class AssetAllocationContentGenerator:
         return {'titulo': 'Chile y Economía Local', 'narrativa': narrativa, 'datos': datos}
 
     def _default_chile(self) -> Dict[str, Any]:
+        """Chile generado por Sonnet usando datos BCCh disponibles."""
+        from narrative_engine import generate_data_driven_narrative
+
         tpm_str = 'N/D'
         ipc_str = 'N/D'
+        cobre_str = 'N/D'
+        usdclp_str = 'N/D'
+
         if self.data:
             try:
                 chile = self.data.get_chile_latest()
@@ -875,8 +1050,11 @@ class AssetAllocationContentGenerator:
                     tpm_str = f"{chile['tpm']}%"
                 if chile.get('ipc_yoy') is not None:
                     ipc_str = f"{chile['ipc_yoy']}%"
+                if chile.get('usd_clp') is not None:
+                    usdclp_str = f"${chile['usd_clp']:.0f}"
             except Exception:
                 pass
+
         if tpm_str == 'N/D':
             tpm_val = self._q('chile', 'tpm')
             if tpm_val is not None:
@@ -885,18 +1063,38 @@ class AssetAllocationContentGenerator:
             ipc_val = self._q('chile', 'ipc_yoy')
             if ipc_val is not None:
                 ipc_str = f"{ipc_val}%"
+        cobre_val = self._q('equity', 'bcch_indices', 'copper', 'value')
+        if cobre_val is not None:
+            cobre_str = f"${cobre_val}/lb"
 
-        # Try to compute tendencia even in default path
         tpm_dir = self._q('tpm_expectations', 'summary', 'direction')
         tpm_tend = str(tpm_dir) if tpm_dir else 'N/D'
         ipc_tend = 'N/D'
 
+        quant_ctx = f"TPM: {tpm_str} | IPC YoY: {ipc_str} | USD/CLP: {usdclp_str} | Cobre: {cobre_str} | Tendencia TPM: {tpm_tend}"
+
+        narrativa = generate_data_driven_narrative(
+            section_name="aa_chile_dd",
+            prompt=(
+                f"Escribe 2 párrafos sobre Chile para el reporte de asset allocation de "
+                f"{self.month_name} {self.date.year}. Analiza: TPM y tasa real, inflación, "
+                "tipo de cambio y cobre. Máximo 120 palabras."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=500,
+        )
+        if not narrativa:
+            narrativa = f"Chile: TPM {tpm_str}, IPC {ipc_str}, USD/CLP {usdclp_str}, cobre {cobre_str}."
+
         return {
             'titulo': 'Chile y Economía Local',
-            'narrativa': 'Sin datos del council para detalle de Chile.',
+            'narrativa': narrativa,
             'datos': [
                 {'indicador': 'TPM (Tasa de Política Monetaria)', 'valor': tpm_str, 'tendencia': tpm_tend},
                 {'indicador': 'IPC YoY (inflación interanual Chile)', 'valor': ipc_str, 'tendencia': ipc_tend},
+                {'indicador': 'USD/CLP (tipo de cambio)', 'valor': usdclp_str, 'tendencia': 'N/D'},
+                {'indicador': 'Cobre (principal exportación)', 'valor': cobre_str, 'tendencia': 'N/D'},
             ]
         }
 
@@ -991,55 +1189,56 @@ class AssetAllocationContentGenerator:
         if used_probs:
             base_prob = max(10, 100 - sum(used_probs))
 
+        # Build skeleton scenarios with data, then enrich ALL via Claude
         fallback_scenarios = [
             {
                 'nombre': 'Escenario Base',
                 'probabilidad': base_prob,
                 'descripcion': f'GDP US en {gdp_str}. Régimen: {regime_str}. Prob. recesión 12M: {recession_str}.',
-                'senales': [s for s in [f'GDP: {gdp_str}', f'Recesión: {recession_str}'] if 'N/D' not in s] or ['Ver council'],
-                'implicancias': {'equities': '+', 'bonds': 'flat', 'usd': 'flat', 'commodities': 'flat'},
-                'que_comprar': 'Ver recomendación del comité'
+                'senales': [s for s in [f'GDP: {gdp_str}', f'Recesión: {recession_str}'] if 'N/D' not in s],
+                'implicancias': {},
+                'que_comprar': ''
             },
             {
                 'nombre': 'Escenario Alcista',
                 'probabilidad': int(bull_prob) if bull_prob is not None else 0,
-                'descripcion': f'Probabilidad bull case: {bull_str} según análisis contrarian.',
-                'senales': ['Ver council'],
-                'implicancias': {'equities': '+', 'bonds': '-', 'usd': '-', 'commodities': '+'},
-                'que_comprar': 'Ver recomendación del comité'
+                'descripcion': f'Probabilidad bull case: {bull_str}.',
+                'senales': [],
+                'implicancias': {},
+                'que_comprar': ''
             },
             {
                 'nombre': 'Riesgo Comercial',
                 'probabilidad': int(tariff_prob) if tariff_prob is not None else 0,
                 'descripcion': f'Probabilidad aranceles amplificados: {tariff_str}.',
-                'senales': ['Ver council'],
-                'implicancias': {'equities': '-', 'bonds': '+', 'usd': '+', 'commodities': '-'},
-                'que_comprar': 'Ver recomendación del comité'
+                'senales': [],
+                'implicancias': {},
+                'que_comprar': ''
             },
             {
                 'nombre': 'Recesión / Crédito',
                 'probabilidad': int(china_prob) if china_prob is not None else 0,
                 'descripcion': f'China hard landing probabilidad: {china_str}. Prob recesión US: {recession_str}.',
-                'senales': ['Ver council'],
-                'implicancias': {'equities': '-', 'bonds': '+', 'usd': '+/-', 'commodities': '-'},
-                'que_comprar': 'Ver recomendación del comité'
+                'senales': [],
+                'implicancias': {},
+                'que_comprar': ''
             }
         ]
 
-        # Try Claude to enrich fallback scenario details
-        if contrarian or riesgo or macro:
-            fallback_parsed = {s['nombre']: s for s in fallback_scenarios}
-            details = self._generate_scenario_details(fallback_parsed)
-            for s in fallback_scenarios:
-                d = details.get(s['nombre'], {})
-                if d.get('implicancias'):
-                    s['implicancias'] = d['implicancias']
-                if d.get('descripcion'):
-                    s['descripcion'] = d['descripcion']
-                if d.get('senales'):
-                    s['senales'] = d['senales']
-                if d.get('que_comprar'):
-                    s['que_comprar'] = d['que_comprar']
+        # ALWAYS use Claude to generate scenario details (implicancias, signals, que_comprar)
+        fallback_parsed = {s['nombre']: s for s in fallback_scenarios}
+        quant_ctx = f"GDP: {gdp_str} | Régimen: {regime_str} | Recesión: {recession_str} | Bull: {bull_str} | Tariff: {tariff_str} | China: {china_str}"
+        details = self._generate_scenario_details(fallback_parsed, extra_context=quant_ctx)
+        for s in fallback_scenarios:
+            d = details.get(s['nombre'], {})
+            if d.get('implicancias'):
+                s['implicancias'] = d['implicancias']
+            if d.get('descripcion'):
+                s['descripcion'] = d['descripcion']
+            if d.get('senales'):
+                s['senales'] = d['senales']
+            if d.get('que_comprar'):
+                s['que_comprar'] = d['que_comprar']
 
         return {
             'escenario_base': escenario_base,
@@ -1047,18 +1246,51 @@ class AssetAllocationContentGenerator:
             'escenarios': fallback_scenarios,
         }
 
-    def _generate_scenario_details(self, scenarios: Dict) -> Dict[str, Dict]:
+    def _generate_scenario_details(self, scenarios: Dict, extra_context: str = "") -> Dict[str, Dict]:
         """Generate descriptions, signals, and what-to-buy for each scenario via Claude."""
         import json as _json
-        from narrative_engine import generate_narrative
+        from narrative_engine import generate_narrative, generate_data_driven_narrative
 
         final = self._final()
         cio = self._cio()
         riesgo = self._panel('riesgo')
-        if not (final or cio or riesgo):
-            return {}
 
         scenario_names = [info.get('name', info.get('nombre', str(info))) for info in scenarios.values()]
+
+        # If no council data, use data-driven generation
+        if not (final or cio or riesgo):
+            quant_ctx = extra_context or self._build_quant_summary()
+            raw = generate_data_driven_narrative(
+                section_name="aa_scenario_details_dd",
+                prompt=(
+                    f"Para estos escenarios: {scenario_names}, genera un JSON dict donde cada key es el nombre "
+                    "del escenario y el value tiene: "
+                    '{"descripcion": "1-2 oraciones con datos disponibles", '
+                    '"senales": ["señal cuantitativa 1", "señal 2"], '
+                    '"implicancias": {"equities": "+/-/flat con rationale breve", "bonds": "+/-/flat", "usd": "+/-/flat", "commodities": "+/-/flat"}, '
+                    '"que_comprar": "ETFs específicos para este escenario"}. '
+                    "Basa las implicancias en lógica financiera estándar aplicada a los datos. "
+                    "SOLO JSON, sin explicación."
+                ),
+                quant_context=quant_ctx,
+                company_name=self.company_name,
+                max_tokens=1500,
+            )
+            if raw:
+                try:
+                    cleaned = raw.strip()
+                    if cleaned.startswith('```'):
+                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                        if cleaned.endswith('```'):
+                            cleaned = cleaned[:-3]
+                        cleaned = cleaned.strip()
+                    parsed = _json.loads(cleaned)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except (_json.JSONDecodeError, Exception):
+                    pass
+            return {}
+
         council_ctx = (
             f"FINAL:\n{final[:1500]}\n\nCIO:\n{cio[:1000]}\n\nRIESGO:\n{riesgo[:800]}"
         )
@@ -1162,11 +1394,11 @@ class AssetAllocationContentGenerator:
 
         # Try to get view/conviction from parser
         alloc = self.parser.get_regional_allocation()
-        usa_view = 'Sin recomendación'
+        usa_view = 'N'
         usa_conviccion = 'N/D'
         usa_alloc = self._find_view(alloc, 'usa')
         if usa_alloc:
-            usa_view = usa_alloc.get('vs_benchmark', 'Sin recomendación')
+            usa_view = usa_alloc.get('vs_benchmark', 'N')
             usa_conviccion = usa_alloc.get('conviction', usa_alloc.get('weight', 'MEDIA'))
 
         eq_views = self.parser.get_equity_views()
@@ -1195,20 +1427,51 @@ class AssetAllocationContentGenerator:
         }
 
     def _default_usa_view(self) -> Dict[str, Any]:
-        # Try to extract tesis from council parser even in default path
-        tesis = 'Sin tesis del comité.'
-        regional = self.parser.get_regional_allocation() if self.parser else None
-        usa_data = self._find_view(regional, 'usa')
-        if usa_data:
-            tesis = usa_data.get('rationale', tesis)
+        """USA view generado por Sonnet usando datos de valuación y macro."""
+        from narrative_engine import generate_data_driven_narrative
+
+        # Gather USA data
+        sp500_pe = self._q('equity', 'valuations', 'us', 'pe')
+        sp500_ret_1m = self._q('equity', 'valuations', 'us', 'returns', '1m')
+        sp500_ret_ytd = self._q('equity', 'valuations', 'us', 'returns', 'ytd')
+        gdp = self._q('macro_usa', 'gdp')
+        unemployment = self._q('macro_usa', 'unemployment')
+
+        quant_parts = []
+        if sp500_pe is not None:
+            quant_parts.append(f"S&P 500 P/E: {sp500_pe:.1f}x")
+        if sp500_ret_1m is not None:
+            quant_parts.append(f"S&P 500 1M: {sp500_ret_1m:+.1f}%")
+        if sp500_ret_ytd is not None:
+            quant_parts.append(f"S&P 500 YTD: {sp500_ret_ytd:+.1f}%")
+        if gdp is not None:
+            quant_parts.append(f"GDP: {gdp}%")
+        if unemployment is not None:
+            quant_parts.append(f"Desempleo: {unemployment}%")
+
+        quant_ctx = " | ".join(quant_parts) if quant_parts else "Datos de valuación no disponibles"
+
+        tesis = generate_data_driven_narrative(
+            section_name="aa_usa_tesis_dd",
+            prompt=(
+                "Escribe la tesis de inversión para Estados Unidos en 3-4 oraciones. "
+                "Analiza valuaciones (P/E), crecimiento (GDP), empleo, y retornos recientes. "
+                "Máximo 70 palabras."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=300,
+        )
+        if not tesis:
+            tesis = f"S&P 500 cotiza a {sp500_pe:.1f}x P/E." if sp500_pe else "Datos insuficientes para tesis."
 
         return {
-            'region': 'Estados Unidos', 'view': 'Sin recomendación',
-            'conviccion': 'MEDIA' if self.parser.has_council_text() else 'N/D',
+            'region': 'Estados Unidos', 'view': 'NEUTRAL',
+            'conviccion': 'BAJA',
             'tesis': tesis,
-            'argumentos_favor': [{'punto': 'Ver council', 'dato': 'Sin recomendación del comité'}],
-            'argumentos_contra': [{'punto': 'Ver council', 'dato': 'Sin recomendación del comité'}],
-            'trigger_cambio': 'Ver council para triggers de cambio.'
+            'argumentos_favor': [{'punto': 'Datos cuantitativos', 'dato': quant_ctx}],
+            'argumentos_contra': [{'punto': 'Sin deliberación completa', 'dato': 'Análisis basado solo en datos cuantitativos'}],
+            'trigger_cambio': 'Requiere sesión completa de council para triggers específicos.'
         }
 
     def _generate_europe_view(self) -> Dict[str, Any]:
@@ -1234,18 +1497,18 @@ class AssetAllocationContentGenerator:
                 max_tokens=400,
             )
         if not tesis:
-            tesis = "Sin recomendación del comité para Europa."
+            tesis = "Análisis en proceso — datos cuantitativos disponibles para Europa."
 
         args_favor, args_contra = self._generate_region_args('Europa', council_ctx)
         trigger = self._generate_trigger_cambio('Europa', council_ctx)
 
         # Try parser for structured view/conviction
-        europe_view = 'Sin recomendación'
+        europe_view = 'N'
         europe_conviccion = 'N/D'
         alloc = self.parser.get_regional_allocation()
         eu_alloc = self._find_view(alloc, 'europe')
         if eu_alloc:
-            europe_view = eu_alloc.get('vs_benchmark', 'Sin recomendación')
+            europe_view = eu_alloc.get('vs_benchmark', 'N')
             europe_conviccion = eu_alloc.get('conviction', eu_alloc.get('weight', 'MEDIA'))
         eq_views = self.parser.get_equity_views()
         eu_eq = self._find_view(eq_views, 'europe')
@@ -1304,18 +1567,18 @@ class AssetAllocationContentGenerator:
                 max_tokens=400,
             )
         if not tesis:
-            tesis = "Sin recomendación del comité para China."
+            tesis = "Análisis en proceso — datos cuantitativos disponibles para China."
 
         args_favor, args_contra = self._generate_region_args('China', council_ctx, quant_ctx)
         trigger = self._generate_trigger_cambio('China', council_ctx)
 
         # Try parser for structured view/conviction
-        china_view = 'Sin recomendación'
+        china_view = 'N'
         china_conviccion = 'N/D'
         alloc = self.parser.get_regional_allocation()
         cn_alloc = self._find_view(alloc, 'china')
         if cn_alloc:
-            china_view = cn_alloc.get('vs_benchmark', 'Sin recomendación')
+            china_view = cn_alloc.get('vs_benchmark', 'N')
             china_conviccion = cn_alloc.get('conviction', cn_alloc.get('weight', 'MEDIA'))
         eq_views = self.parser.get_equity_views()
         cn_eq = self._find_view(eq_views, 'china')
@@ -1408,12 +1671,12 @@ class AssetAllocationContentGenerator:
             tesis = f"Chile: {', '.join(parts)}." if parts else "Sin datos suficientes para tesis de Chile."
 
         # Try parser for structured view/conviction
-        chile_view = 'Sin recomendación'
+        chile_view = 'N'
         chile_conviccion = 'N/D'
         alloc = self.parser.get_regional_allocation()
         cl_alloc = self._find_view(alloc, 'chile')
         if cl_alloc:
-            chile_view = cl_alloc.get('vs_benchmark', 'Sin recomendación')
+            chile_view = cl_alloc.get('vs_benchmark', 'N')
             chile_conviccion = cl_alloc.get('conviction', cl_alloc.get('weight', 'MEDIA'))
         eq_views = self.parser.get_equity_views()
         cl_eq = self._find_view(eq_views, 'chile')
@@ -1492,12 +1755,12 @@ class AssetAllocationContentGenerator:
         trigger = self._generate_trigger_cambio('Brasil', council_ctx)
 
         # Try parser for structured view/conviction
-        brazil_view = 'Sin recomendación'
+        brazil_view = 'N'
         brazil_conviccion = 'N/D'
         alloc = self.parser.get_regional_allocation()
         br_alloc = self._find_view(alloc, 'brazil')
         if br_alloc:
-            brazil_view = br_alloc.get('vs_benchmark', 'Sin recomendación')
+            brazil_view = br_alloc.get('vs_benchmark', 'N')
             brazil_conviccion = br_alloc.get('conviction', br_alloc.get('weight', 'MEDIA'))
         eq_views = self.parser.get_equity_views()
         br_eq = self._find_view(eq_views, 'brazil')
@@ -1552,12 +1815,12 @@ class AssetAllocationContentGenerator:
         trigger = self._generate_trigger_cambio('México', council_ctx)
 
         # Try parser for structured view/conviction
-        mexico_view = 'Sin recomendación'
+        mexico_view = 'N'
         mexico_conviccion = 'N/D'
         alloc = self.parser.get_regional_allocation()
         mx_alloc = self._find_view(alloc, 'mexico')
         if mx_alloc:
-            mexico_view = mx_alloc.get('vs_benchmark', 'Sin recomendación')
+            mexico_view = mx_alloc.get('vs_benchmark', 'N')
             mexico_conviccion = mx_alloc.get('conviction', mx_alloc.get('weight', 'MEDIA'))
         eq_views = self.parser.get_equity_views()
         mx_eq = self._find_view(eq_views, 'mexico')
@@ -1656,11 +1919,11 @@ class AssetAllocationContentGenerator:
         if not por_region:
             # Fallback: minimal without hardcoded views
             por_region = [
-                {'region': 'US Large Cap', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'region': 'Europa', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'region': 'Chile', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'region': 'EM ex-China', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'region': 'China', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'region': 'US Large Cap', 'view': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
+                {'region': 'Europa', 'view': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
+                {'region': 'Chile', 'view': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
+                {'region': 'EM ex-China', 'view': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
+                {'region': 'China', 'view': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
             ]
 
         # View global from macro stance
@@ -1676,15 +1939,63 @@ class AssetAllocationContentGenerator:
         }
 
     def _default_equity_view(self) -> Dict[str, Any]:
+        """Equity view generado por Sonnet con datos de valuaciones."""
+        from narrative_engine import generate_data_driven_narrative
+
+        # Gather valuations per region
+        regions_data = []
+        for key, name in [('us', 'US'), ('europe', 'Europa'), ('em', 'EM'), ('chile', 'Chile')]:
+            val = self._q('equity', 'valuations', key)
+            if val and isinstance(val, dict):
+                pe = val.get('pe')
+                ret_ytd = val.get('returns', {}).get('ytd')
+                parts = []
+                if pe is not None:
+                    parts.append(f"P/E {pe:.1f}x")
+                if ret_ytd is not None:
+                    parts.append(f"YTD {ret_ytd:+.1f}%")
+                regions_data.append(f"{name}: {', '.join(parts)}" if parts else f"{name}: N/D")
+            else:
+                regions_data.append(f"{name}: N/D")
+
+        quant_ctx = " | ".join(regions_data)
+
+        # Generate per-region views via Sonnet
+        result = generate_data_driven_narrative(
+            section_name="aa_equity_view_dd",
+            prompt=(
+                "Basándote en las valuaciones regionales, genera un JSON con esta estructura: "
+                '{"view_global": "NEUTRAL/CONSTRUCTIVO/CAUTELOSO", '
+                '"por_region": [{"region": "US", "view": "OW/UW/N", "rationale": "1 oración con dato"}], '
+                '"factor_tilt": "value/growth/quality/momentum basado en valuaciones"}. '
+                "Regiones: US, Europa, Chile, EM. SOLO JSON."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=600,
+        )
+        if result:
+            import json as _json
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                parsed = _json.loads(cleaned.strip())
+                if isinstance(parsed, dict) and 'por_region' in parsed:
+                    parsed.setdefault('sectores_preferidos', [])
+                    parsed.setdefault('sectores_evitar', [])
+                    return parsed
+            except (_json.JSONDecodeError, Exception):
+                pass
+
         return {
-            'view_global': 'N/D',
-            'por_region': [
-                {'region': 'US', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'region': 'Chile', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-            ],
+            'view_global': 'NEUTRAL',
+            'por_region': [{'region': r.split(':')[0], 'view': 'N', 'rationale': r} for r in regions_data],
             'sectores_preferidos': [],
             'sectores_evitar': [],
-            'factor_tilt': 'N/D'
+            'factor_tilt': 'Sin datos suficientes para tilt de factor'
         }
 
     def _generate_fixed_income_view(self) -> Dict[str, Any]:
@@ -1829,7 +2140,7 @@ class AssetAllocationContentGenerator:
         all_fi_lower = {k.lower(): v for k, v in all_fi.items()} if all_fi else {}
         for tramo_label, search_keys in tramo_keys:
             tramo_view = 'N/D'
-            tramo_rationale = 'Sin recomendación del comité'
+            tramo_rationale = 'Análisis en proceso — datos cuantitativos disponibles'
             for key in search_keys:
                 if key in all_fi:
                     tramo_view = all_fi[key].get('view', 'N/D')
@@ -1878,18 +2189,78 @@ class AssetAllocationContentGenerator:
         return 'Sin recomendación específica'
 
     def _default_rf_view(self) -> Dict[str, Any]:
+        """RF view generado por Sonnet con datos de tasas y spreads."""
+        from narrative_engine import generate_data_driven_narrative
+
+        # Gather rates data
+        us_2y = self._q('yield_curve', 'us_2y') or self._q('chile_rates', 'ust_2y')
+        us_10y = self._q('yield_curve', 'us_10y') or self._q('chile_rates', 'ust_10y')
+        ig_bps = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
+        hy_bps = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
+        tpm = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
+        ipc = self._q('chile', 'ipc_yoy')
+
+        quant_parts = []
+        if us_2y is not None:
+            quant_parts.append(f"UST 2Y: {us_2y}%")
+        if us_10y is not None:
+            quant_parts.append(f"UST 10Y: {us_10y}%")
+        if us_2y and us_10y:
+            quant_parts.append(f"Slope 2s10s: {(us_10y - us_2y)*100:.0f}bps")
+        if ig_bps:
+            quant_parts.append(f"IG spread: {ig_bps:.0f}bps")
+        if hy_bps:
+            quant_parts.append(f"HY spread: {hy_bps:.0f}bps")
+        if tpm is not None:
+            quant_parts.append(f"TPM Chile: {tpm}%")
+        if tpm is not None and ipc is not None:
+            quant_parts.append(f"Tasa real Chile: {tpm - ipc:.1f}%")
+
+        quant_ctx = " | ".join(quant_parts) if quant_parts else "Sin datos de tasas disponibles"
+
+        result = generate_data_driven_narrative(
+            section_name="aa_rf_view_dd",
+            prompt=(
+                "Basándote en los datos de tasas y spreads, genera un JSON: "
+                '{"view_tasas": "HIGHER/LOWER/ESTABLE con fundamento", '
+                '"view_duration": "SHORT/NEUTRAL/LONG vs benchmark", '
+                '"view_credito": "descripción de spreads IG/HY", '
+                '"curva": [{"tramo": "0-2Y", "view": "OW/UW/N", "rationale": "1 oración"}], '
+                '"chile_especifico": {"tpm_path": "trayectoria TPM", "carry_trade": "análisis carry", '
+                '"recomendacion": "1 oración"}}. '
+                "Tramos: 0-2Y, 2-5Y, 5-10Y, 10Y+. SOLO JSON."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=800,
+        )
+        if result:
+            import json as _json
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                parsed = _json.loads(cleaned.strip())
+                if isinstance(parsed, dict) and 'curva' in parsed:
+                    return parsed
+            except (_json.JSONDecodeError, Exception):
+                pass
+
+        # Minimal data-only fallback
+        carry_str = f'Tasa real: {tpm - ipc:.1f}%' if tpm is not None and ipc is not None else 'N/D'
         return {
-            'view_tasas': 'N/D', 'view_duration': 'N/D', 'view_credito': 'N/D',
+            'view_tasas': f'UST 10Y en {us_10y}%' if us_10y else 'N/D',
+            'view_duration': 'NEUTRAL — datos insuficientes para recomendación firme',
+            'view_credito': f'IG: {ig_bps:.0f}bps, HY: {hy_bps:.0f}bps' if ig_bps and hy_bps else 'N/D',
             'curva': [
-                {'tramo': '0-2Y', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'tramo': '2-5Y', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'tramo': '5-10Y', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'tramo': '10Y+', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'tramo': '0-2Y', 'view': 'N', 'rationale': quant_ctx},
+                {'tramo': '2-5Y', 'view': 'N', 'rationale': quant_ctx},
+                {'tramo': '5-10Y', 'view': 'N', 'rationale': quant_ctx},
+                {'tramo': '10Y+', 'view': 'N', 'rationale': quant_ctx},
             ],
-            'chile_especifico': {
-                'tpm_path': 'N/D', 'carry_trade': 'N/D',
-                'recomendacion': 'N/D'
-            }
+            'chile_especifico': {'tpm_path': f'TPM {tpm}%' if tpm else 'N/D', 'carry_trade': carry_str, 'recomendacion': 'N/D'}
         }
 
     def _generate_fx_view(self) -> Dict[str, Any]:
@@ -1925,7 +2296,7 @@ class AssetAllocationContentGenerator:
                     'view': raw_view,
                     'target_3m': target_3m if target_3m else 'N/D',
                     'target_12m': target_12m if target_12m else 'N/D',
-                    'rationale': info.get('rationale', 'Sin recomendación del comité'),
+                    'rationale': info.get('rationale', 'Análisis en proceso — datos cuantitativos disponibles'),
                 })
                 # Determine USD view from DXY or USD pairs
                 if 'DXY' in pair.upper() or ('USD' in pair.upper() and 'CLP' not in pair.upper()):
@@ -1946,10 +2317,10 @@ class AssetAllocationContentGenerator:
         return {
             'view_usd': 'N/D',
             'pares': [
-                {'par': 'EUR/USD', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'par': 'USD/CLP', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': f'Spot: {usdclp_str}. Sin recomendación del comité'},
-                {'par': 'USD/JPY', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'par': 'USD/CNY', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'par': 'EUR/USD', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
+                {'par': 'USD/CLP', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': f'Spot: {usdclp_str}. Análisis en proceso — datos cuantitativos disponibles'},
+                {'par': 'USD/JPY', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
+                {'par': 'USD/CNY', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
             ]
         }
 
@@ -2434,30 +2805,57 @@ class AssetAllocationContentGenerator:
         }
 
     def _default_dashboard(self) -> Dict[str, Any]:
-        """Dashboard por defecto sin council — all views N/D."""
+        """Dashboard generado por Sonnet con datos cuantitativos disponibles."""
+        from narrative_engine import generate_data_driven_narrative
+
+        quant_ctx = self._build_quant_summary()
+        result = generate_data_driven_narrative(
+            section_name="aa_dashboard_dd",
+            prompt=(
+                "Genera un JSON con el dashboard de asset allocation basado en datos cuantitativos. "
+                "Estructura: "
+                '{"renta_variable": [{"asset": "US Large Cap", "view": "OW/UW/N", "cambio": "→/↑/↓", "conviccion": "ALTA/MEDIA/BAJA"}], '
+                '"renta_fija": [...], "commodities_fx": [...], '
+                '"postura_general": {"view": "CONSTRUCTIVO/CAUTELOSO/NEUTRAL", "sesgo": "risk-on/risk-off/neutral", "conviccion": "..."}}. '
+                "Assets RV: US Large Cap, Europa, China, Chile, EM ex-China. "
+                "Assets RF: UST Short (0-2Y), UST Medium (2-5Y), UST Long (5-10Y), IG Credit, HY Credit. "
+                "Assets Comm/FX: Cobre, Oro, Petroleo, USD (DXY), CLP. "
+                "Basa views en valuaciones, niveles de tasas, y spreads. Cambio siempre '→' sin datos previos. "
+                "Convicción BAJA cuando basado solo en datos sin deliberación. SOLO JSON."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=1200,
+        )
+        if result:
+            import json as _json
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                parsed = _json.loads(cleaned.strip())
+                if isinstance(parsed, dict) and 'renta_variable' in parsed:
+                    return parsed
+            except (_json.JSONDecodeError, Exception):
+                pass
+
+        # Ultra-minimal fallback: all NEUTRAL with low conviction
         return {
             'renta_variable': [
-                {'asset': 'US Large Cap', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'Europa', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'China', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'Chile', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'EM ex-China', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': a, 'view': 'N', 'cambio': '→', 'conviccion': 'BAJA'}
+                for a in ['US Large Cap', 'Europa', 'China', 'Chile', 'EM ex-China']
             ],
             'renta_fija': [
-                {'asset': 'UST Short (0-2Y)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'UST Medium (2-5Y)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'UST Long (5-10Y)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'IG Credit', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'HY Credit', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': a, 'view': 'N', 'cambio': '→', 'conviccion': 'BAJA'}
+                for a in ['UST Short (0-2Y)', 'UST Medium (2-5Y)', 'UST Long (5-10Y)', 'IG Credit', 'HY Credit']
             ],
             'commodities_fx': [
-                {'asset': 'Cobre', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'Oro', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'Petroleo', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'USD (DXY)', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
-                {'asset': 'CLP', 'view': 'N/D', 'cambio': '→', 'conviccion': 'N/D'},
+                {'asset': a, 'view': 'N', 'cambio': '→', 'conviccion': 'BAJA'}
+                for a in ['Cobre', 'Oro', 'Petroleo', 'USD (DXY)', 'CLP']
             ],
-            'postura_general': {'view': 'N/D', 'sesgo': 'N/D', 'conviccion': 'N/D'}
+            'postura_general': {'view': 'NEUTRAL', 'sesgo': 'neutral', 'conviccion': 'BAJA'}
         }
 
     # =========================================================================
@@ -2598,19 +2996,55 @@ class AssetAllocationContentGenerator:
         }
 
     def _default_focus_list(self) -> Dict[str, List]:
-        """Focus list por defecto sin council — all views N/D."""
+        """Focus list generado por Sonnet con datos de valuaciones y retornos."""
+        from narrative_engine import generate_data_driven_narrative
+
+        quant_ctx = self._build_quant_summary()
+        result = generate_data_driven_narrative(
+            section_name="aa_focus_list_dd",
+            prompt=(
+                "Genera un JSON con la focus list de ETFs basada en datos cuantitativos. "
+                "Estructura: "
+                '{"renta_variable": [{"ticker": "SPY", "nombre": "SPDR S&P 500 ETF", "view": "OW/UW/N", '
+                '"rationale": "1 oración con dato cuantitativo"}], '
+                '"renta_fija": [...], "commodities": [...]}. '
+                "ETFs RV: SPY, ECH, EEM, EWG, IWB, SOXX, XLI. "
+                "ETFs RF: BIL, SHY, LQD, TLT, HYG. "
+                "ETFs Comm: GLD, CPER, USO. "
+                "Basa rationale en valuaciones y retornos disponibles. "
+                "Convicción baja sin deliberación completa. SOLO JSON."
+            ),
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=1200,
+        )
+        if result:
+            import json as _json
+            try:
+                cleaned = result.strip()
+                if cleaned.startswith('```'):
+                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
+                    if cleaned.endswith('```'):
+                        cleaned = cleaned[:-3]
+                parsed = _json.loads(cleaned.strip())
+                if isinstance(parsed, dict) and 'renta_variable' in parsed:
+                    return parsed
+            except (_json.JSONDecodeError, Exception):
+                pass
+
+        # Minimal fallback with N (neutral) instead of N/D
         return {
             'renta_variable': [
-                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': 'N', 'rationale': 'Core US — análisis basado en datos cuantitativos'},
+                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': 'N', 'rationale': 'Chile equity — análisis basado en datos cuantitativos'},
+                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': 'N', 'rationale': 'EM exposure — análisis basado en datos cuantitativos'},
             ],
             'renta_fija': [
-                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
-                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': 'N', 'rationale': 'Cash-like — análisis basado en datos cuantitativos'},
+                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': 'N', 'rationale': 'IG credit — análisis basado en datos cuantitativos'},
             ],
             'commodities': [
-                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'N/D', 'rationale': 'Sin recomendación del comité'},
+                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'N', 'rationale': 'Gold hedge — análisis basado en datos cuantitativos'},
             ]
         }
 

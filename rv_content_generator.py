@@ -335,12 +335,12 @@ class RVContentGenerator:
         }
 
         defaults = [
-            {'mercado': 'Global Equity', 'indice': 'MSCI (Morgan Stanley Capital International) ACWI', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
-            {'mercado': 'Estados Unidos', 'indice': 'S&P 500', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
-            {'mercado': 'Europa', 'indice': 'Stoxx 600', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
-            {'mercado': 'Emergentes', 'indice': 'MSCI EM', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
-            {'mercado': 'Japon', 'indice': 'Topix', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
-            {'mercado': 'Chile', 'indice': 'IPSA', 'view': 'Sin recomendación', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Global Equity', 'indice': 'MSCI (Morgan Stanley Capital International) ACWI', 'view': 'N', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Estados Unidos', 'indice': 'S&P 500', 'view': 'N', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Europa', 'indice': 'Stoxx 600', 'view': 'N', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Emergentes', 'indice': 'MSCI EM', 'view': 'N', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Japon', 'indice': 'Topix', 'view': 'N', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Chile', 'indice': 'IPSA', 'view': 'N', 'cambio': '=', 'driver': '-'},
         ]
 
         # Overlay council views if available
@@ -348,7 +348,7 @@ class RVContentGenerator:
             for row in defaults:
                 ev = self._find_equity_view(equity_views, equity_alias_map.get(row['mercado'], [row['mercado'].lower()]))
                 if ev:
-                    row['view'] = ev.get('view', 'Sin recomendación')
+                    row['view'] = ev.get('view', 'N')
                     row['driver'] = ev.get('rationale', '-')
 
         # Enrich with real BCCh index returns
@@ -1206,17 +1206,17 @@ class RVContentGenerator:
             return '-'
 
         sector_map = [
-            ('Technology', 'technology', 'Sin recomendación', '-'),
-            ('Healthcare', 'healthcare', 'Sin recomendación', '-'),
-            ('Financials', 'financials', 'Sin recomendación', '-'),
-            ('Materials', 'materials', 'Sin recomendación', mat_cat),
-            ('Industrials', 'industrials', 'Sin recomendación', '-'),
-            ('Consumer Disc.', 'consumer_disc', 'Sin recomendación', '-'),
-            ('Energy', 'energy', 'Sin recomendación', energy_cat),
-            ('Comm Services', 'comm_services', 'Sin recomendación', '-'),
-            ('Consumer Staples', 'consumer_staples', 'Sin recomendación', '-'),
-            ('Utilities', 'utilities', 'Sin recomendación', '-'),
-            ('Real Estate', 'real_estate', 'Sin recomendación', '-'),
+            ('Technology', 'technology', 'N', '-'),
+            ('Healthcare', 'healthcare', 'N', '-'),
+            ('Financials', 'financials', 'N', '-'),
+            ('Materials', 'materials', 'N', mat_cat),
+            ('Industrials', 'industrials', 'N', '-'),
+            ('Consumer Disc.', 'consumer_disc', 'N', '-'),
+            ('Energy', 'energy', 'N', energy_cat),
+            ('Comm Services', 'comm_services', 'N', '-'),
+            ('Consumer Staples', 'consumer_staples', 'N', '-'),
+            ('Utilities', 'utilities', 'N', '-'),
+            ('Real Estate', 'real_estate', 'N', '-'),
         ]
 
         # Overlay council sector views if available
@@ -1226,7 +1226,7 @@ class RVContentGenerator:
                 aliases = sector_alias_map.get(name, [name.lower()])
                 sv = self._find_equity_view(sector_views, aliases)
                 if sv:
-                    view = sv.get('view', 'Sin recomendación')
+                    view = sv.get('view', 'N')
                     cat_default = sv.get('rationale', cat_default)
                 sector_map_updated.append((name, key, view, cat_default))
             sector_map = sector_map_updated
@@ -1327,12 +1327,22 @@ class RVContentGenerator:
             if preferred:
                 return preferred
 
-        # Fallback: no hardcoded views
-        return [
-            {'sector': 'N/D', 'view': 'Sin recomendación del comité',
-             'tesis': 'Ver análisis del council para sectores preferidos.',
-             'upside': '-', 'subsectores': [], 'evitar': []},
-        ]
+        # Fallback: generate from sector returns data
+        from narrative_engine import generate_data_driven_narrative
+        sector_data = self._q('equity', 'sectors')
+        if sector_data and isinstance(sector_data, dict):
+            top_sectors = sorted(
+                [(k, v.get('returns', {}).get('1m', 0)) for k, v in sector_data.items()
+                 if isinstance(v, dict) and 'error' not in v],
+                key=lambda x: x[1] if x[1] is not None else 0, reverse=True
+            )[:3]
+            return [
+                {'sector': s[0].replace('_', ' ').title(), 'view': 'OW',
+                 'tesis': f'Retorno 1M: {s[1]:+.1f}% — liderazgo sectorial' if s[1] else 'Análisis cuantitativo',
+                 'upside': '-', 'subsectores': [], 'evitar': []}
+                for s in top_sectors if s[1] is not None
+            ] or [{'sector': 'Análisis cuantitativo', 'view': 'N', 'tesis': 'Datos sectoriales insuficientes', 'upside': '-', 'subsectores': [], 'evitar': []}]
+        return [{'sector': 'Datos insuficientes', 'view': 'N', 'tesis': 'Requiere datos sectoriales para recomendación', 'upside': '-', 'subsectores': [], 'evitar': []}]
 
     def _extract_sector_picks(self, sector_name: str, subsector_keywords: list) -> list:
         """Extract subsector/stock mentions from council text for a given sector."""
@@ -1413,12 +1423,21 @@ class RVContentGenerator:
             if avoid:
                 return avoid
 
-        # Fallback: no hardcoded views
-        return [
-            {'sector': 'N/D', 'view': 'Sin recomendación del comité',
-             'razon': 'Ver análisis del council para sectores a evitar.',
-             'que_cambiaria': 'N/D'},
-        ]
+        # Fallback: generate from worst-performing sectors
+        sector_data = self._q('equity', 'sectors')
+        if sector_data and isinstance(sector_data, dict):
+            worst_sectors = sorted(
+                [(k, v.get('returns', {}).get('1m', 0)) for k, v in sector_data.items()
+                 if isinstance(v, dict) and 'error' not in v],
+                key=lambda x: x[1] if x[1] is not None else 0
+            )[:2]
+            return [
+                {'sector': s[0].replace('_', ' ').title(), 'view': 'UW',
+                 'razon': f'Retorno 1M: {s[1]:+.1f}% — rezago sectorial' if s[1] else 'Análisis cuantitativo',
+                 'que_cambiaria': 'Mejora en datos fundamentales del sector'}
+                for s in worst_sectors if s[1] is not None
+            ] or [{'sector': 'Datos insuficientes', 'view': 'N', 'razon': 'Requiere análisis completo', 'que_cambiaria': 'N/D'}]
+        return [{'sector': 'Datos insuficientes', 'view': 'N', 'razon': 'Requiere datos sectoriales', 'que_cambiaria': 'N/D'}]
 
     def _generate_sector_narrative(self) -> str:
         """Genera narrativa sectorial."""
@@ -1811,7 +1830,7 @@ class RVContentGenerator:
         # Try to get US view from council parser
         equity_views = self.parser.get_equity_views()
         us_council_view = self._find_equity_view(equity_views, ['usa', 'estados unidos', 'us', 'eeuu']) or {}
-        view = us_council_view.get('view', 'Sin recomendación') if us_council_view else 'Sin recomendación'
+        view = us_council_view.get('view', 'N') if us_council_view else 'N'
         cambio = '='
 
         # Get equity target from forecast engine
@@ -1869,7 +1888,7 @@ class RVContentGenerator:
         result = {
             'mercado': 'Europa',
             'indice': 'Stoxx 600',
-            'view': eu_council_view.get('view', 'Sin recomendación') if eu_council_view else 'Sin recomendación',
+            'view': eu_council_view.get('view', 'N') if eu_council_view else 'N',
             'cambio': '=',
             'target_12m': eq_target.get('target_12m', '-'),
             'upside': eq_target.get('upside', '-'),
@@ -1917,7 +1936,7 @@ class RVContentGenerator:
         result = {
             'mercado': 'Emergentes',
             'indice': 'MSCI EM',
-            'view': em_council_view.get('view', 'Sin recomendación') if em_council_view else 'Sin recomendación',
+            'view': em_council_view.get('view', 'N') if em_council_view else 'N',
             'cambio': '=',
             'target_12m': eq_target.get('target_12m', '-'),
             'upside': eq_target.get('upside', '-'),
@@ -1970,7 +1989,7 @@ class RVContentGenerator:
         return {
             'mercado': 'Japon',
             'indice': 'Topix',
-            'view': jp_council_view.get('view', 'Sin recomendación') if jp_council_view else 'Sin recomendación',
+            'view': jp_council_view.get('view', 'N') if jp_council_view else 'N',
             'cambio': '=',
             'target_12m': eq_target.get('target_12m', '-'),
             'upside': eq_target.get('upside', '-'),
@@ -2087,7 +2106,7 @@ class RVContentGenerator:
         return {
             'mercado': 'Chile',
             'indice': 'IPSA',
-            'view': cl_council_view.get('view', 'Sin recomendación') if cl_council_view else 'Sin recomendación',
+            'view': cl_council_view.get('view', 'N') if cl_council_view else 'N',
             'cambio': '=',
             'target_12m': eq_target.get('target_12m', '-'),
             'upside': eq_target.get('upside', '-'),
