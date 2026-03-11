@@ -64,25 +64,7 @@ class AnalyticsModuleBase(ABC):
 
     MODULE_NAME: str = "base"
 
-    # Greybark design system (matches chart_generator.py)
-    COLORS = {
-        'primary': '#1a1a1a',
-        'accent': '#dd6b20',
-        'positive': '#276749',
-        'negative': '#c53030',
-        'neutral': '#744210',
-        'bg_light': '#f7f7f7',
-        'text_dark': '#1a1a1a',
-        'text_medium': '#4a4a4a',
-        'text_light': '#718096',
-    }
-
-    SERIES_COLORS = [
-        '#1a365d', '#dd6b20', '#276749', '#c53030',
-        '#805ad5', '#d69e2e', '#319795', '#e53e3e',
-    ]
-
-    def __init__(self, verbose: bool = True, dpi: int = 100):
+    def __init__(self, verbose: bool = True, dpi: int = 100, branding: Dict = None):
         self.verbose = verbose
         self.dpi = dpi
         self._data: Dict = {}
@@ -90,6 +72,31 @@ class AnalyticsModuleBase(ABC):
         self._chart: Optional[str] = None
         self._errors: list = []
         self._timestamp: Optional[str] = None
+        # Derive colors from branding (or use Greybark defaults)
+        try:
+            from chart_config import get_chart_colors
+            scheme = get_chart_colors(branding)
+            self.COLORS = {
+                'primary': scheme.primary, 'accent': scheme.accent,
+                'positive': scheme.positive, 'negative': scheme.negative,
+                'neutral': scheme.neutral, 'bg_light': scheme.bg_light,
+                'text_dark': scheme.text_dark, 'text_medium': scheme.text_medium,
+                'text_light': scheme.text_light,
+            }
+            self.SERIES_COLORS = scheme.series
+        except ImportError:
+            # Fallback if chart_config not available
+            self.COLORS = {
+                'primary': '#1a1a1a', 'accent': '#dd6b20',
+                'positive': '#276749', 'negative': '#c53030',
+                'neutral': '#744210', 'bg_light': '#f7f7f7',
+                'text_dark': '#1a1a1a', 'text_medium': '#4a4a4a',
+                'text_light': '#718096',
+            }
+            self.SERIES_COLORS = [
+                '#1a365d', '#dd6b20', '#276749', '#c53030',
+                '#805ad5', '#d69e2e', '#319795', '#e53e3e',
+            ]
         if HAS_MPL:
             self._setup_matplotlib()
 

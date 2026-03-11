@@ -529,6 +529,28 @@ class RFContentGenerator:
             '_real': True
         }
 
+    def _get_cleveland_fed_row(self, inflation_add: float) -> dict:
+        """Cleveland Fed r-star: use FRED series if available, else fallback."""
+        # Try FRED Cleveland Fed expected real rate (NROUST)
+        clev_real = self._val('nyfed', 'cleveland_rstar') or self._val('cleveland_rstar')
+        if clev_real is not None and not (isinstance(clev_real, dict) and 'error' in clev_real):
+            val = clev_real.get('value') if isinstance(clev_real, dict) else clev_real
+            if val is not None:
+                val = float(val)
+                return {
+                    'fuente': 'Cleveland Fed',
+                    'r_star_real': self._fmt_pct(val),
+                    'i_star_nominal': self._fmt_pct(val + inflation_add),
+                    'nota': f'Real data, {clev_real.get("date", "N/D") if isinstance(clev_real, dict) else "FRED"}',
+                }
+        # Fallback: use NY Fed r-star as reference with range note
+        return {
+            'fuente': 'Cleveland Fed',
+            'r_star_real': 'N/D',
+            'i_star_nominal': 'N/D',
+            'nota': 'Rango histórico 0.8-2.2% real — sin datos API disponibles',
+        }
+
     def _generate_neutral_rate_section(self) -> Optional[Dict[str, Any]]:
         """Genera sección de tasa neutral (NY Fed r-star + Cleveland Fed + term premia)."""
         # Try new path (nyfed.rstar) first, then legacy (nyfed_rstar)
@@ -551,12 +573,7 @@ class RFContentGenerator:
                 'i_star_nominal': self._fmt_pct(rstar_val + inflation_add),
                 'nota': f'Modelo dinámico, Q: {rstar_data.get("date", "N/D")}',
             },
-            {
-                'fuente': 'Cleveland Fed',
-                'r_star_real': '1.50%',
-                'i_star_nominal': '3.70%',
-                'nota': 'Rango 0.8-2.2% real, 2.9-4.5% nominal',
-            },
+            self._get_cleveland_fed_row(inflation_add),
         ]
 
         # Add term premia row if available

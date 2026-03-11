@@ -126,6 +126,17 @@ class MacroContentGenerator:
         self._china_latest = {}
         return self._china_latest
 
+    def _q(self, *keys, default=None):
+        """Navigate nested quant_data dict by key path."""
+        d = self.quant
+        for k in keys:
+            if not isinstance(d, dict) or k not in d:
+                return default
+            d = d[k]
+        if isinstance(d, dict) and 'error' in d:
+            return default
+        return d if d is not None else default
+
     def _fmt(self, val: Optional[float], suffix: str = '%', decimals: int = 1) -> str:
         """Formatea un valor numérico, retorna 'N/D' si None."""
         if val is None:
@@ -648,8 +659,40 @@ class MacroContentGenerator:
         hs_val = f"{hs_raw/1000:.2f}M" if hs_raw else 'N/D'
         cc_val = self._fmt(d.get('consumer_confidence'), suffix='')
 
+        # --- BEA GDP components (real data if available) ---
+        bea = self._q('bea') or {}
+        bea_parts = []
+        if isinstance(bea, dict) and 'error' not in bea:
+            gdp_comps = bea.get('gdp_components', {})
+            for comp, label in [('personal_consumption', 'Consumo Personal'),
+                                ('gross_private_investment', 'Inversión Privada'),
+                                ('government', 'Gasto Gobierno'),
+                                ('net_exports', 'Export. Netas')]:
+                v = gdp_comps.get(comp)
+                if v is not None:
+                    bea_parts.append(f"{label}: {v:+.1f}%")
+            pce = bea.get('pce', {})
+            pce_total = pce.get('total_yoy')
+            if pce_total is not None:
+                bea_parts.append(f"PCE Total YoY: {pce_total:.1f}%")
+
+        # --- OECD leading indicators ---
+        oecd = self._q('oecd') or {}
+        oecd_parts = []
+        if isinstance(oecd, dict) and 'error' not in oecd:
+            cli_usa = oecd.get('cli_usa') or oecd.get('cli', {}).get('usa')
+            if cli_usa is not None:
+                oecd_parts.append(f"OECD CLI USA: {cli_usa:.1f}")
+            bci = oecd.get('business_confidence', {}).get('usa')
+            if bci is not None:
+                oecd_parts.append(f"Confianza Empresarial OECD: {bci:.1f}")
+
         from narrative_engine import generate_narrative
         quant_ctx = f"GDP QoQ anualizado: {gdp_val}. Mfg New Orders: {no_val}. Housing Starts: {hs_val}. Consumer Confidence: {cc_val}."
+        if bea_parts:
+            quant_ctx += f" BEA componentes: {'; '.join(bea_parts)}."
+        if oecd_parts:
+            quant_ctx += f" {'; '.join(oecd_parts)}."
         council_ctx = self.council.get('panel_outputs', {}).get('macro', '')[:1500]
         narrativa = generate_narrative(
             section_name="usa_growth",
@@ -664,15 +707,30 @@ class MacroContentGenerator:
             max_tokens=350,
         ) or f"GDP EE.UU.: {gdp_val}. Mfg New Orders: {no_val}. Housing Starts: {hs_val}. Consumer Confidence: {cc_val}."
 
+        indicators = [
+            {'indicador': 'Mfg New Orders (Nuevas Órdenes Industriales)', 'valor': no_val, 'tendencia': '-'},
+            {'indicador': 'Housing Starts (Inicios de Vivienda)', 'valor': hs_val, 'tendencia': '-'},
+            {'indicador': 'Consumer Confidence (Confianza del Consumidor)', 'valor': cc_val, 'tendencia': '-'},
+        ]
+        # Add BEA GDP components if available
+        if isinstance(bea, dict) and 'error' not in bea:
+            gdp_comps = bea.get('gdp_components', {})
+            for comp, label in [('personal_consumption', 'Consumo Personal (BEA)'),
+                                ('gross_private_investment', 'Inversión Privada (BEA)')]:
+                v = gdp_comps.get(comp)
+                if v is not None:
+                    indicators.append({'indicador': label, 'valor': f"{v:+.1f}%", 'tendencia': '-'})
+        # Add OECD CLI if available
+        if isinstance(oecd, dict) and 'error' not in oecd:
+            cli_usa = oecd.get('cli_usa') or oecd.get('cli', {}).get('usa')
+            if cli_usa is not None:
+                indicators.append({'indicador': 'OECD CLI EE.UU.', 'valor': f"{cli_usa:.1f}", 'tendencia': '-'})
+
         return {
             'titulo': 'Crecimiento Económico',
             'narrativa': narrativa,
             'drivers': [],
-            'leading_indicators': [
-                {'indicador': 'Mfg New Orders (Nuevas Órdenes Industriales)', 'valor': no_val, 'tendencia': '-'},
-                {'indicador': 'Housing Starts (Inicios de Vivienda)', 'valor': hs_val, 'tendencia': '-'},
-                {'indicador': 'Consumer Confidence (Confianza del Consumidor)', 'valor': cc_val, 'tendencia': '-'},
-            ]
+            'leading_indicators': indicators,
         }
 
     def _generate_usa_labor(self) -> Dict[str, Any]:
@@ -1210,11 +1268,32 @@ class MacroContentGenerator:
         ecb_rate = self._fmt(eu.get('ecb_rate'), decimals=2)
         bund_10y = self._fmt(eu.get('bund_10y'), decimals=2)
 
-        has_real = bool(eu.get('ecb_rate') is not None)
-        src = ' (datos BCCh)' if has_real else ''
+        # --- ECB API direct data (DFR, HICP, M3) ---
+        ecb_api = self._q('ecb') or {}
+        ecb_parts = []
+        if isinstance(ecb_api, dict) and 'error' not in ecb_api:
+            dfr = ecb_api.get('deposit_facility_rate') or ecb_api.get('dfr')
+            if dfr is not None:
+                # Prefer ECB API over BCCh for deposit rate
+                ecb_rate = f"{float(dfr):.2f}%"
+                ecb_parts.append(f"DFR (ECB): {ecb_rate}")
+            hicp = ecb_api.get('hicp_yoy')
+            if hicp is not None:
+                ecb_parts.append(f"HICP (ECB): {float(hicp):.1f}%")
+            m3 = ecb_api.get('m3_yoy')
+            if m3 is not None:
+                ecb_parts.append(f"M3 YoY (ECB): {float(m3):.1f}%")
+            ea_10y = ecb_api.get('ea_10y_yield') or ecb_api.get('ea_benchmark_10y')
+            if ea_10y is not None:
+                ecb_parts.append(f"EA 10Y: {float(ea_10y):.2f}%")
+
+        has_real = bool(eu.get('ecb_rate') is not None or ecb_parts)
+        src = ' (datos BCCh + ECB)' if ecb_parts else (' (datos BCCh)' if has_real else '')
 
         from narrative_engine import generate_narrative
         quant_ctx = f"ECB Deposit Rate: {ecb_rate}. Bund 10Y: {bund_10y}."
+        if ecb_parts:
+            quant_ctx += f" {'; '.join(ecb_parts)}."
         council_ctx = self.council.get('panel_outputs', {}).get('macro', '')[:1000]
         narrativa = generate_narrative(
             section_name="ecb_policy",
@@ -1324,6 +1403,26 @@ class MacroContentGenerator:
         rs_val = self._fmt(cn.get('retail_sales_yoy'))
         rs_prev = self._fmt(cn.get('retail_sales_yoy_prev'))
 
+        # --- AKShare China real data (NBS direct) ---
+        ak = self._q('akshare_china') or self._q('akshare') or {}
+        ak_parts = []
+        if isinstance(ak, dict) and 'error' not in ak:
+            # AKShare can provide more granular NBS data
+            for ak_key, ak_label in [('fai_ytd', 'Inversión Fija (FAI) YTD'),
+                                      ('m2_yoy', 'M2 YoY'), ('tso_yoy', 'TSF YoY')]:
+                v = ak.get(ak_key)
+                if v is not None:
+                    ak_parts.append(f"{ak_label}: {v:.1f}%")
+            # Overwrite N/D values with AKShare if BCCh missed them
+            if ip_val == 'N/D' and ak.get('industrial_production_yoy') is not None:
+                ip_val = self._fmt(ak['industrial_production_yoy'])
+            if rs_val == 'N/D' and ak.get('retail_sales_yoy') is not None:
+                rs_val = self._fmt(ak['retail_sales_yoy'])
+            if cpi_val == 'N/D' and ak.get('cpi_yoy') is not None:
+                cpi_val = self._fmt(ak['cpi_yoy'])
+            if ppi_val == 'N/D' and ak.get('ppi_yoy') is not None:
+                ppi_val = self._fmt(ak['ppi_yoy'])
+
         has_real = bool(cn.get('gdp_qoq') is not None or cn.get('pmi_mfg') is not None)
         src = ' (BCCh + NBS)' if has_real else ''
 
@@ -1333,6 +1432,8 @@ class MacroContentGenerator:
             f"Desempleo: {desemp_val}. PMI Mfg (NBS): {pmi_mfg}. PMI Svc: {pmi_svc}. "
             f"Caixin Mfg: {caixin_mfg}. Prod Industrial: {ip_val}. Ventas Retail: {rs_val}."
         )
+        if ak_parts:
+            quant_ctx += f" AKShare NBS: {'; '.join(ak_parts)}."
         council_ctx = self.council.get('panel_outputs', {}).get('geo', '')[:1000]
         narrativa = generate_narrative(
             section_name="china_growth",

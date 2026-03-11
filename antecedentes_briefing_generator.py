@@ -93,6 +93,7 @@ class AntecedentesBriefingGenerator:
             self._macro_charts = MacroChartsGenerator(
                 data_provider=dp,
                 forecast_data=self.data.get('forecasts'),
+                branding=self.branding,
             )
             self._print("[Briefing] Chart tools initialized")
         except Exception as e:

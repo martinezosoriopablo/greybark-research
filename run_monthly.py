@@ -796,21 +796,27 @@ class MonthlyPipeline:
 
         if report_name == 'macro':
             from macro_report_renderer import MacroReportRenderer
-            # Build quant_data for macro from collected data
+            # Pass ALL collected macro_quant data (BEA, OECD, AKShare, ECB, BCRP, NYFed, etc.)
             macro_quant = {}
             if self.data:
                 macro_quant = self.data.get('macro_agent_data', {})
                 if not macro_quant:
-                    # Fallback: build from chile_extended in macro_quant
                     mq = self.data.get('macro_quant', {})
-                    chile_ext = mq.get('chile_extended', self.data.get('chile_extended', {}))
-                    if chile_ext and 'error' not in chile_ext:
-                        macro_quant['chile_eee'] = chile_ext.get('eee_expectations', {})
-                        macro_quant['chile_imce'] = chile_ext.get('imce', {})
-                        macro_quant['chile_ipc_detail'] = chile_ext.get('ipc_detail', {})
-                    nyfed = self.data.get('macro_quant', {}).get('nyfed', {})
-                    if nyfed and 'error' not in nyfed:
-                        macro_quant['nyfed_rstar'] = nyfed.get('rstar', {})
+                    if isinstance(mq, dict) and 'error' not in mq:
+                        # Pass entire macro_quant — all 10 modules + external APIs
+                        macro_quant = dict(mq)
+                    else:
+                        macro_quant = {}
+                    # Ensure chile_extended sub-fields are accessible at top level
+                    chile_ext = macro_quant.get('chile_extended', self.data.get('chile_extended', {}))
+                    if chile_ext and isinstance(chile_ext, dict) and 'error' not in chile_ext:
+                        macro_quant.setdefault('chile_eee', chile_ext.get('eee_expectations', {}))
+                        macro_quant.setdefault('chile_imce', chile_ext.get('imce', {}))
+                        macro_quant.setdefault('chile_ipc_detail', chile_ext.get('ipc_detail', {}))
+                    # Ensure nyfed rstar accessible at top level for backward compat
+                    nyfed = macro_quant.get('nyfed', {})
+                    if nyfed and isinstance(nyfed, dict) and 'error' not in nyfed:
+                        macro_quant.setdefault('nyfed_rstar', nyfed.get('rstar', {}))
             renderer = MacroReportRenderer(
                 council_result=council_result,
                 forecast_data=forecast_data,
@@ -848,6 +854,20 @@ class MonthlyPipeline:
             sov_curves = self.data.get('macro_quant', {}).get('sovereign_curves', {})
             if sov_curves and 'error' not in sov_curves:
                 rf_data['sovereign_curves'] = sov_curves
+            # Inject BCRP EMBI spreads for LatAm section
+            macro_quant = self.data.get('macro_quant', {})
+            if isinstance(macro_quant, dict):
+                bcrp = macro_quant.get('bcrp_embi') or macro_quant.get('bcrp', {})
+                if bcrp and isinstance(bcrp, dict) and 'error' not in bcrp:
+                    rf_data.setdefault('bcrp_embi', bcrp)
+                # Inject ECB API data (DFR, HICP, M3, EA yield)
+                ecb = macro_quant.get('ecb', {})
+                if ecb and isinstance(ecb, dict) and 'error' not in ecb:
+                    rf_data.setdefault('ecb', ecb)
+                # Inject Cleveland Fed r-star if collected
+                clev = macro_quant.get('cleveland_rstar', {})
+                if clev and isinstance(clev, dict) and 'error' not in clev:
+                    rf_data.setdefault('cleveland_rstar', clev)
             renderer = RFReportRenderer(
                 council_result=council_result,
                 market_data=rf_data,
@@ -875,7 +895,9 @@ class MonthlyPipeline:
             if isinstance(macro_quant, dict) and 'error' not in macro_quant:
                 for key in ['macro_usa', 'chile', 'chile_extended', 'chile_rates',
                             'regime', 'inflation', 'rates', 'leading_indicators',
-                            'china', 'risk', 'breadth', 'international', 'bloomberg']:
+                            'china', 'risk', 'breadth', 'international', 'bloomberg',
+                            'bea', 'oecd', 'ecb', 'bcrp_embi', 'bcrp',
+                            'akshare_china', 'akshare', 'nyfed', 'sovereign_curves']:
                     if key in macro_quant and key not in aa_data:
                         aa_data[key] = macro_quant[key]
                 # Map tpm_expectations from rates

@@ -573,6 +573,8 @@ class AssetAllocationContentGenerator:
         # Enrich with real FRED data if available
         gdp_prev = None
         cpi_prev = None
+        retail_prev = None
+        recession_prev = None
         if self.data:
             try:
                 usa = self.data.get_usa_latest()
@@ -582,6 +584,8 @@ class AssetAllocationContentGenerator:
                     cpi = usa['cpi_core']
                 gdp_prev = usa.get('gdp_qoq_prev')
                 cpi_prev = usa.get('cpi_core_yoy_prev')
+                retail_prev = usa.get('retail_sales_yoy_prev')
+                recession_prev = usa.get('recession_prob_prev')
             except Exception:
                 pass
 
@@ -601,6 +605,8 @@ class AssetAllocationContentGenerator:
         recession_str = f'{int(recession)}%' if recession is not None else 'N/D'
         gdp_prev_str = f'{gdp_prev}%' if gdp_prev is not None else 'N/D'
         cpi_prev_str = f'{cpi_prev}%' if cpi_prev is not None else 'N/D'
+        retail_prev_str = f'+{retail_prev}%' if retail_prev is not None else 'N/D'
+        recession_prev_str = f'{int(recession_prev)}%' if recession_prev is not None else 'N/D'
 
         from narrative_engine import generate_narrative
         council_ctx = f"MACRO PANEL:\n{macro[:2500]}"
@@ -646,7 +652,7 @@ class AssetAllocationContentGenerator:
         cpi_sorpresa = _surprise(cpi, cpi_prev)
 
         # Try to extract retail/recession surprise from macro text
-        retail_sorpresa = _surprise(None, None)
+        retail_sorpresa = _surprise(retail, retail_prev)
         recession_sorpresa = 'N/D'
         if macro:
             for pattern, result in [('retail.*mejor', '↑ Sobre consenso'), ('retail.*peor', '↓ Bajo consenso'),
@@ -659,8 +665,8 @@ class AssetAllocationContentGenerator:
         datos = [
             {'indicador': 'GDP US QoQ (PIB EE.UU. trimestral)', 'actual': gdp_str, 'anterior': gdp_prev_str, 'sorpresa': gdp_sorpresa},
             {'indicador': 'Core CPI YoY (inflación subyacente interanual)', 'actual': cpi_str, 'anterior': cpi_prev_str, 'sorpresa': cpi_sorpresa},
-            {'indicador': 'Retail Sales YoY (Ventas Minoristas interanual)', 'actual': retail_str, 'anterior': 'N/D', 'sorpresa': retail_sorpresa},
-            {'indicador': 'Prob. Recesión 12M (probabilidad de recesión a 12 meses)', 'actual': recession_str, 'anterior': 'N/D', 'sorpresa': recession_sorpresa},
+            {'indicador': 'Retail Sales YoY (Ventas Minoristas interanual)', 'actual': retail_str, 'anterior': retail_prev_str, 'sorpresa': retail_sorpresa},
+            {'indicador': 'Prob. Recesión 12M (probabilidad de recesión a 12 meses)', 'actual': recession_str, 'anterior': recession_prev_str, 'sorpresa': recession_sorpresa},
         ]
 
         return {'titulo': 'Economía Global', 'narrativa': narrativa, 'datos': datos}
@@ -720,10 +726,23 @@ class AssetAllocationContentGenerator:
         if not narrativa:
             narrativa = f"Datos macro: GDP US {gdp_str}, Core CPI {cpi_str}, desempleo {unemployment_str}, Fed Funds {fed_str}."
 
+        # Try to get prior values from ChartDataProvider
+        gdp_prev_str = 'N/D'
+        cpi_prev_str = 'N/D'
+        unemp_prev_str = 'N/D'
+        if self.data:
+            try:
+                usa_d = self.data.get_usa_latest()
+                gdp_prev_str = f"{usa_d['gdp_qoq_prev']}%" if usa_d.get('gdp_qoq_prev') is not None else 'N/D'
+                cpi_prev_str = f"{usa_d['cpi_core_yoy_prev']}%" if usa_d.get('cpi_core_yoy_prev') is not None else 'N/D'
+                unemp_prev_str = f"{usa_d['unemployment_prev']}%" if usa_d.get('unemployment_prev') is not None else 'N/D'
+            except Exception:
+                pass
+
         datos = [
-            {'indicador': 'GDP US QoQ (PIB EE.UU. trimestral)', 'actual': gdp_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
-            {'indicador': 'US Core CPI (inflación subyacente EE.UU.)', 'actual': cpi_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
-            {'indicador': 'Desempleo (tasa de desempleo EE.UU.)', 'actual': unemployment_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
+            {'indicador': 'GDP US QoQ (PIB EE.UU. trimestral)', 'actual': gdp_str, 'anterior': gdp_prev_str, 'sorpresa': 'N/D'},
+            {'indicador': 'US Core CPI (inflación subyacente EE.UU.)', 'actual': cpi_str, 'anterior': cpi_prev_str, 'sorpresa': 'N/D'},
+            {'indicador': 'Desempleo (tasa de desempleo EE.UU.)', 'actual': unemployment_str, 'anterior': unemp_prev_str, 'sorpresa': 'N/D'},
             {'indicador': 'Fed Funds (tasa de referencia Fed)', 'actual': fed_str, 'anterior': 'N/D', 'sorpresa': 'N/D'},
         ]
 
