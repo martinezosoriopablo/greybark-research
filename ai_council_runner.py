@@ -566,7 +566,7 @@ Si hay research externo, contrasta las opiniones del panel con las visiones exte
 
     def _build_contrarian_prompt(self, cio_output: str, panel_outputs: Dict) -> str:
         """Construye el prompt para el Contrarian."""
-        panel_summary = "\n".join([f"- {k}: {v[:200]}..." for k, v in panel_outputs.items()])
+        panel_summary = "\n\n".join([f"### {k.upper()}\n{v}" for k, v in panel_outputs.items()])
 
         return f"""
 <sintesis_cio>
@@ -597,6 +597,76 @@ Traduce todo lo demás al español.
 Desafía la síntesis del CIO. Encuentra las fallas. Propón mejoras.
 500-600 palabras máximo.
 """
+
+    def _check_panel_coherence(self, council_input: Dict) -> List[str]:
+        """Check if panelists cite the same indicator with conflicting values.
+
+        Extracts numbers from each panel output, matches them to verified data
+        keys, and flags cases where two agents cite the same key with different values.
+
+        Returns list of warning strings (empty = no conflicts).
+        """
+        warnings = []
+        try:
+            from narrative_engine import _extract_numbers, _find_label_number_pairs
+            from post_council_validator import PostCouncilValidator
+
+            pcv = PostCouncilValidator(verbose=False)
+            agent_data_map = council_input.get('agent_data', {})
+
+            # For each agent, extract (key, value) pairs from their output
+            agent_citations: Dict[str, Dict[str, float]] = {}
+
+            import re
+            for agent_name, output in self.panel_outputs.items():
+                if not output:
+                    continue
+                clean = re.sub(r'<[^>]+>', ' ', output)
+                numbers = _extract_numbers(clean)
+                if not numbers:
+                    continue
+
+                agent_data = agent_data_map.get(agent_name, {})
+                verified = pcv._build_verified_data(agent_name, agent_data)
+                pairs = _find_label_number_pairs(clean, numbers, verified)
+
+                citations = {}
+                for num_info, key, verified_val in pairs:
+                    citations[key] = num_info['value']
+                agent_citations[agent_name] = citations
+
+            # Cross-check: find keys cited by 2+ agents with different values
+            all_keys = set()
+            for citations in agent_citations.values():
+                all_keys.update(citations.keys())
+
+            for key in sorted(all_keys):
+                values_by_agent = {}
+                for agent_name, citations in agent_citations.items():
+                    if key in citations:
+                        values_by_agent[agent_name] = citations[key]
+
+                if len(values_by_agent) < 2:
+                    continue
+
+                vals = list(values_by_agent.values())
+                # Check if any pair differs by more than 5%
+                for i in range(len(vals)):
+                    for j in range(i + 1, len(vals)):
+                        if vals[j] != 0 and abs(vals[i] - vals[j]) / abs(vals[j]) > 0.05:
+                            agents = list(values_by_agent.keys())
+                            warnings.append(
+                                f"{key}: {agents[i]}={vals[i]}, {agents[j]}={vals[j]}"
+                            )
+                            break
+                    else:
+                        continue
+                    break
+
+        except Exception as e:
+            self._print(f"  [WARN] Coherence check skipped: {e}")
+
+        return warnings
 
     def _build_refinador_prompt(
         self,
@@ -757,6 +827,13 @@ El output debe ser profesional y listo para el cliente.
 
         # Capa 1: Panel horizontal
         self.panel_outputs = await self._run_panel_async(council_input)
+
+        # Pre-synthesis coherence check: detect conflicting data citations
+        coherence_warnings = self._check_panel_coherence(council_input)
+        if coherence_warnings:
+            self._print(f"\n  [COHERENCE] {len(coherence_warnings)} data conflicts detected:")
+            for w in coherence_warnings[:5]:
+                self._print(f"    - {w}")
 
         # Capa 2: Síntesis vertical
         self.synthesis_outputs = await self._run_synthesis_async(self.panel_outputs, council_input)
