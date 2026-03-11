@@ -13,6 +13,7 @@ Dependencias:
 
 import base64
 import io
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import warnings
@@ -32,35 +33,13 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
     print("Warning: matplotlib not installed. Charts will use fallback placeholders.")
 
+from chart_config import get_chart_colors, get_failure_tracker
+
+logger = logging.getLogger(__name__)
+
 
 class ChartGenerator:
     """Generador de charts para reportes."""
-
-    # Colores Greybark (consistente con CSS — escala de negros)
-    COLORS = {
-        'primary_blue': '#1a1a1a',
-        'secondary_blue': '#3a3a3a',
-        'accent_orange': '#dd6b20',
-        'positive': '#276749',
-        'negative': '#c53030',
-        'neutral': '#744210',
-        'bg_light': '#f7f7f7',
-        'text_dark': '#1a1a1a',
-        'text_medium': '#4a4a4a',
-        'text_light': '#718096',
-    }
-
-    # Paleta para series multiples
-    SERIES_COLORS = [
-        '#1a365d',  # Dark blue
-        '#dd6b20',  # Orange
-        '#276749',  # Green
-        '#c53030',  # Red
-        '#805ad5',  # Purple
-        '#d69e2e',  # Gold
-        '#319795',  # Teal
-        '#e53e3e',  # Light red
-    ]
 
     @staticmethod
     def _safe_float(val, default: float = 0.0) -> float:
@@ -75,10 +54,15 @@ class ChartGenerator:
         except (ValueError, TypeError):
             return default
 
-    def __init__(self, width: int = 8, height: int = 4, dpi: int = 100):
+    def __init__(self, width: int = 8, height: int = 4, dpi: int = 100, branding: Dict = None):
         self.width = width
         self.height = height
         self.dpi = dpi
+        # Derive colors from branding (or use Greybark defaults)
+        scheme = get_chart_colors(branding)
+        self.COLORS = scheme.to_dict()
+        self.SERIES_COLORS = scheme.series
+        self._failure_tracker = get_failure_tracker()
         self._setup_style()
 
     def _setup_style(self):
@@ -1021,10 +1005,11 @@ class ChartGenerator:
 class MacroChartsGenerator:
     """Generador de charts especificos para el Reporte Macro."""
 
-    def __init__(self, data_provider=None, forecast_data: Dict = None):
-        self.chart_gen = ChartGenerator()
+    def __init__(self, data_provider=None, forecast_data: Dict = None, branding: Dict = None):
+        self.chart_gen = ChartGenerator(branding=branding)
         self.data = data_provider  # ChartDataProvider or None (fallback to _interp)
         self.forecast_data = forecast_data or {}
+        self._failure_tracker = get_failure_tracker()
 
     def generate_all_charts(self, content: Dict[str, Any]) -> Dict[str, str]:
         """
@@ -1039,13 +1024,14 @@ class MacroChartsGenerator:
         charts = {}
 
         def _safe_chart(chart_id, fn):
-            """Generate a chart with error isolation."""
+            """Generate a chart with error isolation + failure tracking."""
             try:
                 result = fn()
                 if result:
                     charts[chart_id] = result
             except Exception as e:
-                print(f"  [WARN] Chart '{chart_id}' failed: {e}")
+                self._failure_tracker.record(chart_id, str(e), fallback_used=False)
+                logger.warning("Chart '%s' failed: %s", chart_id, e)
 
         # 0. Time Series Charts (new)
         try:
