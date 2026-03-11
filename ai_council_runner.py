@@ -43,6 +43,7 @@ except ImportError:
     HAS_ANTHROPIC = False
 
 from council_data_collector import CouncilDataCollector
+from narrative_engine import validate_narrative
 
 
 # =============================================================================
@@ -764,6 +765,25 @@ El output debe ser profesional y listo para el cliente.
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
 
+        # Validate refinador output against verified data before storing
+        refinador_raw = self.synthesis_outputs.get('refinador', '')
+        if refinador_raw and council_input.get('agent_data'):
+            try:
+                from post_council_validator import PostCouncilValidator
+                pcv = PostCouncilValidator(verbose=False)
+                combined_data = {}
+                for a_data in council_input['agent_data'].values():
+                    if isinstance(a_data, dict):
+                        combined_data.update(a_data)
+                verified = pcv._build_verified_data('macro', combined_data)
+                refinador_validated = validate_narrative(refinador_raw, verified)
+                self._print(f"  [VALIDATE] Refinador: {len(verified)} verified points checked")
+            except Exception as e:
+                self._print(f"  [WARN] Refinador validation skipped: {e}")
+                refinador_validated = refinador_raw
+        else:
+            refinador_validated = refinador_raw
+
         result = {
             'metadata': {
                 'timestamp': start_time.isoformat(),
@@ -776,7 +796,7 @@ El output debe ser profesional y listo para el cliente.
             'panel_outputs': self.panel_outputs,
             'cio_synthesis': self.synthesis_outputs.get('cio', ''),
             'contrarian_critique': self.synthesis_outputs.get('contrarian', ''),
-            'final_recommendation': self.synthesis_outputs.get('refinador', ''),
+            'final_recommendation': refinador_validated,
             'preflight': council_input.get('preflight', {}),
             'council_input_summary': {
                 'quantitative_modules': list(council_input.get('quantitative', {}).keys()),

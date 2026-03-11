@@ -356,19 +356,19 @@ def _is_significant_discrepancy(narrative_val: float, verified_val: float,
     # A rate of 4.05% vs 4.3% is ~6% relative but only 0.25pp —
     # we want to catch this since it's a meaningful difference for rates.
     if unit == '%' or unit == '':
-        # For values < 10 (typical rates, yields, CPI): trigger if >0.15 absolute AND >3% relative
+        # For values < 10 (typical rates, yields, CPI): trigger if >0.05 absolute AND >1.5% relative
         if abs(verified_val) < 10:
-            return abs_diff > 0.15 and rel_diff > 0.03
+            return abs_diff > 0.05 and rel_diff > 0.015
         # For larger values (index levels, prices): use standard relative threshold
         return rel_diff > threshold
 
-    # For multiples (P/E): trigger if >0.5x absolute AND >3% relative
+    # For multiples (P/E): trigger if >0.3x absolute AND >2% relative
     if unit == 'x':
-        return abs_diff > 0.5 and rel_diff > 0.03
+        return abs_diff > 0.3 and rel_diff > 0.02
 
-    # For basis points: trigger if >15bp absolute AND >5% relative
+    # For basis points: trigger if >5bp absolute AND >3% relative
     if unit in ('bp', 'bps', 'pb'):
-        return abs_diff > 15 and rel_diff > threshold
+        return abs_diff > 5 and rel_diff > 0.03
 
     return rel_diff > threshold
 
@@ -637,7 +637,38 @@ _KEY_SOURCE_MAP = {
     'copper': 'BCCh:commodities', 'gold': 'BCCh:commodities',
     'usdclp': 'BCCh:FX', 'dxy': 'yfinance:DX-Y.NYB',
     'us_gdp': 'FRED:GDPC1', 'chile_gdp': 'BCCh:PIB',
+    'us_unemployment': 'FRED:UNRATE',
     'tips_10y': 'FRED:DFII10', 'breakeven_10y': 'FRED:T10YIE',
+    'breakeven_5y': 'FRED:T5YIE',
+    # Macro USA (FRED)
+    'ism_manufacturing': 'FRED:ISM/PMI', 'nfp': 'FRED:PAYEMS', 'jolts': 'FRED:JTSJOL',
+    'fed_cuts': 'internal:rate_expectations',
+    # Chile macro
+    'chile_ipc': 'BCCh:IPC', 'chile_imacec': 'BCCh:IMACEC',
+    # IMCE + IPC Detail
+    'imce_total': 'BCCh:IMCE', 'imce_sin_mineria': 'BCCh:IMCE',
+    'ipc_sae': 'BCCh:IPC_SAE', 'ipc_servicios': 'BCCh:IPC_SERVICIOS',
+    'ipc_bienes': 'BCCh:IPC_BIENES', 'ipc_energia': 'BCCh:IPC_ENERGIA',
+    # Fiscal
+    'fiscal_deficit': 'FRED:fiscal', 'fiscal_debt': 'FRED:fiscal',
+    # Risk
+    'max_drawdown': 'internal:risk_metrics', 'current_drawdown': 'internal:risk_metrics',
+    'diversification': 'internal:risk_metrics',
+    # Breadth
+    'breadth_50ma': 'yfinance:breadth', 'cyclical_defensive': 'yfinance:breadth',
+    # IMF WEO additional
+    'imf_gdp_world': 'IMF:WEO/NGDP_RPCH/WEOWORLD',
+    'imf_cpi_eurozone': 'IMF:WEO/PCPIPCH/EURO', 'imf_cpi_china': 'IMF:WEO/PCPIPCH/CHN',
+    # BEA GDP components
+    'gdp_qoq': 'BEA:NIPA:T10101', 'pce_contrib': 'BEA:NIPA:T10101',
+    'investment_qoq': 'BEA:NIPA:T10101', 'net_exports': 'BEA:NIPA:T10101',
+    'pce_goods_qoq': 'BEA:NIPA:T10101', 'pce_services_qoq': 'BEA:NIPA:T10101',
+    'residential_qoq': 'BEA:NIPA:T10101', 'govt_qoq': 'BEA:NIPA:T10101',
+    # BEA PCE
+    'pce_goods_yoy': 'BEA:NIPA:T20804', 'pce_services_mom': 'BEA:NIPA:T20807',
+    # BEA Income
+    'personal_income': 'BEA:NIPA:T20600',
+    'profits_nonfinancial': 'BEA:NIPA:T61600D',
     # SOFR Swap Curve (Bloomberg)
     'sofr_rate': 'Bloomberg:SOFRRATE', 'sofr_1y': 'Bloomberg:USOSFR1',
     'sofr_2y': 'Bloomberg:USOSFR2', 'sofr_5y': 'Bloomberg:USOSFR5',
