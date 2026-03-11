@@ -1011,11 +1011,26 @@ class MonthlyPipeline:
             from report_auditor import (
                 audit_reports, format_audit_report,
                 resolve_flags, format_resolution,
+                numeric_audit,
             )
+            from coherence_validator import format_coherence_report
 
-            # --- Step 1: Audit ---
+            # --- Step 0: Numeric coherence (deterministic) ---
+            source_data = {
+                'quant_data': self.data.get('quant', {}),
+                'rf_data': self.data.get('rf', {}),
+                'equity_data': self.data.get('equity', {}),
+            }
+            numeric_result = numeric_audit(source_data, contents)
+            print(format_coherence_report(numeric_result))
+
+            # --- Step 1: LLM Audit ---
             result = audit_reports(contents)
             print(format_audit_report(result))
+
+            # Merge numeric flags into LLM audit
+            result.setdefault("flags", []).extend(numeric_result.get("flags", []))
+            result["numeric_coherence"] = numeric_result.get("coherence_score")
 
             high_flags = [f for f in result.get("flags", []) if f.get("severity") == "high"]
 

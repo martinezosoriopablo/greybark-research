@@ -478,6 +478,24 @@ def format_resolution(result: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def numeric_audit(
+    source_data: Dict[str, Any],
+    report_contents: Dict[str, Dict],
+) -> Dict[str, Any]:
+    """
+    Run deterministic numeric coherence validation.
+    Complementary to the LLM-based audit_reports().
+
+    Returns coherence_validator result dict, or skipped result on error.
+    """
+    try:
+        from coherence_validator import validate_coherence
+        return validate_coherence(source_data, report_contents)
+    except Exception as e:
+        logger.error("Numeric audit failed: %s", e)
+        return {"status": "skipped", "reason": str(e), "flags": [], "coherence_score": None}
+
+
 def format_audit_report(result: Dict[str, Any], verbose: bool = True) -> str:
     """Format audit result for console output."""
     lines = []
