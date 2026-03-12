@@ -65,10 +65,10 @@ MACRO_MANIFEST: List[DataField] = [
     DataField("china.credit_impulse", "Impulso crediticio China", "internal:china_credit", "index", FieldPriority.IMPORTANT),
     DataField("china.epu_analysis.level", "China EPU Level", "FRED:CHINAEPUINDXM", "label", FieldPriority.IMPORTANT),
     # EEE Expectations (BCCh Encuesta de Expectativas Economicas)
-    DataField("chile_eee.ipc_12m", "Exp. inflacion Chile 12M (EEE)", "BCCh:F089.IPC.V12.Z.M", "%", FieldPriority.OPTIONAL),  # BCCh series often delayed
+    DataField("chile_eee.ipc_12m", "Exp. inflacion Chile 12M (EEE)", "BCCh:F089.IPC.V12.14.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.tpm_11m", "Exp. TPM 11 meses (EEE)", "BCCh:F089.TPM.TAS.14.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.tpm_lp", "Exp. TPM largo plazo (tasa neutral)", "BCCh:F089.TPM.TAS.LP.M", "%", FieldPriority.IMPORTANT),
-    DataField("chile_eee.pib_actual", "Exp. PIB Chile año actual (EEE)", "BCCh:F089.PIB.VAR.Z.M", "%", FieldPriority.OPTIONAL),  # BCCh series often delayed
+    DataField("chile_eee.pib_actual", "Exp. PIB Chile 2026 (EEE)", "BCCh:F089.PIB.V12.2026.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.pib_lp", "Exp. PIB largo plazo (potencial)", "BCCh:F089.PIB.V12.LP.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.ipc_lp", "Exp. inflacion largo plazo (ancla)", "BCCh:F089.IPC.V12.LP.M", "%", FieldPriority.IMPORTANT),
     # IMCE Business Confidence (BCCh)
@@ -90,10 +90,10 @@ MACRO_MANIFEST: List[DataField] = [
     DataField("chile_ipc_detail.ipc_bienes", "IPC Bienes Chile", "BCCh:F074.IPCB", "%", FieldPriority.IMPORTANT),
     DataField("chile_ipc_detail.ipc_energia", "IPC Energia Chile", "BCCh:F074.IPCE", "%", FieldPriority.IMPORTANT),
     # EEE additional horizons
-    DataField("chile_eee.ipc_24m", "Exp. inflacion Chile 24M (EEE)", "BCCh:F089.IPC.V24.Z.M", "%", FieldPriority.OPTIONAL),  # BCCh series often delayed
+    DataField("chile_eee.ipc_24m", "Exp. inflacion Chile 24M (EEE)", "BCCh:F089.IPCSV.V12.15.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.tpm_23m", "Exp. TPM 23 meses (EEE)", "BCCh:F089.TPM.TAS.15.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.tpm_prox_reunion", "Exp. TPM prox reunion (EEE)", "BCCh:F089.TPM.TAS.11.M", "%", FieldPriority.IMPORTANT),
-    DataField("chile_eee.tcn_12m", "Exp. USD/CLP 12M (EEE)", "BCCh:F089.TCN.VAL.Z.M", "CLP", FieldPriority.OPTIONAL),  # BCCh series often delayed
+    DataField("chile_eee.tcn_12m", "Exp. USD/CLP 11M (EEE)", "BCCh:F089.TCN.PRE.14.M", "CLP", FieldPriority.IMPORTANT),
     # Leading Economic Indicators (FRED)
     DataField("leading_indicators.lei_usa", "LEI USA (OECD CLI)", "FRED:USALOLITOAASTSAM", "index", FieldPriority.IMPORTANT),
     DataField("leading_indicators.lei_eurozone", "LEI Eurozone (Biz Confidence)", "FRED:BSCICP02EZM460S", "index", FieldPriority.IMPORTANT),
