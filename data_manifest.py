@@ -202,7 +202,7 @@ RF_MANIFEST: List[DataField] = [
     DataField("bbg_cds", "CDS Soberanos 5Y (14 paises)", "Bloomberg:CDS", "dict", FieldPriority.IMPORTANT),
     DataField("bbg_intl_curves", "Bund/Gilt/JGB curvas", "Bloomberg:Intl_Curves", "dict", FieldPriority.OPTIONAL),
     # --- OPTIONAL ---
-    DataField("rates.tpm_expectations", "Expectativas TPM Chile", "internal:tpm_expectations", "dict", FieldPriority.OPTIONAL),
+    DataField("rf_data.tpm_expectations", "Expectativas TPM Chile", "internal:tpm_expectations", "dict", FieldPriority.OPTIONAL),
     DataField("chile_extended.eof_expectations.tc_28d", "Exp. USD/CLP 28 dias (EOF)", "BCCh:F089.EOF.TC.28DA", "CLP", FieldPriority.OPTIONAL),
     DataField("chile_extended.eof_expectations.tc_3m", "Exp. USD/CLP 3 meses (EOF)", "BCCh:F089.EOF.TC.7MA", "CLP", FieldPriority.OPTIONAL),
 ]

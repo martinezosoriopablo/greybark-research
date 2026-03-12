@@ -270,13 +270,21 @@ class ForecastEngine:
             if 'error' not in consensus:
                 result['imf_consensus'] = consensus
                 # Inject into individual forecasts
-                for region in ('usa', 'eurozone', 'china', 'chile'):
+                for region in ('usa', 'eurozone', 'china', 'chile', 'world'):
+                    # GDP
                     gdp_fc = result.get('gdp_forecasts', {}).get(region)
+                    imf_gdp = consensus.get('gdp', {}).get(region)
                     if isinstance(gdp_fc, dict) and 'error' not in gdp_fc:
-                        gdp_fc['consensus_imf'] = consensus.get('gdp', {}).get(region)
+                        gdp_fc['consensus_imf'] = imf_gdp
+                    elif imf_gdp is not None:
+                        result.setdefault('gdp_forecasts', {})[region] = {'consensus_imf': imf_gdp}
+                    # Inflation
                     infl_fc = result.get('inflation_forecasts', {}).get(region)
+                    imf_inf = consensus.get('inflation', {}).get(region)
                     if isinstance(infl_fc, dict) and 'error' not in infl_fc:
-                        infl_fc['consensus_imf'] = consensus.get('inflation', {}).get(region)
+                        infl_fc['consensus_imf'] = imf_inf
+                    elif imf_inf is not None:
+                        result.setdefault('inflation_forecasts', {})[region] = {'consensus_imf': imf_inf}
                 n_gdp = sum(1 for v in consensus.get('gdp', {}).values() if v is not None)
                 n_infl = sum(1 for v in consensus.get('inflation', {}).values() if v is not None)
                 self._print(f"  [OK] IMF WEO: {n_gdp} GDP + {n_infl} inflación")

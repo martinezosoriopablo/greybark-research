@@ -990,6 +990,24 @@ class EquityDataCollector:
         except Exception as e:
             data['earnings'] = {'error': str(e)}
 
+        # 4b. PE Forward fallback: ETFs don't have forwardPE in yfinance,
+        #     use avg_forward_pe from mega-cap earnings as proxy
+        try:
+            valuations = data.get('valuations', {})
+            earnings = data.get('earnings', {})
+            region_earnings_map = {'us': 'us_mega', 'europe': 'europe', 'chile': 'chile'}
+            for region, earn_key in region_earnings_map.items():
+                v = valuations.get(region, {})
+                if isinstance(v, dict) and v.get('pe_forward') is None:
+                    earn = earnings.get(earn_key, {})
+                    avg_fwd = earn.get('avg_forward_pe') if isinstance(earn, dict) else None
+                    if avg_fwd is not None:
+                        v['pe_forward'] = round(float(avg_fwd), 2)
+                        v['pe_forward_source'] = f'mega-cap avg ({earn_key})'
+                        self._print(f"    [FWD PE] {region}: {avg_fwd:.1f}x (from {earn_key} mega-caps)")
+        except Exception as e:
+            self._print(f"    [WARN] PE forward fallback: {e}")
+
         # 5. Factor analysis
         try:
             data['factors'] = self.collect_factor_data()

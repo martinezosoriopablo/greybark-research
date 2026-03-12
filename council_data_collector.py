@@ -99,6 +99,17 @@ class CouncilDataCollector:
             self._print(f"  [ERR] Macro USA: {e}")
             data['macro_usa'] = {'error': str(e)}
 
+        # 2a. JOLTS (FRED) — enrich macro_usa
+        try:
+            if isinstance(data.get('macro_usa'), dict) and 'error' not in data['macro_usa']:
+                from greybark.data_sources.fred_client import FREDClient
+                jolts_s = FREDClient().get_series('JTSJOL')
+                if jolts_s is not None and len(jolts_s) > 0:
+                    data['macro_usa']['jolts'] = round(float(jolts_s.iloc[-1]) / 1000, 1)  # Millions
+                    self._print(f"    [OK] JOLTS: {data['macro_usa']['jolts']}M")
+        except Exception as e:
+            self._print(f"    [WARN] JOLTS: {e}")
+
         # 2b. Leading Indicators (FRED)
         def _fetch_leading():
             from greybark.data_sources.fred_client import FREDClient
@@ -853,12 +864,13 @@ class CouncilDataCollector:
             'temas_mes': daily.get('temas_recurrentes', []),
         }
 
-        # IAS RV: regime + breadth + international indices
+        # IAS RV: regime + breadth + international indices + rates context
         agent_data['rv'] = {
             'regime': quant.get('regime', {}),
             'breadth': quant.get('breadth', {}),
             'indices': quant.get('international', {}).get('stock_indices', {}),
             'macro_usa': quant.get('macro_usa', {}),
+            'rates': quant.get('rates', {}),
             # Bloomberg structured
             'bbg_valuations': bbg.get('valuations_extended', {}),
             'bbg_factor_returns': bbg.get('factor_returns', {}),
