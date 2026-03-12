@@ -519,13 +519,27 @@ class TaylorRule:
         if self.verbose:
             print(f"  [Taylor] {msg}")
 
+    def _fetch_nairu(self, default: float = 4.2) -> float:
+        """Fetch CBO NAIRU from FRED (NROU quarterly). Fallback to default."""
+        try:
+            fred = self._get_fred()
+            s = fred.get_series('NROU', start_date=date(2020, 1, 1))
+            if s is not None and len(s) > 0:
+                val = float(s.dropna().iloc[-1])
+                if 2.0 <= val <= 8.0:
+                    self._log(f"CBO NAIRU from FRED: {val:.1f}%")
+                    return round(val, 2)
+        except Exception as e:
+            self._log(f"NAIRU fetch failed: {e}")
+        return default
+
     def fed_rate(
         self,
         inflation: float = None,
         unemployment: float = None,
         inflation_target: float = 2.0,
         r_star: float = 0.5,
-        nairu: float = 4.2,
+        nairu: float = None,
         okun_coef: float = 2.0,
     ) -> Dict[str, Any]:
         """
@@ -538,9 +552,11 @@ class TaylorRule:
             unemployment: Current unemployment rate (%)
             inflation_target: Fed target (2%)
             r_star: Real neutral rate estimate (0.5%)
-            nairu: Natural rate of unemployment (4.2%)
+            nairu: Natural rate of unemployment (None = fetch from FRED NROU)
             okun_coef: Okun coefficient (2.0)
         """
+        if nairu is None:
+            nairu = self._fetch_nairu(default=4.2)
         fred = self._get_fred()
 
         # Fetch current values if not provided
@@ -814,7 +830,7 @@ class PhillipsCurve:
     def estimate_and_forecast(
         self,
         unemployment_forecast: float = None,
-        nairu: float = 4.2,
+        nairu: float = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Estima Phillips Curve con datos históricos y genera forecast.
@@ -825,11 +841,24 @@ class PhillipsCurve:
 
         Args:
             unemployment_forecast: Unemployment rate esperado en 12M
-            nairu: Assumed NAIRU (4.2% para USA)
+            nairu: NAIRU (None = fetch from FRED NROU, fallback 4.2%)
 
         Returns:
             Dict con forecast, coefficient, R², etc.
         """
+        if nairu is None:
+            # Fetch CBO NAIRU from FRED
+            try:
+                fred = self._get_fred()
+                nrou = fred.get_series('NROU', start_date=date(2020, 1, 1))
+                if nrou is not None and len(nrou) > 0:
+                    nairu = round(float(nrou.dropna().iloc[-1]), 2)
+                    self._log(f"Phillips: CBO NAIRU from FRED: {nairu}%")
+            except Exception:
+                pass
+            if nairu is None:
+                nairu = 4.2
+
         try:
             from statsmodels.regression.linear_model import OLS
             import statsmodels.api as sm

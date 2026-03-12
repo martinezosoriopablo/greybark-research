@@ -594,6 +594,14 @@ class MacroReportRenderer:
             for placeholder, chart_id in chart_map.items():
                 replacements[placeholder] = all_charts.get(chart_id, '')
             self._print(f"  [OK] {len(all_charts)} charts generados")
+
+            # Log chart data source summary
+            summary = macro_charts.get_chart_source_summary()
+            self._print(f"  [CHARTS] {summary['real_api']} real | {summary['partial_real']} partial | "
+                        f"{summary['fallback_estimated']} fallback | {summary['content_generated']} generated "
+                        f"({summary['real_pct']}% real)")
+            if summary['details']['fallback']:
+                self._print(f"  [CHARTS] Fallback: {', '.join(summary['details']['fallback'])}")
         except Exception as e:
             self._print(f"  [WARN] Charts no generados: {e}")
             for placeholder in chart_map:
