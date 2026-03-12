@@ -74,14 +74,15 @@ def _check_bcch() -> Dict[str, Any]:
             return {"status": "FAIL", "reason": "BCCH_USER/BCCH_PASSWORD not set"}
 
         client = BCChClient()
-        # Quick test: fetch TPM
-        data = client.get_series("F022.TPM.TIN.D001.NO.Z.D", periods=5)
+        # Quick test: fetch TPM (last 30 days)
+        data = client.get_series("F022.TPM.TIN.D001.NO.Z.D", days_back=30)
         if data is None or (hasattr(data, '__len__') and len(data) == 0):
             return {"status": "WARN", "reason": "BCCh returned empty for TPM"}
 
+        latest = float(data.iloc[-1]) if len(data) > 0 else None
         return {
             "status": "OK",
-            "sample": "TPM series accessible",
+            "sample": f"TPM = {latest}%" if latest else "TPM series accessible",
             "series_count": "93+",
         }
     except Exception as e:
@@ -138,7 +139,7 @@ def _check_imf() -> Dict[str, Any]:
     try:
         from imf_weo_client import IMFWEOClient
         client = IMFWEOClient()
-        data = client.fetch_all()
+        data = client.fetch_consensus()
         if not data or data.get("error"):
             return {"status": "WARN", "reason": data.get("error", "Empty response")}
 
@@ -179,8 +180,8 @@ def _check_bea() -> Dict[str, Any]:
         from greybark.data_sources.bea_client import BEAClient
         client = BEAClient()
         gdp = client.get_gdp_components()
-        if gdp and gdp.get("gdp_total"):
-            return {"status": "OK", "sample": f"GDP QoQ = {gdp['gdp_total'].get('value', 'N/D')}%"}
+        if gdp and gdp.get("gdp_total") is not None:
+            return {"status": "OK", "sample": f"GDP QoQ = {gdp['gdp_total']}%"}
         return {"status": "WARN", "reason": "BEA returned empty GDP"}
     except Exception as e:
         return {"status": "FAIL", "reason": str(e)[:200]}
@@ -190,7 +191,13 @@ def _check_anthropic() -> Dict[str, Any]:
     """Check Anthropic API key is set (no actual call to save cost)."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        return {"status": "FAIL", "reason": "ANTHROPIC_API_KEY not set"}
+        try:
+            from greybark.config import CLAUDE_API_KEY
+            api_key = CLAUDE_API_KEY or ""
+        except Exception:
+            pass
+    if not api_key:
+        return {"status": "FAIL", "reason": "ANTHROPIC_API_KEY not set (env nor greybark.config)"}
     if api_key.startswith("sk-ant-"):
         return {"status": "OK", "sample": f"Key: sk-ant-...{api_key[-4:]}"}
     return {"status": "OK", "sample": f"Key present ({len(api_key)} chars)"}
@@ -246,10 +253,11 @@ def _check_oecd() -> Dict[str, Any]:
         from greybark.data_sources.oecd_client import OECDClient
         client = OECDClient()
         # Quick test: fetch CLI for USA
-        data = client.get_cli(countries=["USA"], months=3)
+        data = client.get_cli()
         if not data:
             return {"status": "WARN", "reason": "OECD returned empty"}
-        return {"status": "OK", "sample": "CLI data accessible"}
+        usa_cli = data.get("USA", {}).get("latest")
+        return {"status": "OK", "sample": f"USA CLI = {usa_cli}" if usa_cli else "CLI data accessible"}
     except Exception as e:
         return {"status": "FAIL", "reason": str(e)[:200]}
 
@@ -303,12 +311,13 @@ API_CHECKS = {
     "ECB":                  {"fn": _check_ecb,            "critical": False, "slow": False},
     "BCRP (EMBI)":          {"fn": _check_bcrp,           "critical": False, "slow": False},
     "CommLoan (SOFR)":      {"fn": _check_commloan,       "critical": False, "slow": False},
-    # Optional / Slow
-    "yfinance":             {"fn": _check_yfinance,       "critical": False, "slow": True},
-    "BEA":                  {"fn": _check_bea,            "critical": False, "slow": True},
-    "OECD":                 {"fn": _check_oecd,           "critical": False, "slow": True},
-    "AKShare (China)":      {"fn": _check_akshare,        "critical": False, "slow": True},
+    # Optional (tested in all modes)
+    "yfinance":             {"fn": _check_yfinance,       "critical": False, "slow": False},
+    "BEA":                  {"fn": _check_bea,            "critical": False, "slow": False},
+    "OECD":                 {"fn": _check_oecd,           "critical": False, "slow": False},
     "Bloomberg (Excel)":    {"fn": _check_bloomberg,      "critical": False, "slow": False},
+    # Slow (skip in quick mode — known timeouts)
+    "AKShare (China)":      {"fn": _check_akshare,        "critical": False, "slow": True},
 }
 
 
