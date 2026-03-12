@@ -74,14 +74,15 @@ def _check_bcch() -> Dict[str, Any]:
             return {"status": "FAIL", "reason": "BCCH_USER/BCCH_PASSWORD not set"}
 
         client = BCChClient()
-        # Quick test: fetch TPM
-        data = client.get_series("F022.TPM.TIN.D001.NO.Z.D", periods=5)
+        # Quick test: fetch TPM (last 30 days)
+        data = client.get_series("F022.TPM.TIN.D001.NO.Z.D", days_back=30)
         if data is None or (hasattr(data, '__len__') and len(data) == 0):
             return {"status": "WARN", "reason": "BCCh returned empty for TPM"}
 
+        latest = float(data.iloc[-1]) if len(data) > 0 else None
         return {
             "status": "OK",
-            "sample": "TPM series accessible",
+            "sample": f"TPM = {latest}%" if latest else "TPM series accessible",
             "series_count": "93+",
         }
     except Exception as e:
@@ -138,7 +139,7 @@ def _check_imf() -> Dict[str, Any]:
     try:
         from imf_weo_client import IMFWEOClient
         client = IMFWEOClient()
-        data = client.fetch_all()
+        data = client.fetch_consensus()
         if not data or data.get("error"):
             return {"status": "WARN", "reason": data.get("error", "Empty response")}
 

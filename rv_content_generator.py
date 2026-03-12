@@ -38,6 +38,17 @@ class RVContentGenerator:
         self._parser = None
         self.bloomberg = None  # BloombergReader, injected externally
 
+    def _q(self, *keys, default=None):
+        """Navigate nested market_data dict by key path."""
+        d = self.market_data
+        for k in keys:
+            if not isinstance(d, dict) or k not in d:
+                return default
+            d = d[k]
+        if isinstance(d, dict) and 'error' in d:
+            return default
+        return d if d is not None else default
+
     @property
     def parser(self):
         """Lazy-init council parser."""
@@ -322,7 +333,7 @@ class RVContentGenerator:
         }
 
         # Try to get views from council parser first
-        equity_views = self.parser.get_equity_views()
+        equity_views = self.parser.get_equity_views() or {}
 
         # Region label → list of parser key aliases (parser lowercases region names)
         equity_alias_map = {
@@ -784,7 +795,7 @@ class RVContentGenerator:
                 parts.append(f"En contraste, {', '.join(ex_us_parts)} ofrecen valuaciones más atractivas. ")
 
             # Add regional preference from council if available
-            ev = self.parser.get_equity_views() if self.parser else {}
+            ev = (self.parser.get_equity_views() if self.parser else {}) or {}
             ow_regions = [r.capitalize() for r, d in ev.items() if d.get('view') == 'OW']
             if ow_regions:
                 parts.append(f"Preferencia: {', '.join(ow_regions)}.")
@@ -1140,7 +1151,7 @@ class RVContentGenerator:
             energy_cat = f'WTI {oil:.0f} USD/bbl ({oil_ytd:+.1f}% YTD), OPEC+'
 
         # Get sector views from council parser
-        sector_views = self.parser.get_sector_views()
+        sector_views = self.parser.get_sector_views() or {}
 
         # Sector name → list of parser key aliases (parser lowercases sector names)
         sector_alias_map = {
@@ -1275,7 +1286,7 @@ class RVContentGenerator:
 
     def _generate_preferred_sectors(self) -> List[Dict[str, Any]]:
         """Genera detalle de sectores preferidos from council parser."""
-        sector_views = self.parser.get_sector_views()
+        sector_views = self.parser.get_sector_views() or {}
 
         # Map sector names to ETF keys for return lookup
         sector_etf_map = {
@@ -1397,7 +1408,7 @@ class RVContentGenerator:
 
     def _generate_avoid_sectors(self) -> List[Dict[str, Any]]:
         """Genera detalle de sectores a evitar from council parser."""
-        sector_views = self.parser.get_sector_views()
+        sector_views = self.parser.get_sector_views() or {}
         if sector_views:
             avoid = []
             for k, v in sector_views.items():
@@ -1489,7 +1500,7 @@ class RVContentGenerator:
             }
 
             # Get style views from council parser
-            fv = self.parser.get_factor_views() if self.parser else {}
+            fv = (self.parser.get_factor_views() if self.parser else {}) or {}
             g_view = fv.get('growth', {})
             v_view = fv.get('value', {})
             q_view = fv.get('quality', {})
@@ -1535,7 +1546,7 @@ class RVContentGenerator:
             style_signal = 'BALANCED'
 
         # Derive preferencia from factor views
-        fv_pref = self.parser.get_factor_views() if self.parser else {}
+        fv_pref = ((self.parser.get_factor_views() if self.parser else {}) or {}) or {}
         pref_parts = []
         for fname in ('quality', 'value', 'growth', 'momentum'):
             fdata = fv_pref.get(fname, {})
@@ -1696,7 +1707,7 @@ class RVContentGenerator:
         spread_ytd = size_spread.get('ytd')
 
         # Get size view from council parser
-        fv = self.parser.get_factor_views() if self.parser else {}
+        fv = ((self.parser.get_factor_views() if self.parser else {}) or {}) or {}
         size_view_data = None
         for key in ('size small', 'size (small)', 'small cap', 'size'):
             if key in fv:
@@ -1762,7 +1773,7 @@ class RVContentGenerator:
             )
         else:
             # Fallback: build from parser factor views
-            fv = self.parser.get_factor_views() if self.parser else {}
+            fv = (self.parser.get_factor_views() if self.parser else {}) or {}
             ow_factors = [f.capitalize() for f, d in fv.items() if d.get('view') == 'OW']
             if ow_factors:
                 rationale = f"Preferencia: {', '.join(ow_factors)}."
@@ -1773,7 +1784,7 @@ class RVContentGenerator:
                 rationale = ""
 
         # Build recommendation from factor views
-        fv_rec = self.parser.get_factor_views() if self.parser else {}
+        fv_rec = (self.parser.get_factor_views() if self.parser else {}) or {}
         ow_list = [f.capitalize() for f, d in fv_rec.items() if d.get('view') == 'OW']
         recomendacion = ' + '.join(ow_list) if ow_list else 'NEUTRAL'
 
@@ -1828,7 +1839,7 @@ class RVContentGenerator:
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
 
         # Try to get US view from council parser
-        equity_views = self.parser.get_equity_views()
+        equity_views = self.parser.get_equity_views() or {}
         us_council_view = self._find_equity_view(equity_views, ['usa', 'estados unidos', 'us', 'eeuu']) or {}
         view = us_council_view.get('view', 'N') if us_council_view else 'N'
         cambio = '='
@@ -1880,7 +1891,7 @@ class RVContentGenerator:
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
 
         # Get Europe view from council parser
-        equity_views = self.parser.get_equity_views()
+        equity_views = self.parser.get_equity_views() or {}
         eu_council_view = self._find_equity_view(equity_views, ['europa', 'europe']) or {}
 
         eq_target = self._get_equity_target('eurostoxx')
@@ -1928,7 +1939,7 @@ class RVContentGenerator:
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
 
         # Get EM view from council parser
-        equity_views = self.parser.get_equity_views()
+        equity_views = self.parser.get_equity_views() or {}
         em_council_view = self._find_equity_view(equity_views, ['em', 'emergentes', 'emerging']) or {}
 
         eq_target = self._get_equity_target('csi300')  # EM proxy
@@ -1981,7 +1992,7 @@ class RVContentGenerator:
         pe_str = self._fmt(pe, 'x') if pe else 'N/D'
 
         # Get Japan view from council parser
-        equity_views = self.parser.get_equity_views()
+        equity_views = self.parser.get_equity_views() or {}
         jp_council_view = self._find_equity_view(equity_views, ['japón', 'japon', 'japan', 'japn']) or {}
 
         eq_target = self._get_equity_target('nikkei')
@@ -2070,7 +2081,7 @@ class RVContentGenerator:
 
         # Fallback: use council equity view for Chile
         if not parts:
-            ev = self.parser.get_equity_views() if self.parser else {}
+            ev = (self.parser.get_equity_views() if self.parser else {}) or {}
             chile_ev = ev.get('chile', {})
             if chile_ev.get('view'):
                 narrativa = f"Chile: {chile_ev['view']}."
@@ -2098,7 +2109,7 @@ class RVContentGenerator:
         usdclp_chg = f" ({usdclp_1m:+.1f}% 1M, {usdclp_ytd:+.1f}% YTD)" if usdclp_1m is not None and usdclp_ytd is not None else ''
 
         # Get Chile view from council parser
-        equity_views = self.parser.get_equity_views()
+        equity_views = self.parser.get_equity_views() or {}
         cl_council_view = equity_views.get('chile', {}) if equity_views else {}
 
         eq_target = self._get_equity_target('ipsa')

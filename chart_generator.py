@@ -1202,13 +1202,15 @@ class MacroChartsGenerator:
         charts['latam_rates'] = self._generate_latam_rates()
         charts['epu_geopolitics'] = self._generate_epu_geopolitics()
 
-        # Track data sources for each chart by detecting "(datos" in SVG title
+        # Track data sources for each chart by detecting markers in SVG content
         for name, svg in charts.items():
             if not svg:
                 self.chart_sources[name] = 'error'
-            elif 'datos reales' in svg or 'datos FRED' in svg or 'datos BCCh' in svg or 'datos Bloomberg' in svg:
+            elif any(m in svg for m in ['datos reales', 'datos FRED', 'datos BCCh',
+                                         'datos Bloomberg', '(datos real', 'real BCCh',
+                                         'real FRED']):
                 self.chart_sources[name] = 'real'
-            elif 'último real' in svg or 'partial' in svg.lower():
+            elif 'ltimo real' in svg or 'partial' in svg.lower():
                 self.chart_sources[name] = 'partial'
             elif 'ESTIMADO' in svg:
                 self.chart_sources[name] = 'fallback'
