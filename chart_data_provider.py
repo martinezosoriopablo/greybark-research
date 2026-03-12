@@ -711,6 +711,24 @@ class ChartDataProvider:
         return result if len(result) >= 2 else None
 
     # =========================================================================
+    # CHINA PMI (AKShare NBS — fallback when Bloomberg unavailable)
+    # =========================================================================
+
+    def get_china_pmi_akshare(self) -> Optional[Dict[str, float]]:
+        """Get latest China PMI values from AKShare (NBS). Returns dict with latest values, not time series."""
+        try:
+            data = self.akshare.get_pmi()
+            if data and isinstance(data, dict):
+                result = {}
+                for key in ['pmi_mfg', 'pmi_svc', 'caixin_mfg', 'caixin_svc']:
+                    if key in data and data[key] is not None:
+                        result[key] = float(data[key])
+                return result if result else None
+        except Exception as e:
+            print(f"[ChartDataProvider] AKShare China PMI failed: {e}")
+        return None
+
+    # =========================================================================
     # CHINA TRADE (Bloomberg)
     # =========================================================================
 
