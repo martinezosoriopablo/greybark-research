@@ -938,7 +938,7 @@ class CouncilDataCollector:
             'daily_context': daily,
             'regime': quant.get('regime', {}),
             'commodities': quant.get('chile_extended', {}).get('commodities', {}),
-            'epu': quant.get('china', {}).get('epu_signal', {}),
+            'epu': quant.get('china', {}).get('epu_analysis', {}),
             'volatility_epu': quant.get('international', {}).get('volatility_epu', {}),
             'leading_indicators': quant.get('leading_indicators', {}),
             'international': quant.get('international', {}),

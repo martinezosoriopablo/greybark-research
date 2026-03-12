@@ -55,20 +55,20 @@ MACRO_MANIFEST: List[DataField] = [
     # --- IMPORTANT ---
     DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT, min_value=-2.0, max_value=10.0),
     DataField("inflation.breakeven_10y", "Breakeven 10Y USA", "FRED:T10YIE", "%", FieldPriority.IMPORTANT, min_value=-1.0, max_value=8.0),
-    DataField("macro_usa.ism_manufacturing", "ISM Manufacturing", "FRED:ISM/PMI", "index", FieldPriority.IMPORTANT, min_value=20.0, max_value=80.0),
+    DataField("bbg_pmi.usa_mfg", "ISM/PMI Manufacturing USA (Bloomberg)", "Bloomberg:PMI", "index", FieldPriority.IMPORTANT, min_value=20.0, max_value=80.0),
     DataField("macro_usa.payrolls", "ADP/NFP Employment", "FRED:PAYEMS", "K", FieldPriority.IMPORTANT, min_value=-2000.0, max_value=5000.0),
-    DataField("macro_usa.jolts", "JOLTS Job Openings", "FRED:JTSJOL", "M", FieldPriority.IMPORTANT, min_value=0.0, max_value=15.0),
+    DataField("macro_usa.jolts", "JOLTS Job Openings", "FRED:JTSJOL", "M", FieldPriority.OPTIONAL, min_value=0.0, max_value=15.0),  # Not in macro_usa module yet
     DataField("rates.direction", "Expectativa de tasas Fed", "internal:rate_expectations", "label", FieldPriority.IMPORTANT),
     DataField("rates.cuts_expected", "Cortes esperados Fed", "internal:rate_expectations", "#", FieldPriority.IMPORTANT, min_value=-5.0, max_value=15.0),
     DataField("fiscal.deficit_gdp", "Deficit fiscal USA (% GDP)", "FRED:fiscal", "%", FieldPriority.IMPORTANT, min_value=-20.0, max_value=5.0),
     DataField("fiscal.debt_gdp", "Deuda publica USA (% GDP)", "FRED:fiscal", "%", FieldPriority.IMPORTANT, min_value=30.0, max_value=200.0),
     DataField("china.credit_impulse", "Impulso crediticio China", "internal:china_credit", "index", FieldPriority.IMPORTANT),
-    DataField("china.epu_analysis.epu_level", "China EPU Index", "FRED:CHINAEPUINDXM", "index", FieldPriority.IMPORTANT, min_value=0.0, max_value=2000.0),
+    DataField("china.epu_analysis.level", "China EPU Level", "FRED:CHINAEPUINDXM", "label", FieldPriority.IMPORTANT),
     # EEE Expectations (BCCh Encuesta de Expectativas Economicas)
-    DataField("chile_eee.ipc_12m", "Exp. inflacion Chile 12M (EEE)", "BCCh:F089.IPC.V12.Z.M", "%", FieldPriority.IMPORTANT),
+    DataField("chile_eee.ipc_12m", "Exp. inflacion Chile 12M (EEE)", "BCCh:F089.IPC.V12.Z.M", "%", FieldPriority.OPTIONAL),  # BCCh series often delayed
     DataField("chile_eee.tpm_11m", "Exp. TPM 11 meses (EEE)", "BCCh:F089.TPM.TAS.14.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.tpm_lp", "Exp. TPM largo plazo (tasa neutral)", "BCCh:F089.TPM.TAS.LP.M", "%", FieldPriority.IMPORTANT),
-    DataField("chile_eee.pib_actual", "Exp. PIB Chile año actual (EEE)", "BCCh:F089.PIB.VAR.Z.M", "%", FieldPriority.IMPORTANT),
+    DataField("chile_eee.pib_actual", "Exp. PIB Chile año actual (EEE)", "BCCh:F089.PIB.VAR.Z.M", "%", FieldPriority.OPTIONAL),  # BCCh series often delayed
     DataField("chile_eee.pib_lp", "Exp. PIB largo plazo (potencial)", "BCCh:F089.PIB.V12.LP.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.ipc_lp", "Exp. inflacion largo plazo (ancla)", "BCCh:F089.IPC.V12.LP.M", "%", FieldPriority.IMPORTANT),
     # IMCE Business Confidence (BCCh)
@@ -90,10 +90,10 @@ MACRO_MANIFEST: List[DataField] = [
     DataField("chile_ipc_detail.ipc_bienes", "IPC Bienes Chile", "BCCh:F074.IPCB", "%", FieldPriority.IMPORTANT),
     DataField("chile_ipc_detail.ipc_energia", "IPC Energia Chile", "BCCh:F074.IPCE", "%", FieldPriority.IMPORTANT),
     # EEE additional horizons
-    DataField("chile_eee.ipc_24m", "Exp. inflacion Chile 24M (EEE)", "BCCh:F089.IPC.V24.Z.M", "%", FieldPriority.IMPORTANT),
+    DataField("chile_eee.ipc_24m", "Exp. inflacion Chile 24M (EEE)", "BCCh:F089.IPC.V24.Z.M", "%", FieldPriority.OPTIONAL),  # BCCh series often delayed
     DataField("chile_eee.tpm_23m", "Exp. TPM 23 meses (EEE)", "BCCh:F089.TPM.TAS.15.M", "%", FieldPriority.IMPORTANT),
     DataField("chile_eee.tpm_prox_reunion", "Exp. TPM prox reunion (EEE)", "BCCh:F089.TPM.TAS.11.M", "%", FieldPriority.IMPORTANT),
-    DataField("chile_eee.tcn_12m", "Exp. USD/CLP 12M (EEE)", "BCCh:F089.TCN.VAL.Z.M", "CLP", FieldPriority.IMPORTANT),
+    DataField("chile_eee.tcn_12m", "Exp. USD/CLP 12M (EEE)", "BCCh:F089.TCN.VAL.Z.M", "CLP", FieldPriority.OPTIONAL),  # BCCh series often delayed
     # Leading Economic Indicators (FRED)
     DataField("leading_indicators.lei_usa", "LEI USA (OECD CLI)", "FRED:USALOLITOAASTSAM", "index", FieldPriority.IMPORTANT),
     DataField("leading_indicators.lei_eurozone", "LEI Eurozone (Biz Confidence)", "FRED:BSCICP02EZM460S", "index", FieldPriority.IMPORTANT),
