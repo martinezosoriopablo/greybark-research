@@ -166,17 +166,17 @@ RV_MANIFEST: List[DataField] = [
 RF_MANIFEST: List[DataField] = [
     # --- REQUIRED ---
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
-    DataField("rf_data.yield_curve", "Curva UST (2Y/5Y/10Y/30Y)", "FRED:DGS*", "dict", FieldPriority.REQUIRED),
     DataField("rates.fed_expectations", "Expectativas Fed", "internal:rate_expectations", "dict", FieldPriority.REQUIRED),
-    DataField("rf_data.credit_spreads", "IG spread + HY spread", "FRED:BAMLC0A0CM/HY", "bps", FieldPriority.REQUIRED),
+    DataField("rates.terminal_rate", "Fed Funds Rate terminal", "internal:rate_expectations", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
+    DataField("bonds_intl", "Bonos 10Y internacionales (incl UST)", "BCCh:international_bonds", "dict", FieldPriority.REQUIRED),
     DataField("chile_extended.spc_curve", "BCP + BCU curva Chile", "BCCh:SPC", "dict", FieldPriority.REQUIRED),
     DataField("chile.tpm", "TPM Chile", "BCCh:TPM", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
     # --- IMPORTANT ---
     DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT, min_value=-2.0, max_value=10.0),
     DataField("inflation.breakeven_10y", "Breakeven 10Y USA", "FRED:T10YIE", "%", FieldPriority.IMPORTANT, min_value=-1.0, max_value=8.0),
     DataField("inflation.real_rate_10y", "TIPS real yield 10Y", "FRED:DFII10", "%", FieldPriority.IMPORTANT, min_value=-3.0, max_value=8.0),
-    DataField("rf_data.inflation", "Inflation analytics RF", "FRED:inflation", "dict", FieldPriority.IMPORTANT),
-    DataField("bonds_intl", "Bonos 10Y internacionales", "BCCh:international_bonds", "dict", FieldPriority.IMPORTANT),
+    DataField("inflation", "Inflation analytics RF", "FRED:inflation", "dict", FieldPriority.IMPORTANT),
+    DataField("bbg_credit_spreads", "Credit spreads IG/HY Bloomberg", "Bloomberg:Credit_Spreads", "dict", FieldPriority.IMPORTANT),
     DataField("fiscal.deficit_gdp", "Deficit fiscal USA", "FRED:fiscal", "%", FieldPriority.IMPORTANT, min_value=-20.0, max_value=5.0),
     # BCRP EMBI + Bloomberg curves (via bloomberg_reader → bcrp_embi_client.py + Bloomberg)
     DataField("bloomberg_context", "EMBI spreads (BCRP) + Bund/Gilt/JGB curvas + EM credit", "BCRP:EMBI+Bloomberg:intl_curves", "text", FieldPriority.IMPORTANT),
@@ -202,7 +202,7 @@ RF_MANIFEST: List[DataField] = [
     DataField("bbg_cds", "CDS Soberanos 5Y (14 paises)", "Bloomberg:CDS", "dict", FieldPriority.IMPORTANT),
     DataField("bbg_intl_curves", "Bund/Gilt/JGB curvas", "Bloomberg:Intl_Curves", "dict", FieldPriority.OPTIONAL),
     # --- OPTIONAL ---
-    DataField("rf_data.tpm_expectations", "Expectativas TPM Chile", "internal:tpm_expectations", "dict", FieldPriority.OPTIONAL),
+    DataField("rates.tpm_expectations", "Expectativas TPM Chile", "internal:tpm_expectations", "dict", FieldPriority.OPTIONAL),
     DataField("chile_extended.eof_expectations.tc_28d", "Exp. USD/CLP 28 dias (EOF)", "BCCh:F089.EOF.TC.28DA", "CLP", FieldPriority.OPTIONAL),
     DataField("chile_extended.eof_expectations.tc_3m", "Exp. USD/CLP 3 meses (EOF)", "BCCh:F089.EOF.TC.7MA", "CLP", FieldPriority.OPTIONAL),
 ]
@@ -212,8 +212,8 @@ RIESGO_MANIFEST: List[DataField] = [
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
     DataField("risk.vix", "VIX actual", "yfinance:^VIX", "index", FieldPriority.REQUIRED, min_value=5.0, max_value=100.0),
     DataField("risk.scorecard", "Risk scorecard (percentiles)", "internal:risk_metrics", "dict", FieldPriority.REQUIRED),
-    DataField("risk.max_drawdown", "Max drawdown portfolio", "internal:risk_metrics", "%", FieldPriority.REQUIRED, min_value=-100.0, max_value=0.0),
-    DataField("risk.current_drawdown", "Drawdown actual", "internal:risk_metrics", "%", FieldPriority.REQUIRED, min_value=-100.0, max_value=0.0),
+    DataField("risk.max_drawdown", "Max drawdown portfolio", "internal:risk_metrics", "%", FieldPriority.REQUIRED, min_value=-100.0, max_value=100.0),
+    DataField("risk.current_drawdown", "Drawdown actual", "internal:risk_metrics", "%", FieldPriority.REQUIRED, min_value=-100.0, max_value=100.0),
     # --- IMPORTANT ---
     DataField("equity_risk", "Equity risk metrics", "yfinance:equity_risk", "dict", FieldPriority.IMPORTANT),
     DataField("equity_credit", "Credit spread metrics", "yfinance/FRED:credit", "dict", FieldPriority.IMPORTANT),
