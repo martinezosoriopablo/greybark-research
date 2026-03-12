@@ -1926,6 +1926,9 @@ class AssetAllocationContentGenerator:
                 'chile': 'Chile',
                 'em ex-china': 'EM ex-China', 'em': 'EM ex-China',
                 'china': 'China',
+                'japón': 'Japón', 'japon': 'Japón', 'japan': 'Japón',
+                'brasil': 'Brasil', 'brazil': 'Brasil',
+                'méxico': 'México', 'mexico': 'México',
             }
             for key, info in eq_views.items():
                 label = region_map.get(key.lower(), key)
@@ -2392,23 +2395,49 @@ class AssetAllocationContentGenerator:
         }
 
     def _extract_commodity_views(self) -> Dict[str, str]:
-        """Extract commodity OW/UW/NEUTRAL from council text."""
+        """Extract commodity OW/UW/NEUTRAL from council text.
+
+        Strategy: first check the recommendation table (most reliable),
+        then fall back to narrower context search (±40 chars after commodity name).
+        """
         views = {}
         if not self._has_council():
             return views
-        final = (self._final() + ' ' + self._cio() + ' ' + self._panel('macro')).lower()
-        for comm, patterns in [('Cobre', ['copper', 'cobre']),
-                                ('Oro', ['gold', 'oro']),
-                                ('Petróleo', ['oil', 'petróleo', 'petroleo', 'wti', 'brent'])]:
+
+        final_text = self._final()
+
+        # Strategy 1: Parse recommendation table rows (e.g., "| Oro y alternativos | 10% | OW |")
+        for comm, patterns in [('Cobre', ['cobre', 'copper']),
+                                ('Oro', ['oro', 'gold']),
+                                ('Petróleo', ['petróleo', 'petroleo', 'oil', 'wti', 'brent'])]:
             for pat in patterns:
-                idx = final.find(pat)
+                # Look for table row: | {pat}... | ... | OW/UW/N |
+                table_re = re.compile(
+                    r'\|\s*[^|]*' + re.escape(pat) + r'[^|]*\|[^|]*\|\s*(OW|UW|Neutral|N)\b',
+                    re.IGNORECASE
+                )
+                m = table_re.search(final_text)
+                if m:
+                    raw = m.group(1).upper().strip()
+                    if raw in ('OW', 'UW', 'N', 'NEUTRAL'):
+                        views[comm] = 'NEUTRAL' if raw in ('N', 'NEUTRAL') else raw
+                    break
+
+        # Strategy 2: Narrow context search for any not yet found
+        combined = (final_text + ' ' + self._cio() + ' ' + self._panel('macro')).lower()
+        for comm, patterns in [('Cobre', ['cobre', 'copper']),
+                                ('Oro', ['oro', 'gold']),
+                                ('Petróleo', ['petróleo', 'petroleo', 'oil', 'wti', 'brent'])]:
+            if comm in views:
+                continue
+            for pat in patterns:
+                idx = combined.find(pat)
                 if idx >= 0:
-                    context = final[max(0, idx - 100):idx + 100]
-                    if any(w in context for w in ['ow', 'sobrepon', 'overweight', 'bullish',
-                                                   'alcista', 'comprar', 'long']):
+                    # Use narrow window: only 40 chars after the keyword (not before)
+                    context = combined[idx:idx + 60]
+                    if any(w in context for w in ['ow', 'sobrepon', 'overweight']):
                         views[comm] = 'OW'
-                    elif any(w in context for w in ['uw', 'subpon', 'underweight', 'bearish',
-                                                     'bajista', 'vender', 'short', 'reducir']):
+                    elif any(w in context for w in ['uw', 'subpon', 'underweight']):
                         views[comm] = 'UW'
                     else:
                         views[comm] = 'NEUTRAL'
@@ -2739,11 +2768,11 @@ class AssetAllocationContentGenerator:
         ig_view = 'N/D'
         hy_view = 'N/D'
         if fi_views:
-            for k in ['ig', 'investment grade', 'ig credit']:
+            for k in ['ig', 'investment grade', 'ig credit', 'ig corporate']:
                 if k in fi_views:
                     ig_view = fi_views[k].get('view', 'N/D')
                     break
-            for k in ['hy', 'high yield', 'hy credit']:
+            for k in ['hy', 'high yield', 'hy credit', 'hy corporate']:
                 if k in fi_views:
                     hy_view = fi_views[k].get('view', 'N/D')
                     break

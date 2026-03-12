@@ -496,8 +496,11 @@ _provenance_records: List[dict] = []
 
 
 def get_provenance_records() -> List[dict]:
-    """Get accumulated provenance records from narrative generation."""
-    return list(_provenance_records)
+    """Get accumulated provenance records, deduplicated by key."""
+    seen = {}
+    for rec in _provenance_records:
+        seen[rec.get('key', id(rec))] = rec  # last value wins
+    return list(seen.values())
 
 
 def clear_provenance_records():

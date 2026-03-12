@@ -1185,9 +1185,11 @@
             {{risks_html}}
 
             <!-- Risk Matrix Chart -->
+            {% if chart_risk_matrix %}
             <div style="text-align: center; margin: 20px 0;">
                 <img src="{{chart_risk_matrix}}" style="width:100%; max-width:750px; border-radius:5px;" alt="Risk Matrix">
             </div>
+            {% endif %}
         </section>
 
         <!-- 8. CONCLUSIONES -->
@@ -1212,7 +1214,11 @@
 
         <!-- Glosario -->
         <section class="glossary-section">
-            <h2 class="section-title">Glosario de Términos</h2>
+            <div class="glossary-toggle" onclick="var c=this.nextElementSibling;c.classList.toggle('open');this.querySelector('.glossary-toggle-icon').textContent=c.classList.contains('open')?'&#9650;':'&#9660;';" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:2px solid var(--accent-orange,#dd6b20);">
+                <h2 class="section-title" style="margin:0; border:none; padding:0;">Glosario de Términos</h2>
+                <span class="glossary-toggle-icon" style="font-size:14pt; color:var(--accent-orange,#dd6b20);">&#9660;</span>
+            </div>
+            <div class="glossary-content" style="display:none;">
             <div class="glossary-grid">
                 <div class="glossary-item">
                     <div class="glossary-term">PMI (Purchasing Managers' Index)</div>
@@ -1279,13 +1285,15 @@
                     <div class="glossary-def">Seasonally Adjusted Annual Rate — tasa anualizada con ajuste estacional, usada en datos trimestrales de EE.UU.</div>
                 </div>
             </div>
+            </div>
         </section>
+        <style>.glossary-content.open, .glossary-content[style*="display:none"].open { display:block !important; }</style>
 
         <!-- Footer -->
         <footer class="footer">
             <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Macro | {{fecha_reporte}}</div>
             <div class="disclaimer">
-                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion. Las proyecciónes y estimaciónes contenidas en este reporte estan basadas en supuestos que pueden no materializarse. El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
+                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion. Las proyecciones y estimaciones contenidas en este reporte estan basadas en supuestos que pueden no materializarse. El desempeño pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
             </div>
         </footer>
     </div>

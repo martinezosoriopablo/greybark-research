@@ -65,6 +65,7 @@ EQUITY_UNIVERSE = {
     'eurostoxx': {'ticker': 'FEZ', 'name': 'EuroStoxx 50',  'region': 'europe', 'erp': 4.5},
     'nikkei':    {'ticker': 'EWJ', 'name': 'Nikkei 225',    'region': 'japan',  'erp': 4.5},
     'csi300':    {'ticker': 'MCHI', 'name': 'CSI 300/China', 'region': 'china',  'erp': 6.0},
+    'msci_em':   {'ticker': 'EEM', 'name': 'MSCI EM',       'region': 'em',     'erp': 5.5},
     'ipsa':      {'ticker': 'ECH', 'name': 'IPSA/Chile',    'region': 'chile',  'erp': 6.0},
     'bovespa':   {'ticker': 'EWZ', 'name': 'Bovespa',       'region': 'brazil', 'erp': 6.0},
 }

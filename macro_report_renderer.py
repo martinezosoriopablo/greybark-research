@@ -13,12 +13,22 @@ Para el reporte de Asset Allocation con OW/UW, ver asset_allocation_renderer.py
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
 from jinja2 import Environment, FileSystemLoader, Undefined
+
+
+def _md_to_html_inline(text: str) -> str:
+    """Convert markdown bold/italic to HTML inline."""
+    if not text or not isinstance(text, str):
+        return text or ''
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    return text
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
@@ -117,6 +127,9 @@ class MacroReportRenderer:
 
         # Append data provenance div (hidden, for audit)
         html = self._append_provenance(html)
+
+        # Convert any remaining markdown bold/italic to HTML
+        html = _md_to_html_inline(html)
 
         # Strip all N/D from final output
         from html_nd_cleaner import clean_nd
@@ -522,7 +535,7 @@ class MacroReportRenderer:
                     </span>
                 </div>
                 <p style="margin: 10px 0; color: #4a5568;">{r.get("descripcion", r.get("horizonte", ""))}</p>
-                <p style="font-size: 9pt; color: #718096;"><strong>Monitoreo:</strong> {r.get("senal_temprana", r.get("monitoreo", "N/D"))}</p>
+                {'<p style="font-size: 9pt; color: #718096;"><strong>Horizonte:</strong> ' + monitoreo_val + '</p>' if (monitoreo_val := r.get("senal_temprana", r.get("monitoreo", ""))) and monitoreo_val != r.get("nombre", "") else ''}
             </div>'''
         if narrativa and not risk_list:
             risks_html = f'<p style="color:#4a5568;">{narrativa}</p>'

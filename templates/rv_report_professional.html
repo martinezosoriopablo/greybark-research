@@ -1006,7 +1006,11 @@
                     .glossary-section { page-break-inside: avoid; }
                 }
             </style>
-            <div class="glossary-title">Glosario de Terminos</div>
+            <div class="glossary-toggle" onclick="var c=this.nextElementSibling;c.classList.toggle('open');this.querySelector('.glossary-toggle-icon').textContent=c.classList.contains('open')?'&#9650;':'&#9660;';" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding-bottom:6px; margin-bottom:14px; border-bottom:2px solid var(--accent,#dd6b20);">
+                <div class="glossary-title" style="border:none; padding:0; margin:0;">Glosario de Terminos</div>
+                <span class="glossary-toggle-icon" style="font-size:14pt; color:var(--accent,#dd6b20);">&#9660;</span>
+            </div>
+            <div class="glossary-content" style="display:none;">
             <div class="glossary-grid">
                 <div class="glossary-item"><strong>OW / UW:</strong> Overweight (sobreponderacion) / Underweight (subponderacion) — indica si un activo tiene mayor o menor peso que su benchmark.</div>
                 <div class="glossary-item"><strong>P/E (Price-to-Earnings):</strong> Relacion precio/ganancias. P/E alto puede indicar sobrevaluacion relativa.</div>
@@ -1025,7 +1029,9 @@
                 <div class="glossary-item"><strong>IPSA:</strong> Indice de Precio Selectivo de Acciones — principal indice bursatil de Chile (30 acciones mas liquidas).</div>
                 <div class="glossary-item"><strong>MSCI EM:</strong> Morgan Stanley Capital International Emerging Markets — indice de acciones de mercados emergentes.</div>
             </div>
+            </div>
         </section>
+        <style>.glossary-content.open, .glossary-content[style*="display:none"].open { display:block !important; }</style>
 
         <!-- Footer -->
         <footer class="footer">

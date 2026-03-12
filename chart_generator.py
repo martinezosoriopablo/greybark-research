@@ -1104,7 +1104,12 @@ class MacroChartsGenerator:
 
         # 6. Risk Matrix
         if 'escenarios_riesgos' in content:
-            risks = content['escenarios_riesgos'].get('top_risks', [])
+            risks_raw = content['escenarios_riesgos'].get('top_risks', [])
+            # Handle both list and dict format (dict wraps list in 'riesgos' key)
+            if isinstance(risks_raw, dict):
+                risks = risks_raw.get('riesgos', [])
+            else:
+                risks = risks_raw
             if risks:
                 _safe_chart('risk_matrix',
                             lambda: self.chart_gen.generate_risk_matrix(risks))

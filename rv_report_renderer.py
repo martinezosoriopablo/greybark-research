@@ -12,12 +12,22 @@ Produce el reporte final con analisis sectorial, valorizaciones y views.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
 from jinja2 import Environment, FileSystemLoader, Undefined
+
+
+def _md_to_html_inline(text: str) -> str:
+    """Convert markdown bold/italic to HTML inline."""
+    if not text or not isinstance(text, str):
+        return text or ''
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    return text
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -107,6 +117,13 @@ class RVReportRenderer:
 
         # Append data provenance div (hidden, for audit)
         html = self._append_provenance(html)
+
+        # Convert any remaining markdown bold/italic to HTML
+        html = _md_to_html_inline(html)
+
+        # Clean up truncated text and unresolved placeholders (Bug #4)
+        html = re.sub(r'\[BLOQUE:\s*[^\]]*\]', '', html)
+        html = re.sub(r'<strong>[A-ZÁÉÍÓÚÑ]{2,6}</strong>\s*$', '', html, flags=re.MULTILINE)
 
         # Strip all N/D from final output
         from html_nd_cleaner import clean_nd

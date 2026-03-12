@@ -882,7 +882,11 @@
 
         <!-- Glosario -->
         <section class="glossary-section">
-            <h2>Glosario de Terminos</h2>
+            <div class="glossary-toggle" onclick="var c=this.nextElementSibling;c.classList.toggle('open');this.querySelector('.glossary-toggle-icon').textContent=c.classList.contains('open')?'&#9650;':'&#9660;';" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:2px solid var(--accent,#dd6b20);">
+                <h2 style="margin:0; font-size:11pt; font-weight:700;">Glosario de Terminos</h2>
+                <span class="glossary-toggle-icon" style="font-size:14pt; color:var(--accent,#dd6b20);">&#9660;</span>
+            </div>
+            <div class="glossary-content" style="display:none;">
             <div class="glossary-grid">
                 <div class="glossary-item">
                     <span class="glossary-term">OW / UW: </span>
@@ -985,7 +989,9 @@
                     <span class="glossary-def">Tasa de interes nominal menos inflacion. Tasa real positiva = el rendimiento supera la perdida de poder adquisitivo.</span>
                 </div>
             </div>
+            </div>
         </section>
+        <style>.glossary-content.open, .glossary-content[style*="display:none"].open { display:block !important; }</style>
 
         <!-- Footer -->
         <footer class="footer">

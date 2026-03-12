@@ -108,6 +108,10 @@ class RVContentGenerator:
         text = re.sub(r'^\s*[-•]\s+', '• ', text, flags=re.MULTILINE)
         # Numbered lists: 1. item → <br>1. item
         text = re.sub(r'^\s*(\d+)\.\s+', r'\1. ', text, flags=re.MULTILINE)
+        # Remove unresolved BLOQUE placeholders and truncated text
+        text = re.sub(r'\[BLOQUE:\s*[^\]]*\]', '', text)
+        # Remove truncated bold tags (e.g., **ANÁLI at end of text)
+        text = re.sub(r'\*\*[A-ZÁÉÍÓÚÑ]{2,10}$', '', text)
         # Line breaks
         text = text.replace('\n\n', '<br><br>').replace('\n', '<br>')
         return text
@@ -1942,7 +1946,7 @@ class RVContentGenerator:
         equity_views = self.parser.get_equity_views() or {}
         em_council_view = self._find_equity_view(equity_views, ['em', 'emergentes', 'emerging']) or {}
 
-        eq_target = self._get_equity_target('csi300')  # EM proxy
+        eq_target = self._get_equity_target('msci_em')
 
         result = {
             'mercado': 'Emergentes',

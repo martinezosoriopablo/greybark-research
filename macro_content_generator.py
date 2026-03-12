@@ -2181,7 +2181,7 @@ class MacroContentGenerator:
                 'probabilidad': f"{r['probability']}" if r.get('probability') else 'N/D',
                 'impacto': r.get('impact', 'N/D'),
                 'horizonte': r.get('horizon', 'N/D'),
-                'monitoreo': r.get('risk', ''),
+                'senal_temprana': r.get('horizon', ''),
             })
 
         return {

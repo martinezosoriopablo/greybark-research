@@ -12,12 +12,22 @@ Produce el reporte final con recomendaciones OW/UW listo para cliente.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
 from jinja2 import Environment, FileSystemLoader, Undefined
+
+
+def _md_to_html_inline(text: str) -> str:
+    """Convert markdown bold/italic to HTML inline."""
+    if not text or not isinstance(text, str):
+        return text or ''
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    return text
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
@@ -119,6 +129,9 @@ class AssetAllocationRenderer:
         # Append data provenance div (hidden, for audit)
         html = self._append_provenance(html)
 
+        # Convert any remaining markdown bold/italic to HTML
+        html = _md_to_html_inline(html)
+
         # Strip all N/D from final output
         from html_nd_cleaner import clean_nd
         html = clean_nd(html)
@@ -184,7 +197,7 @@ class AssetAllocationRenderer:
         # Key points
         kp_html = ''.join([f'<li>{kp}</li>' for kp in resumen['key_points']])
         replacements['{{key_points_html}}'] = kp_html
-        replacements['{{catalizador}}'] = resumen['catalizador']
+        replacements['{{catalizador}}'] = resumen['catalizador'].strip(' |')
 
         # 2. DASHBOARD DE POSICIONAMIENTO
         dashboard = content.get('dashboard', {})
