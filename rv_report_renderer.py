@@ -22,11 +22,18 @@ from jinja2 import Environment, FileSystemLoader, Undefined
 
 
 def _md_to_html_inline(text: str) -> str:
-    """Convert markdown bold/italic to HTML inline."""
+    """Convert markdown bold/italic to HTML inline, preserving <style> blocks."""
     if not text or not isinstance(text, str):
         return text or ''
+    styles = []
+    def _save_style(m):
+        styles.append(m.group(0))
+        return f'__STYLE_BLOCK_{len(styles)-1}__'
+    text = re.sub(r'<style[^>]*>.*?</style>', _save_style, text, flags=re.DOTALL)
     text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
     text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    for i, style in enumerate(styles):
+        text = text.replace(f'__STYLE_BLOCK_{i}__', style)
     return text
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -401,11 +408,7 @@ class RVReportRenderer:
                             <div class="metric-value">{r['pe_actual']}</div>
                         </div>
                         <div class="metric-box">
-                            <div class="metric-label">Target 12M</div>
-                            <div class="metric-value">{r['target_12m']}</div>
-                        </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Upside</div>
+                            <div class="metric-label">Retorno Esp. 12M</div>
                             <div class="metric-value" style="color: var(--success);">{r['upside']}</div>
                         </div>
                         <div class="metric-box">

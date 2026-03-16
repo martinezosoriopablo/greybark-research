@@ -217,6 +217,24 @@ class ChartDataProvider:
         except Exception:
             pass
 
+        # Consumo Privado (YoY variation series)
+        try:
+            cp_s = self.bcch.get_series('F033.CPR.V12.R.Z.2018.0.T', days_back=730)
+            if cp_s is not None and len(cp_s) >= 2:
+                result['consumo_privado_yoy'] = round(float(cp_s.iloc[-1]), 1)
+                result['consumo_privado_yoy_prev'] = round(float(cp_s.iloc[-2]), 1)
+        except Exception:
+            pass
+
+        # Formación Bruta de Capital Fijo (YoY variation series)
+        try:
+            fbcf_s = self.bcch.get_series('F033.FKF.V12.R.Z.2018.0.T', days_back=730)
+            if fbcf_s is not None and len(fbcf_s) >= 2:
+                result['fbcf_yoy'] = round(float(fbcf_s.iloc[-1]), 1)
+                result['fbcf_yoy_prev'] = round(float(fbcf_s.iloc[-2]), 1)
+        except Exception:
+            pass
+
         return result
 
     # =========================================================================

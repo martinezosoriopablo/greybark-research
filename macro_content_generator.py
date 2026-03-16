@@ -455,6 +455,9 @@ class MacroContentGenerator:
         if gdp_world_fc is None:
             gdp_world_fc = self._fc('gdp_forecasts', 'world', 'forecast_12m')
 
+        # Scenario-specific GDP adjustments (base=0, upside=+0.5pp, downside=-1.0pp)
+        gdp_adj = {'base': 0.0, 'upside': 0.5, 'downside': -1.0}
+
         # Build scenario rows from council data
         scenario_rows = []
         weighted_gdp_parts = []
@@ -469,12 +472,13 @@ class MacroContentGenerator:
             sc_type = self._classify_scenario(name)
             sp_val = sp_by_type.get(sc_type)
 
-            # GDP USA: use forecast engine if available, otherwise N/D
-            gdp_val = gdp_us_fc if gdp_us_fc is not None else None
+            # GDP USA: scenario-adjusted forecast
+            adj = gdp_adj.get(sc_type, 0.0)
+            gdp_val = round(gdp_us_fc + adj, 1) if gdp_us_fc is not None else None
             gdp_display = f'{gdp_val:.1f}%' if gdp_val is not None else 'N/D'
 
-            # GDP World: use IMF consensus or forecast engine, otherwise N/D
-            gdp_world_val = gdp_world_fc if gdp_world_fc is not None else None
+            # GDP World: scenario-adjusted forecast
+            gdp_world_val = round(gdp_world_fc + adj, 1) if gdp_world_fc is not None else None
             gdp_world_display = f'{gdp_world_val:.1f}%' if gdp_world_val is not None else 'N/D'
 
             # S&P 500: per-scenario index level
@@ -1734,8 +1738,10 @@ class MacroContentGenerator:
                 {'indicador': 'IMACEC', 'valor': imacec_str, 'anterior': self._fmt(cl.get('imacec_yoy_prev')), 'tendencia': '-'},
                 {'indicador': 'GDP Trim (t/t-4)', 'valor': self._fmt(cl.get('pib_trim_yoy'), '%'),
                  'anterior': self._fmt(cl.get('pib_trim_yoy_prev'), '%'), 'tendencia': '-'},
-                {'indicador': 'Consumo Privado', 'valor': 'N/D — sin serie BCCh', 'anterior': '-', 'tendencia': '-'},
-                {'indicador': 'Inversion (FBCF)', 'valor': 'N/D — sin serie BCCh', 'anterior': '-', 'tendencia': '-'},
+                {'indicador': 'Consumo Privado', 'valor': self._fmt(cl.get('consumo_privado_yoy'), '%') + ' a/a' if cl.get('consumo_privado_yoy') is not None else 'N/D',
+                 'anterior': self._fmt(cl.get('consumo_privado_yoy_prev'), '%'), 'tendencia': '-'},
+                {'indicador': 'Inversión (FBCF)', 'valor': self._fmt(cl.get('fbcf_yoy'), '%') + ' a/a' if cl.get('fbcf_yoy') is not None else 'N/D',
+                 'anterior': self._fmt(cl.get('fbcf_yoy_prev'), '%'), 'tendencia': '-'},
             ],
             'mercado_laboral': [
                 {'indicador': 'Tasa Desempleo', 'valor': desemp_str, 'anterior': self._fmt(cl.get('desempleo_prev'))},

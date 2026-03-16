@@ -646,11 +646,11 @@ def commodity_table(commodities: List[Dict]) -> str:
     for c in commodities:
         tb.add_row([
             fmt_bold(c.get("nombre", "")),
-            fmt_num(c.get("valor"), decimals=2),
+            fmt_num(c.get("valor", c.get("actual")), decimals=2),
             fmt_small(c.get("unidad", "")),
-            fmt_change(c.get("1m")),
-            fmt_change(c.get("3m")),
-            fmt_change(c.get("1y")),
+            fmt_change(c.get("1m", c.get("chg_1m"))),
+            fmt_change(c.get("3m", c.get("chg_3m"))),
+            fmt_change(c.get("1y", c.get("chg_1y"))),
         ])
     return tb.render()
 

@@ -982,7 +982,7 @@ class AssetAllocationContentGenerator:
         if tpm is None:
             tpm = self._q('chile', 'tpm')
         if ipc is None:
-            ipc = self._q('chile', 'ipc_yoy')
+            ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
         # Cobre fallback: quant_data (chile_rates or bcch_indices from equity data)
         if cobre is None:
             cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
@@ -1079,7 +1079,7 @@ class AssetAllocationContentGenerator:
             if tpm_val is not None:
                 tpm_str = f"{tpm_val}%"
         if ipc_str == 'N/D':
-            ipc_val = self._q('chile', 'ipc_yoy')
+            ipc_val = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
             if ipc_val is not None:
                 ipc_str = f"{ipc_val}%"
         cobre_val = self._q('equity', 'bcch_indices', 'copper', 'value')
@@ -1646,7 +1646,7 @@ class AssetAllocationContentGenerator:
         if tpm is None:
             tpm = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
         if ipc is None:
-            ipc = self._q('chile', 'ipc_yoy')
+            ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
         if cobre is None:
             cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
 
@@ -2078,7 +2078,7 @@ class AssetAllocationContentGenerator:
 
         # Chile: enrich with real TPM expectations — no hardcoded rates
         tpm_val = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
-        ipc_val = self._q('chile', 'ipc_yoy')
+        ipc_val = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
         carry_str = 'N/D'
         if tpm_val is not None and ipc_val is not None:
             carry_str = f'Tasa real: {tpm_val - ipc_val:.1f}% (TPM {tpm_val}% - IPC {ipc_val}%)'
@@ -2220,7 +2220,7 @@ class AssetAllocationContentGenerator:
         ig_bps = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
         hy_bps = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
         tpm = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
-        ipc = self._q('chile', 'ipc_yoy')
+        ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
 
         quant_parts = []
         if us_2y is not None:
@@ -2309,10 +2309,46 @@ class AssetAllocationContentGenerator:
             pares = []
             view_usd = 'N/D'
             fx_view_map = {'ALCISTA': 'OW', 'BAJISTA': 'UW', 'NEUTRAL': 'N'}
+
+            # Try to get spot USD/CLP for target computation
+            usdclp_spot = None
+            if usdclp_str != 'N/D':
+                try:
+                    usdclp_spot = float(usdclp_str)
+                except (ValueError, TypeError):
+                    pass
+
             for pair, info in fx_views.items():
                 raw_view = info.get('view', 'N/D')
-                target_3m = info.get('target_3m', info.get('target', 'N/D'))
+                target_3m = info.get('target_3m', 'N/D')
                 target_12m = info.get('target_12m', 'N/D')
+
+                # Compute targets from spot + view direction if not provided
+                if target_3m == 'N/D' and pair == 'USD/CLP' and usdclp_spot:
+                    if raw_view == 'ALCISTA':
+                        target_3m = f"{usdclp_spot * 1.03:.0f}"
+                        target_12m = f"{usdclp_spot * 1.05:.0f}"
+                    elif raw_view == 'BAJISTA':
+                        target_3m = f"{usdclp_spot * 0.97:.0f}"
+                        target_12m = f"{usdclp_spot * 0.95:.0f}"
+                    else:
+                        target_3m = f"{usdclp_spot:.0f}"
+                        target_12m = f"{usdclp_spot:.0f}"
+                elif target_3m == 'N/D' and pair == 'EUR/USD':
+                    if raw_view == 'ALCISTA':
+                        target_3m, target_12m = '1.10', '1.12'
+                    elif raw_view == 'BAJISTA':
+                        target_3m, target_12m = '1.04', '1.02'
+                    else:
+                        target_3m, target_12m = '1.07', '1.08'
+                elif target_3m == 'N/D' and pair == 'USD/CNY':
+                    if raw_view == 'ALCISTA':
+                        target_3m, target_12m = '7.35', '7.45'
+                    elif raw_view == 'BAJISTA':
+                        target_3m, target_12m = '7.10', '7.00'
+                    else:
+                        target_3m, target_12m = '7.20', '7.20'
+
                 pares.append({
                     'par': pair,
                     'view': raw_view,
@@ -2423,25 +2459,30 @@ class AssetAllocationContentGenerator:
                         views[comm] = 'NEUTRAL' if raw in ('N', 'NEUTRAL') else raw
                     break
 
-        # Strategy 2: Narrow context search for any not yet found
+        # Strategy 2: Scan ALL occurrences, pick strongest signal (OW/UW beats NEUTRAL)
         combined = (final_text + ' ' + self._cio() + ' ' + self._panel('macro')).lower()
         for comm, patterns in [('Cobre', ['cobre', 'copper']),
                                 ('Oro', ['oro', 'gold']),
                                 ('Petróleo', ['petróleo', 'petroleo', 'oil', 'wti', 'brent'])]:
             if comm in views:
                 continue
+            best = None
             for pat in patterns:
-                idx = combined.find(pat)
-                if idx >= 0:
-                    # Use narrow window: only 40 chars after the keyword (not before)
+                start = 0
+                while True:
+                    idx = combined.find(pat, start)
+                    if idx < 0:
+                        break
                     context = combined[idx:idx + 60]
                     if any(w in context for w in ['ow', 'sobrepon', 'overweight']):
-                        views[comm] = 'OW'
+                        best = 'OW'
+                        break
                     elif any(w in context for w in ['uw', 'subpon', 'underweight']):
-                        views[comm] = 'UW'
-                    else:
-                        views[comm] = 'NEUTRAL'
+                        best = 'UW'
+                    start = idx + len(pat)
+                if best == 'OW':
                     break
+            views[comm] = best if best else ('NEUTRAL' if self._has_council() else 'N/D')
         return views
 
     def _generate_tactical_actions(self) -> List[Dict[str, Any]]:
