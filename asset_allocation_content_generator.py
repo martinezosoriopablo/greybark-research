@@ -42,6 +42,7 @@ class AssetAllocationContentGenerator:
         # Cache parsed council data
         self._parsed_final = None
         self._parsed_cio = None
+        self._rf_views_cache = None  # Cache RF curva views for focus list
 
     @property
     def parser(self):
@@ -134,6 +135,39 @@ class AssetAllocationContentGenerator:
         if hy is not None:
             parts.append(f"OAS HY: {hy:.0f}bp")
         return ' | '.join(parts)
+
+    @staticmethod
+    def _clean_json(raw: str):
+        """Extract and parse JSON from LLM response, handling code fences and surrounding text."""
+        import json as _json
+        if not raw:
+            return None
+        cleaned = raw.strip()
+        # Remove code fences (```json ... ``` or ``` ... ```)
+        if cleaned.startswith('```'):
+            # Strip first line (```json or ```)
+            first_nl = cleaned.find('\n')
+            if first_nl > 0:
+                cleaned = cleaned[first_nl + 1:]
+            else:
+                cleaned = cleaned[3:]
+            if cleaned.endswith('```'):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+        # Try direct parse
+        try:
+            return _json.loads(cleaned)
+        except _json.JSONDecodeError:
+            pass
+        # Regex fallback: find first [ ... ] or { ... } block
+        import re
+        m = re.search(r'(\[[\s\S]*\]|\{[\s\S]*\})', cleaned)
+        if m:
+            try:
+                return _json.loads(m.group(1))
+            except _json.JSONDecodeError:
+                pass
+        return None
 
     def _fmt_bp(self, value) -> str:
         """Formatea basis points."""
@@ -373,28 +407,50 @@ class AssetAllocationContentGenerator:
         # Parse postura from final recommendation
         text = final.lower()
 
-        # Detect view
-        # AGRESIVO: solo si explícitamente dice "postura agresiva" o "stance agresivo"
-        # (no matchear "perfil agresivo" ni "agresivamente" que son portfolio/adverbio)
+        # Detect view — explicit postura declarations take highest priority
         import re as _re
-        if _re.search(r'postura\s+(agresiva|agresivo)', text) or 'stance agresivo' in text or 'fuerte risk-on' in text:
+
+        # Priority 1: Explicit "postura cautelosa/constructiva/agresiva" declaration
+        postura_match = _re.search(r'postura\s+(cautelosa|cauteloso|constructiva|constructivo|agresiva|agresivo|neutral)', text)
+        if postura_match:
+            declared = postura_match.group(1).lower()
+            if declared.startswith('cautelos'):
+                view = 'CAUTELOSO'
+                # Determine sesgo from surrounding context
+                if 'risk-off' in text or 'defensiv' in text:
+                    sesgo = 'DEFENSIVO'
+                elif 'selectiv' in text:
+                    sesgo = 'DEFENSIVO SELECTIVO'
+                else:
+                    sesgo = 'DEFENSIVO'
+            elif declared.startswith('constructiv'):
+                view = 'CONSTRUCTIVO'
+                sesgo = 'RISK-ON SELECTIVO'
+            elif declared.startswith('agresiv'):
+                view = 'AGRESIVO'
+                sesgo = 'RISK-ON AGRESIVO'
+            elif declared.startswith('neutral'):
+                view = 'NEUTRAL'
+                sesgo = 'SELECTIVO'
+        # Priority 2: Regime-based inference when no explicit postura
+        elif _re.search(r'postura\s+(agresiva|agresivo)', text) or 'stance agresivo' in text or 'fuerte risk-on' in text:
             view = 'AGRESIVO'
             sesgo = 'RISK-ON AGRESIVO'
         elif 'defensiva moderada' in text or 'defensivo moderado' in text:
             view = 'CAUTELOSO'
             sesgo = 'DEFENSIVO SELECTIVO'
-        elif 'expansión tardía' in text or 'expansion tardia' in text:
-            view = 'CONSTRUCTIVO'
-            sesgo = 'RISK-ON SELECTIVO'
         elif 'risk-off' in text:
             view = 'CAUTELOSO'
             sesgo = 'DEFENSIVO'
-        elif 'expansi' in text and ('tempran' in text or 'aceler' in text):
-            view = 'CONSTRUCTIVO'
-            sesgo = 'RISK-ON'
         elif 'recesi' in text or 'contracci' in text:
             view = 'CAUTELOSO'
             sesgo = 'DEFENSIVO'
+        elif 'expansión tardía' in text or 'expansion tardia' in text:
+            view = 'CONSTRUCTIVO'
+            sesgo = 'RISK-ON SELECTIVO'
+        elif 'expansi' in text and ('tempran' in text or 'aceler' in text):
+            view = 'CONSTRUCTIVO'
+            sesgo = 'RISK-ON'
         else:
             view = 'NEUTRAL'
             sesgo = 'SELECTIVO'
@@ -1360,7 +1416,7 @@ class AssetAllocationContentGenerator:
     # =========================================================================
 
     def generate_regional_views(self) -> List[Dict[str, Any]]:
-        return [
+        views = [
             self._generate_usa_view(),
             self._generate_europe_view(),
             self._generate_china_view(),
@@ -1368,6 +1424,21 @@ class AssetAllocationContentGenerator:
             self._generate_brazil_view(),
             self._generate_mexico_view()
         ]
+        # Generic consistency check: tesis must not contradict the assigned view
+        for v in views:
+            vw = v.get('view', 'N')
+            tesis = v.get('tesis', '')
+            if not tesis or vw == 'N':
+                continue
+            tesis_lower = tesis.lower()
+            region_lower = v.get('region', '').lower()
+            if vw == 'OW' and any(f'{w} {region_lower}' in tesis_lower or f'{w} renta variable' in tesis_lower
+                                   for w in ['uw', 'subponderamos', 'mantenemos uw']):
+                v['tesis'] = re.sub(r'\b(UW|subponderamos)\b', 'OW (sobreponderar)', tesis, count=1, flags=re.IGNORECASE)
+            elif vw == 'UW' and any(f'{w} {region_lower}' in tesis_lower or f'{w} renta variable' in tesis_lower
+                                     for w in ['ow', 'sobreponderar', 'mantenemos ow']):
+                v['tesis'] = re.sub(r'\b(OW|sobreponderar)\b', 'UW (subponderar)', tesis, count=1, flags=re.IGNORECASE)
+        return views
 
     def _generate_usa_view(self) -> Dict[str, Any]:
         """USA view via Claude desde panels rv + macro."""
@@ -1392,26 +1463,7 @@ class AssetAllocationContentGenerator:
         if bbg_ctx:
             quant_ctx += f"Bloomberg: {bbg_ctx}"
 
-        tesis = generate_narrative(
-            section_name="aa_usa_tesis",
-            prompt=(
-                "Escribe la tesis de inversion para Estados Unidos en 3-4 oraciones. "
-                "Cubrir: regimen economico, vista de equity, principal riesgo, y factor tilt. "
-                "Usa datos del council. Maximo 80 palabras."
-                "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
-            ),
-            council_context=council_ctx,
-            quant_context=quant_ctx,
-            company_name=self.company_name,
-            max_tokens=400,
-        )
-        if not tesis:
-            tesis = f"Economia US en regimen de expansion. GDP en {gdp}% QoQ." if gdp else "N/D"
-
-        args_favor, args_contra = self._generate_region_args('Estados Unidos', council_ctx, quant_ctx)
-        trigger = self._generate_trigger_cambio('Estados Unidos', council_ctx)
-
-        # Try to get view/conviction from parser
+        # Extract view/conviction FIRST
         alloc = self.parser.get_regional_allocation()
         usa_view = 'N'
         usa_conviccion = 'N/D'
@@ -1426,7 +1478,6 @@ class AssetAllocationContentGenerator:
             usa_view = usa_eq.get('view', usa_view)
             usa_conviccion = usa_eq.get('conviction', usa_conviccion)
 
-        # Text mining fallback when parser found nothing
         if usa_conviccion == 'N/D' and self.parser.has_council_text():
             mined = self.parser.search_region_view('usa')
             if mined:
@@ -1434,6 +1485,29 @@ class AssetAllocationContentGenerator:
                 usa_conviccion = mined['conviction']
             else:
                 usa_conviccion = 'MEDIA'
+
+        # Generate tesis with view constraint
+        view_label = {'OW': 'OVERWEIGHT (sobreponderar)', 'UW': 'UNDERWEIGHT (subponderar)', 'N': 'NEUTRAL'}.get(usa_view, usa_view)
+        tesis = generate_narrative(
+            section_name="aa_usa_tesis",
+            prompt=(
+                f"La postura asignada a Estados Unidos es {view_label}. "
+                "Escribe la tesis de inversion para Estados Unidos en 3-4 oraciones CONSISTENTE con esta postura. "
+                "Cubrir: regimen economico, vista de equity, principal riesgo, y factor tilt. "
+                "Usa datos del council. Maximo 80 palabras. "
+                f"IMPORTANTE: La narrativa DEBE ser consistente con {usa_view}. NO contradigas la postura."
+                "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
+            ),
+            council_context=council_ctx,
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=400,
+        )
+        if not tesis:
+            tesis = f"Economia US en regimen de expansion. GDP en {gdp}% QoQ." if gdp else "N/D"
+
+        args_favor, args_contra = self._generate_region_args('Estados Unidos', council_ctx, quant_ctx)
+        trigger = self._generate_trigger_cambio('Estados Unidos', council_ctx)
 
         return {
             'region': 'Estados Unidos',
@@ -1501,27 +1575,7 @@ class AssetAllocationContentGenerator:
 
         council_ctx = f"RV:\n{rv[:1000]}\n\nCIO:\n{cio[:800]}"
 
-        tesis = ''
-        if rv or cio:
-            tesis = generate_narrative(
-                section_name="aa_europe_tesis",
-                prompt=(
-                    "Escribe la tesis de inversion para Europa en 3-4 oraciones. "
-                    "Cubrir: posicion relativa, valuaciones, politica BCE, y riesgos. "
-                    "Usa datos del council. Maximo 70 palabras."
-                    "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
-                ),
-                council_context=council_ctx,
-                company_name=self.company_name,
-                max_tokens=400,
-            )
-        if not tesis:
-            tesis = "Análisis en proceso — datos cuantitativos disponibles para Europa."
-
-        args_favor, args_contra = self._generate_region_args('Europa', council_ctx)
-        trigger = self._generate_trigger_cambio('Europa', council_ctx)
-
-        # Try parser for structured view/conviction
+        # Extract view/conviction FIRST so we can pass it to the narrative prompt
         europe_view = 'N'
         europe_conviccion = 'N/D'
         alloc = self.parser.get_regional_allocation()
@@ -1542,6 +1596,45 @@ class AssetAllocationContentGenerator:
                 europe_conviccion = mined['conviction']
             else:
                 europe_conviccion = 'MEDIA'
+
+        # Generate tesis with view constraint
+        view_label = {'OW': 'OVERWEIGHT (sobreponderar)', 'UW': 'UNDERWEIGHT (subponderar)', 'N': 'NEUTRAL'}.get(europe_view, europe_view)
+        tesis = ''
+        if rv or cio:
+            tesis = generate_narrative(
+                section_name="aa_europe_tesis",
+                prompt=(
+                    f"La postura asignada a Europa es {view_label}. "
+                    "Escribe la tesis de inversion para Europa en 3-4 oraciones CONSISTENTE con esta postura. "
+                    "Cubrir: posicion relativa, valuaciones, politica BCE, y riesgos. "
+                    "Usa datos del council. Maximo 70 palabras. "
+                    f"IMPORTANTE: La narrativa DEBE ser consistente con {europe_view}. NO contradigas la postura."
+                    "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
+                ),
+                council_context=council_ctx,
+                company_name=self.company_name,
+                max_tokens=400,
+            )
+        if not tesis:
+            tesis = "Análisis en proceso — datos cuantitativos disponibles para Europa."
+
+        # Post-generation consistency check
+        if tesis and europe_view in ('OW', 'UW'):
+            tesis_lower = tesis.lower()
+            contradicts = False
+            if europe_view == 'OW' and any(w in tesis_lower for w in ['mantenemos uw', 'uw europe', 'uw europa', 'subponderamos europa']):
+                contradicts = True
+            elif europe_view == 'UW' and any(w in tesis_lower for w in ['mantenemos ow', 'ow europe', 'ow europa', 'sobreponderar europa']):
+                contradicts = True
+            if contradicts:
+                # Bold the correct view in the tesis instead of the wrong one
+                if europe_view == 'OW':
+                    tesis = re.sub(r'\b(UW|subponderamos|subponderaci[oó]n)\b', 'OW', tesis, flags=re.IGNORECASE)
+                else:
+                    tesis = re.sub(r'\b(OW|sobreponderar|sobrepondera)\b', 'UW', tesis, flags=re.IGNORECASE)
+
+        args_favor, args_contra = self._generate_region_args('Europa', council_ctx)
+        trigger = self._generate_trigger_cambio('Europa', council_ctx)
 
         return {
             'region': 'Europa',
@@ -2179,13 +2272,42 @@ class AssetAllocationContentGenerator:
                 tramo_rationale = self._infer_tramo_rationale(tramo_label, rf)
             curva.append({'tramo': tramo_label, 'view': tramo_view, 'rationale': tramo_rationale})
 
-        return {
+        # Text-mine RF panel + final to upgrade generic N views on specific tramos
+        combined_rf = (rf + ' ' + self._final() + ' ' + self._cio()).lower() if rf else ''
+        if combined_rf:
+            for c in curva:
+                if c['view'] != 'N':
+                    continue  # Already has a specific view
+                tramo = c['tramo']
+                # Look for directional signals on specific tramos
+                if tramo in ('0-2Y', '2-5Y'):
+                    if any(w in combined_rf for w in ['ig 3-5', 'tramo medio', 'tramo 3-5', 'belly']):
+                        if any(w in combined_rf for w in ['ow', 'sobrepon', 'overweight', 'preferimos']):
+                            if tramo == '2-5Y':
+                                c['view'] = 'OW'
+                                c['rationale'] = 'Preferencia por tramo medio — carry atractivo en IG 3-5Y'
+                    if tramo == '0-2Y' and any(w in combined_rf for w in ['short duration', 'corta duraci', 'reducir duraci']):
+                        c['view'] = 'OW'
+                        c['rationale'] = 'Short duration preferida en entorno de tasas altas'
+                elif tramo in ('5-10Y', '10Y+'):
+                    if any(w in combined_rf for w in ['long duration', 'larga duraci', 'duration larga']):
+                        if any(w in combined_rf for w in ['ow', 'sobrepon', 'preferimos']):
+                            c['view'] = 'OW'
+                            c['rationale'] = 'Duration larga preferida según council'
+                    if any(w in combined_rf for w in ['evitar largo', 'uw long', 'underweight long']):
+                        c['view'] = 'UW'
+                        c['rationale'] = 'Evitar tramo largo según council'
+
+        result = {
             'view_tasas': view_tasas,
             'view_duration': view_duration,
             'view_credito': view_credito,
             'curva': curva,
             'chile_especifico': chile,
         }
+        # Cache for focus list
+        self._rf_views_cache = {c['tramo']: c['view'] for c in curva}
+        return result
 
     def _infer_tramo_rationale(self, tramo: str, rf_text: str) -> str:
         """Infer rationale for a duration bucket from RF panel text."""
@@ -2331,9 +2453,9 @@ class AssetAllocationContentGenerator:
                     elif raw_view == 'BAJISTA':
                         target_3m = f"{usdclp_spot * 0.97:.0f}"
                         target_12m = f"{usdclp_spot * 0.95:.0f}"
-                    else:
-                        target_3m = f"{usdclp_spot:.0f}"
-                        target_12m = f"{usdclp_spot:.0f}"
+                    else:  # NEUTRAL: show range around spot
+                        target_3m = f"{usdclp_spot * 0.98:.0f}-{usdclp_spot * 1.02:.0f}"
+                        target_12m = f"{usdclp_spot * 0.97:.0f}-{usdclp_spot * 1.03:.0f}"
                 elif target_3m == 'N/D' and pair == 'EUR/USD':
                     if raw_view == 'ALCISTA':
                         target_3m, target_12m = '1.10', '1.12'
@@ -2681,16 +2803,9 @@ class AssetAllocationContentGenerator:
                 temperature=0.2,
             )
             if risks_raw:
-                try:
-                    cleaned = risks_raw.strip()
-                    if cleaned.startswith('```'):
-                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
-                        if cleaned.endswith('```'):
-                            cleaned = cleaned[:-3]
-                        cleaned = cleaned.strip()
-                    top_risks = _json.loads(cleaned)
-                except (_json.JSONDecodeError, KeyError):
-                    pass
+                parsed = self._clean_json(risks_raw)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    top_risks = parsed
 
         if not top_risks:
             top_risks = [
@@ -2738,16 +2853,9 @@ class AssetAllocationContentGenerator:
                 temperature=0.2,
             )
             if cal_raw:
-                try:
-                    cleaned = cal_raw.strip()
-                    if cleaned.startswith('```'):
-                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
-                        if cleaned.endswith('```'):
-                            cleaned = cleaned[:-3]
-                        cleaned = cleaned.strip()
-                    calendario = _json.loads(cleaned)
-                except (_json.JSONDecodeError, KeyError):
-                    pass
+                parsed = self._clean_json(cal_raw)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    calendario = parsed
 
         return {
             'top_risks': top_risks,
@@ -2978,18 +3086,9 @@ class AssetAllocationContentGenerator:
             max_tokens=2000,
         )
         if result:
-            try:
-                cleaned = result.strip()
-                if cleaned.startswith('```'):
-                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
-                    if cleaned.endswith('```'):
-                        cleaned = cleaned[:-3]
-                    cleaned = cleaned.strip()
-                parsed = _json.loads(cleaned)
-                if isinstance(parsed, list) and len(parsed) >= 3:
-                    return parsed
-            except (_json.JSONDecodeError, KeyError):
-                pass
+            parsed = self._clean_json(result)
+            if isinstance(parsed, list) and len(parsed) >= 3:
+                return parsed
 
         return [{'perfil': 'N/D', 'risk_score': '-', 'allocations': [], 'nota': 'Error generando portafolios modelo.'}]
 
@@ -3030,13 +3129,22 @@ class AssetAllocationContentGenerator:
                     return sector_views[k].get('view', 'N/D')
             return 'N/D'
 
-        def _fi_view(segment_keys: list) -> str:
-            """Look up FI view by segment keys."""
-            if not fi_views:
-                return 'N/D'
-            for k in segment_keys:
-                if k in fi_views:
-                    return fi_views[k].get('view', 'N/D')
+        def _fi_view(segment_keys: list, tramo_fallback: str = None) -> str:
+            """Look up FI view by segment keys, falling back to cached curva views."""
+            if fi_views:
+                for k in segment_keys:
+                    if k in fi_views:
+                        v = fi_views[k].get('view', 'N/D')
+                        if v != 'N/D':
+                            return v
+            # Fallback: use cached RF curva views from _generate_fixed_income_view()
+            if tramo_fallback and self._rf_views_cache:
+                v = self._rf_views_cache.get(tramo_fallback, 'N/D')
+                if v != 'N/D':
+                    return v
+            # Default N when council exists
+            if self.parser and self.parser.has_council_text():
+                return 'N'
             return 'N/D'
 
         def _fx_view(pair_keys: list) -> str:
@@ -3068,11 +3176,11 @@ class AssetAllocationContentGenerator:
                 {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': em_view, 'rationale': 'Emerging markets equity exposure'},
             ],
             'renta_fija': [
-                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': _fi_view(['0-2y', 'short', 'corto', 'treasury bills', 't-bills']), 'rationale': 'Cash-like, T-Bill exposure'},
-                {'ticker': 'SHY', 'nombre': 'iShares 1-3 Year Treasury', 'view': _fi_view(['0-2y', 'short', 'corto']), 'rationale': 'Short duration (sensibilidad del precio a cambios de tasas) treasury'},
-                {'ticker': 'VMBS', 'nombre': 'Vanguard MBS ETF', 'view': _fi_view(['mbs', 'agency', 'mortgage']), 'rationale': 'MBS spread exposure'},
-                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': _fi_view(['ig', 'investment grade', 'ig credit']), 'rationale': 'Investment grade corporate'},
-                {'ticker': 'TLT', 'nombre': 'iShares 20+ Year Treasury', 'view': _fi_view(['10y+', '10+', 'ultra long', 'long']), 'rationale': 'Long duration treasury'},
+                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': _fi_view(['0-2y', 'short', 'corto', 'treasury bills', 't-bills'], '0-2Y'), 'rationale': 'Cash-like, T-Bill exposure'},
+                {'ticker': 'SHY', 'nombre': 'iShares 1-3 Year Treasury', 'view': _fi_view(['0-2y', 'short', 'corto'], '0-2Y'), 'rationale': 'Short duration treasury'},
+                {'ticker': 'VMBS', 'nombre': 'Vanguard MBS ETF', 'view': _fi_view(['mbs', 'agency', 'mortgage'], '2-5Y'), 'rationale': 'MBS spread exposure'},
+                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': _fi_view(['ig', 'investment grade', 'ig credit'], '2-5Y'), 'rationale': 'Investment grade corporate'},
+                {'ticker': 'TLT', 'nombre': 'iShares 20+ Year Treasury', 'view': _fi_view(['10y+', '10+', 'ultra long', 'long'], '10Y+'), 'rationale': 'Long duration treasury'},
                 {'ticker': 'HYG', 'nombre': 'iShares High Yield Corp', 'view': _fi_view(['hy', 'high yield', 'hy credit']), 'rationale': 'High yield corporate'},
             ],
             'commodities': [
