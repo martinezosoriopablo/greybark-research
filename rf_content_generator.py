@@ -1043,7 +1043,24 @@ class RFContentGenerator:
             dr = dt.get('range', dt.get('duration_range', (6.0, 8.0)))
             vs_bm = dt.get('vs_benchmark', 'NEUTRAL')
             confidence = dt.get('confidence', 'MEDIUM')
-            rationale = dt.get('rationale', '')
+            rationale_raw = dt.get('rationale', '')
+            # Translate common English rationale patterns to Spanish
+            rationale = rationale_raw
+            if rationale and rationale[0].isupper() and all(c.isascii() for c in rationale[:20]):
+                # Likely English — replace with Spanish equivalent
+                rationale_map = {
+                    'Stable growth': 'Crecimiento estable e inflación contenida soportan duration neutral',
+                    'Rising inflation': 'Inflación creciente sugiere acortar duration',
+                    'Slowing growth': 'Desaceleración del crecimiento favorece extensión de duration',
+                    'Recession risk': 'Riesgo recesivo favorece posiciones largas en duration',
+                }
+                for eng_key, esp_val in rationale_map.items():
+                    if eng_key.lower() in rationale.lower():
+                        rationale = esp_val
+                        break
+                else:
+                    # Generic translation fallback
+                    rationale = f'Posicionamiento cuantitativo: duration objetivo {target:.1f} años (confianza: {confidence})'
 
             stance_map = {'LONG': 'LARGA', 'SHORT': 'CORTA', 'NEUTRAL': 'NEUTRAL'}
             stance = stance_map.get(vs_bm, 'NEUTRAL A LARGA')

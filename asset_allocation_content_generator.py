@@ -340,10 +340,9 @@ class AssetAllocationContentGenerator:
 
     def _generate_region_args(self, region: str, council_ctx: str, quant_ctx: str = "") -> tuple:
         """Generate pro/con arguments via Claude for a region. Returns (favor, contra)."""
-        import json as _json
         from narrative_engine import generate_narrative
-        args_favor = [{'punto': 'Sin datos', 'dato': 'N/D'}]
-        args_contra = [{'punto': 'Sin datos', 'dato': 'N/D'}]
+        args_favor = [{'punto': 'Análisis en proceso', 'dato': '-'}]
+        args_contra = [{'punto': 'Análisis en proceso', 'dato': '-'}]
         if not self._has_council():
             return args_favor, args_contra
         args_raw = generate_narrative(
@@ -352,7 +351,7 @@ class AssetAllocationContentGenerator:
                 f"Genera argumentos a favor y en contra de invertir en {region} equity como JSON: "
                 '{"favor": [{"punto": "string", "dato": "string"}], '
                 '"contra": [{"punto": "string", "dato": "string"}]}. '
-                "Exactamente 3 en cada lista. Usa datos del council."
+                "Exactamente 3 en cada lista. Usa datos del council. SOLO JSON, sin texto adicional."
             ),
             council_context=council_ctx,
             quant_context=quant_ctx,
@@ -361,20 +360,12 @@ class AssetAllocationContentGenerator:
             temperature=0.2,
         )
         if args_raw:
-            try:
-                cleaned = args_raw.strip()
-                if cleaned.startswith('```'):
-                    cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
-                    if cleaned.endswith('```'):
-                        cleaned = cleaned[:-3]
-                    cleaned = cleaned.strip()
-                parsed = _json.loads(cleaned)
-                if 'favor' in parsed:
+            parsed = self._clean_json(args_raw)
+            if parsed and isinstance(parsed, dict):
+                if 'favor' in parsed and isinstance(parsed['favor'], list) and len(parsed['favor']) > 0:
                     args_favor = parsed['favor']
-                if 'contra' in parsed:
+                if 'contra' in parsed and isinstance(parsed['contra'], list) and len(parsed['contra']) > 0:
                     args_contra = parsed['contra']
-            except (_json.JSONDecodeError, KeyError):
-                pass
         return args_favor, args_contra
 
     # =========================================================================
