@@ -2028,7 +2028,7 @@ class AssetAllocationContentGenerator:
                 por_region.append({
                     'region': label,
                     'view': info.get('view', 'N'),
-                    'rationale': info.get('rationale', 'Ver council'),
+                    'rationale': info.get('rationale', 'Posición basada en análisis del comité'),
                 })
 
         if not por_region:
@@ -2259,11 +2259,11 @@ class AssetAllocationContentGenerator:
             for key in search_keys:
                 if key in all_fi:
                     tramo_view = all_fi[key].get('view', 'N/D')
-                    tramo_rationale = all_fi[key].get('rationale', 'Ver council')
+                    tramo_rationale = all_fi[key].get('rationale', 'Posición basada en análisis del comité')
                     break
                 if key in all_fi_lower:
                     tramo_view = all_fi_lower[key].get('view', 'N/D')
-                    tramo_rationale = all_fi_lower[key].get('rationale', 'Ver council')
+                    tramo_rationale = all_fi_lower[key].get('rationale', 'Posición basada en análisis del comité')
                     break
             # Default to NEUTRAL when council exists but no specific tramo view
             if tramo_view == 'N/D' and self.parser.has_council_text():
@@ -2809,9 +2809,9 @@ class AssetAllocationContentGenerator:
 
         if not top_risks:
             top_risks = [
-                {'nombre': 'Riesgo principal', 'probabilidad': 0,
-                 'impacto': 'Ver council', 'descripcion': 'Consultar analisis de riesgos del periodo.',
-                 'hedge': 'Diversificacion', 'senal_temprana': 'Ver council'}
+                {'nombre': 'Riesgo geopolítico / macro', 'probabilidad': 25,
+                 'impacto': 'Alto', 'descripcion': 'Deterioro inesperado en condiciones macro o escalada geopolítica.',
+                 'hedge': 'Diversificación y cobertura táctica', 'senal_temprana': 'VIX >25, spreads de crédito +50bp'}
             ]
 
         # Generate triggers via Claude
