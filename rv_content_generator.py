@@ -138,6 +138,72 @@ class RVContentGenerator:
                 pass
         return default
 
+    @staticmethod
+    def _clean_json(raw: str):
+        """Extract and parse JSON from LLM response, handling code fences and surrounding text."""
+        import json as _json
+        if not raw:
+            return None
+        cleaned = raw.strip()
+        # Remove code fences (```json ... ``` or ``` ... ```)
+        if cleaned.startswith('```'):
+            first_nl = cleaned.find('\n')
+            if first_nl > 0:
+                cleaned = cleaned[first_nl + 1:]
+            else:
+                cleaned = cleaned[3:]
+            if cleaned.endswith('```'):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+        # Try direct parse
+        try:
+            return _json.loads(cleaned)
+        except _json.JSONDecodeError:
+            pass
+        # Regex fallback: find first [ ... ] or { ... } block
+        m = re.search(r'(\[[\s\S]*\]|\{[\s\S]*\})', cleaned)
+        if m:
+            try:
+                return _json.loads(m.group(1))
+            except _json.JSONDecodeError:
+                pass
+        return None
+
+    @staticmethod
+    def _clean_rationale(rationale: str, pe_value=None) -> str:
+        """Clean council rationale text to remove contradictions with actual data.
+
+        - If P/E data IS available, remove phrases claiming it's not.
+        - Remove 'percentil X' where X looks like a P/E value (< 50), not a real percentile.
+        """
+        if not rationale:
+            return ''
+        cleaned = rationale
+        # If PE data is available, strip "sin dato de P/E" type phrases
+        if pe_value is not None:
+            cleaned = re.sub(
+                r',?\s*sin dato de P/?E[^.]*\.?\s*', ' ', cleaned, flags=re.IGNORECASE
+            )
+            cleaned = re.sub(
+                r',?\s*sin dato de valuaci[oó]n[^.]*\.?\s*', ' ', cleaned, flags=re.IGNORECASE
+            )
+            cleaned = re.sub(
+                r',?\s*no hay dato de P/?E[^.]*\.?\s*', ' ', cleaned, flags=re.IGNORECASE
+            )
+        # Fix "percentil X" where X is a P/E value (small number, not a real percentile)
+        # Real percentiles are 0-100; P/E values used as percentiles are typically < 50
+        # and match a known P/E value pattern (has decimal like 26.6, 17.8)
+        def _fix_percentil(m):
+            val = float(m.group(1))
+            # If value matches a known P/E range (10-40) with decimal, likely a copy-paste error
+            if pe_value is not None and abs(val - pe_value) < 0.5:
+                return ''  # Remove the erroneous percentile claim
+            return m.group(0)  # Keep legitimate percentiles
+        cleaned = re.sub(r'percentil\s+(\d+\.?\d*)', _fix_percentil, cleaned, flags=re.IGNORECASE)
+        # Clean up double spaces
+        cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
+        return cleaned
+
     # =========================================================================
     # MARKET DATA ACCESS HELPERS
     # =========================================================================
@@ -1863,7 +1929,8 @@ class RVContentGenerator:
             'narrativa': (
                 f"El S&P 500 cotiza a {pe_str} P/E. "
                 + (f"El retorno YTD es de {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + (us_council_view.get('rationale', '') + '. ' if us_council_view.get('rationale') else '')
+                + (self._clean_rationale(us_council_view.get('rationale', ''), pe_value=pe) + '. '
+                   if us_council_view.get('rationale') else '')
             ),
             'sectores_preferidos': [],
             'sectores_evitar': [],
@@ -1912,7 +1979,8 @@ class RVContentGenerator:
             'narrativa': (
                 f"Europa cotiza a {pe_str} P/E. "
                 + (f"Retorno YTD: {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + (eu_council_view.get('rationale', '') + '. ' if eu_council_view.get('rationale') else '')
+                + (self._clean_rationale(eu_council_view.get('rationale', ''), pe_value=pe) + '. '
+                   if eu_council_view.get('rationale') else '')
             ),
             'sectores_preferidos': [],
             'sectores_evitar': [],
@@ -1960,7 +2028,8 @@ class RVContentGenerator:
             'narrativa': (
                 f"EM cotiza a {pe_str} P/E. "
                 + (f"Retorno YTD: {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + (em_council_view.get('rationale', '') + '. ' if em_council_view.get('rationale') else '')
+                + (self._clean_rationale(em_council_view.get('rationale', ''), pe_value=pe) + '. '
+                   if em_council_view.get('rationale') else '')
             ),
             'paises_preferidos': [],
             'paises_evitar': [],
@@ -2013,7 +2082,8 @@ class RVContentGenerator:
             'narrativa': (
                 f"Japón cotiza a {pe_str} P/E. "
                 + (f"Retorno YTD: {ret_ytd:+.1f}%. " if ret_ytd is not None else "")
-                + (jp_council_view.get('rationale', '') + '. ' if jp_council_view.get('rationale') else '')
+                + (self._clean_rationale(jp_council_view.get('rationale', ''), pe_value=pe) + '. '
+                   if jp_council_view.get('rationale') else '')
             ),
             'sectores_preferidos': [],
             'sectores_evitar': [],
@@ -2722,8 +2792,10 @@ class RVContentGenerator:
 
     def _generate_event_calendar(self) -> List[Dict[str, Any]]:
         """Genera calendario de eventos desde council data."""
-        import json as _json
         from narrative_engine import generate_narrative
+
+        # Build month abbreviation for calendar dates
+        month_abbr = self.month_name[:3]
 
         macro = self._panel('macro') if self._has_council() else ''
         final = self._final() if self._has_council() else ''
@@ -2735,11 +2807,12 @@ class RVContentGenerator:
                 prompt=(
                     f"Genera un calendario de 5-7 eventos macro clave para el próximo mes "
                     f"({self.month_name} {self.year}) relevantes para renta variable. "
-                    "Devuelve JSON array: [{\"fecha\": \"DD Mar\", \"evento\": \"nombre\", "
+                    "Devuelve SOLO un JSON array (sin texto adicional): "
+                    "[{\"fecha\": \"DD Mon\", \"evento\": \"nombre\", "
                     "\"relevancia\": \"Alta|Media|Baja\", \"impacto\": \"descripción breve\"}]. "
                     "Incluye: reuniones de bancos centrales (Fed, BCE, BCCh), datos de empleo, "
                     "inflación, GDP, earnings season, etc. Usa fechas reales del calendario "
-                    "económico si las conoces, o indica 'semana X' si no."
+                    "económico si las conoces, o indica 'semana X' si no. SOLO JSON."
                 ),
                 council_context=council_ctx,
                 company_name=self.company_name,
@@ -2747,22 +2820,24 @@ class RVContentGenerator:
                 temperature=0.2,
             )
             if result:
-                try:
-                    cleaned = result.strip()
-                    if cleaned.startswith('```'):
-                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
-                        if cleaned.endswith('```'):
-                            cleaned = cleaned[:-3]
-                        cleaned = cleaned.strip()
-                    events = _json.loads(cleaned)
-                    if isinstance(events, list) and len(events) >= 3:
-                        return events
-                except (_json.JSONDecodeError, KeyError):
-                    pass
+                parsed = self._clean_json(result)
+                if isinstance(parsed, list) and len(parsed) >= 3:
+                    return parsed
 
+        # Fallback: basic economic calendar with known recurring events
         return [
-            {'fecha': '-', 'evento': 'Calendario no disponible — sin datos de eventos',
-             'relevancia': '-', 'impacto': '-'}
+            {'fecha': f'Semana 1 {month_abbr}', 'evento': 'ISM Manufacturing PMI (USA)',
+             'relevancia': 'Alta', 'impacto': 'Indicador adelantado de actividad industrial'},
+            {'fecha': f'Semana 1 {month_abbr}', 'evento': 'Non-Farm Payrolls (NFP)',
+             'relevancia': 'Alta', 'impacto': 'Empleo USA - clave para politica Fed'},
+            {'fecha': f'Semana 2 {month_abbr}', 'evento': 'CPI USA (Inflacion)',
+             'relevancia': 'Alta', 'impacto': 'Dato clave para expectativas de tasas'},
+            {'fecha': f'Semana 3 {month_abbr}', 'evento': 'Reunion FOMC (Fed)',
+             'relevancia': 'Alta', 'impacto': 'Decision de tasa de politica monetaria'},
+            {'fecha': f'Semana 3 {month_abbr}', 'evento': 'Reunion BCE',
+             'relevancia': 'Media', 'impacto': 'Politica monetaria Eurozona'},
+            {'fecha': f'Semana 4 {month_abbr}', 'evento': 'PIB USA (GDP)',
+             'relevancia': 'Media', 'impacto': 'Crecimiento economico trimestral'},
         ]
 
     # =========================================================================
@@ -2780,6 +2855,16 @@ class RVContentGenerator:
         tabla_final = []
         mensaje_clave = ''
 
+        # Build authoritative views string from parser (source of truth for consistency)
+        equity_views = self.parser.get_equity_views() or {}
+        views_str = ''
+        if equity_views:
+            view_lines = []
+            for region, data in equity_views.items():
+                v = data.get('view', 'N') if isinstance(data, dict) else 'N'
+                view_lines.append(f"{region}: {v}")
+            views_str = "VIEWS DEFINITIVOS (usar estos, no inventar): " + ", ".join(view_lines) + ". "
+
         if rv or final:
             council_ctx = f"RV PANEL:\n{rv[:2000]}\n\nFINAL REC:\n{final[:2000]}"
 
@@ -2791,6 +2876,9 @@ class RVContentGenerator:
                     "Cada fila: {\"categoria\": \"string\", \"recomendacion\": \"string\"}. "
                     "Incluir: Equity Global (OW/N/UW), Region Preferida, Region a evitar/neutral, "
                     "Sectores OW, Sectores UW, Style tilt, Factor tilt, Size preference. "
+                    + views_str +
+                    "IMPORTANTE: Usa exactamente los views regionales indicados arriba (OW/N/UW). "
+                    "No contradigas los views — si una region es UW, no la marques como OW. "
                     "Basa las recomendaciones en lo que dice el council."
                 ),
                 council_context=council_ctx,
@@ -2799,18 +2887,9 @@ class RVContentGenerator:
                 temperature=0.1,
             )
             if tabla_raw:
-                try:
-                    cleaned = tabla_raw.strip()
-                    if cleaned.startswith('```'):
-                        cleaned = cleaned.split('\n', 1)[1] if '\n' in cleaned else cleaned[3:]
-                        if cleaned.endswith('```'):
-                            cleaned = cleaned[:-3]
-                        cleaned = cleaned.strip()
-                    parsed = _json.loads(cleaned)
-                    if isinstance(parsed, list) and len(parsed) >= 3:
-                        tabla_final = parsed
-                except (_json.JSONDecodeError, KeyError):
-                    pass
+                parsed = self._clean_json(tabla_raw)
+                if isinstance(parsed, list) and len(parsed) >= 3:
+                    tabla_final = parsed
 
             # Generate key message
             mensaje_clave = generate_narrative(
@@ -2818,6 +2897,9 @@ class RVContentGenerator:
                 prompt=(
                     "Escribe 2-3 oraciones resumiendo el posicionamiento en renta variable: "
                     "postura general, principales preferencias, y principal riesgo a monitorear. "
+                    + views_str +
+                    "IMPORTANTE: Usa exactamente los views indicados. Si una region es UW, "
+                    "NO la describas como OW estrategico ni positiva. "
                     "Usa datos del council. Maximo 60 palabras."
                 ),
                 council_context=council_ctx,

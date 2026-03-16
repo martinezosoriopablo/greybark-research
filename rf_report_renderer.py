@@ -424,7 +424,7 @@ class RFReportRenderer:
             </div>'''
         replacements['{{risks_html}}'] = risks_html
 
-        opps = ''.join([f'<li>{o}</li>' for o in risks['oportunidades']])
+        opps = ''.join([f'<li>{_md_to_html(o)}</li>' for o in risks['oportunidades']])
         replacements['{{opportunities_html}}'] = opps
 
         trades_html = ''
