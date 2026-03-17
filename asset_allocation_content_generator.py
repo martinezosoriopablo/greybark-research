@@ -44,6 +44,9 @@ class AssetAllocationContentGenerator:
         self._parsed_cio = None
         self._rf_views_cache = None  # Cache RF curva views for focus list
 
+        # Canonical data cache — single source of truth for all sections
+        self._canon = None  # Built lazily on first access via canon property
+
     @property
     def parser(self):
         if self._parser is None:
@@ -87,6 +90,191 @@ class AssetAllocationContentGenerator:
     def _has_q(self, *keys) -> bool:
         """Verifica si quant_data tiene datos en la ruta."""
         return self._q(*keys) is not None
+
+    # =========================================================================
+    # CANONICAL DATA — Single source of truth for cross-section consistency
+    # =========================================================================
+
+    @property
+    def canon(self) -> Dict[str, Any]:
+        """Lazily build and return canonical data cache."""
+        if self._canon is None:
+            self._canon = self._build_canonical_data()
+        return self._canon
+
+    def _build_canonical_data(self) -> Dict[str, Any]:
+        """Extract ALL key data points ONCE. Every section MUST use these values."""
+        c = {}
+
+        # --- Equity PEs (authoritative) ---
+        pe_spx = self._q('equity', 'valuations', 'us', 'pe')
+        if pe_spx is None:
+            pe_spx = self._bbg_val('pe_spx')
+        pe_stoxx = self._q('equity', 'valuations', 'europe', 'pe')
+        if pe_stoxx is None:
+            pe_stoxx = self._bbg_val('pe_stoxx600')
+        pe_em = self._q('equity', 'valuations', 'em', 'pe')
+        if pe_em is None:
+            pe_em = self._bbg_val('pe_msci_em')
+        pe_ipsa = self._q('equity', 'valuations', 'chile', 'pe')
+        if pe_ipsa is None:
+            pe_ipsa = self._bbg_val('pe_ipsa')
+        pe_japan = self._q('equity', 'valuations', 'japan', 'pe')
+        c['pe_spx'] = pe_spx
+        c['pe_stoxx'] = pe_stoxx
+        c['pe_em'] = pe_em
+        c['pe_ipsa'] = pe_ipsa
+        c['pe_japan'] = pe_japan
+
+        # --- Rates (authoritative) ---
+        c['ust_2y'] = self._q('yield_curve', 'us_2y') or self._q('chile_rates', 'ust_2y')
+        c['ust_10y'] = self._q('yield_curve', 'us_10y') or self._q('chile_rates', 'ust_10y')
+        c['tpm'] = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
+
+        # --- Spreads ---
+        c['ig_spread'] = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
+        c['hy_spread'] = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
+
+        # --- VIX (single authoritative value) ---
+        vix = self._q('risk', 'vix')
+        if vix is None:
+            vix = self._q('chile_rates', 'vix')
+        if vix is None:
+            vix = self._q('equity', 'risk', 'vix')
+        c['vix'] = float(vix) if vix is not None else None
+
+        # --- Commodities (authoritative prices) ---
+        c['copper'] = self._q('equity', 'bcch_indices', 'copper', 'value')
+        gold = self._q('equity', 'bcch_indices', 'gold', 'value')
+        c['gold'] = float(gold) if gold is not None else None
+        oil = self._q('equity', 'bcch_indices', 'oil_wti', 'value')
+        c['oil_wti'] = float(oil) if oil is not None else None
+
+        # --- Breakevens (authoritative, single value) ---
+        be5 = self._q('inflation', 'breakevens', '5y') or self._q('chile_rates', 'breakeven_5y')
+        if be5 is None:
+            be5 = self._q('rf_data', 'inflation', 'breakeven_5y')
+        c['breakeven_5y'] = float(be5) if be5 is not None else None
+
+        # --- FX ---
+        c['usdclp'] = self._q('chile', 'usd_clp') or self._q('equity', 'bcch_indices', 'usd_clp', 'value')
+
+        # --- Council-derived authoritative views ---
+        # These are extracted ONCE from the parser and override all LLM-generated views
+        eq_views = self.parser.get_equity_views() or {}
+        fi_views = self.parser.get_fi_views() or {}
+        fx_views = self.parser.get_fx_views() or {}
+        comm_views = self.parser.get_commodity_views() if hasattr(self.parser, 'get_commodity_views') else {}
+
+        c['eq_views'] = eq_views
+        c['fi_views'] = fi_views
+        c['fx_views'] = fx_views
+        c['comm_views'] = comm_views
+
+        # USD view (single authoritative)
+        fx_map = {'ALCISTA': 'OW', 'BAJISTA': 'UW', 'NEUTRAL': 'N'}
+        usd_raw = fx_views.get('usd', fx_views.get('dxy', {}))
+        if isinstance(usd_raw, dict):
+            c['usd_view'] = fx_map.get(usd_raw.get('view', ''), 'N')
+        elif isinstance(usd_raw, str):
+            c['usd_view'] = fx_map.get(usd_raw, usd_raw if usd_raw in ('OW', 'UW', 'N') else 'N')
+        else:
+            c['usd_view'] = 'N'
+
+        # Gold view (from commodities)
+        oro_raw = comm_views.get('Oro', comm_views.get('oro', ''))
+        if isinstance(oro_raw, dict):
+            c['oro_view'] = oro_raw.get('view', 'N')
+        elif isinstance(oro_raw, str) and oro_raw in ('OW', 'UW', 'N', 'NEUTRAL'):
+            c['oro_view'] = 'OW' if oro_raw == 'OW' else ('UW' if oro_raw == 'UW' else 'N')
+        else:
+            c['oro_view'] = 'N'
+
+        # Text-mine gold view override: if council says "elevamos oro" or "sobreponderar oro"
+        final_text = (self.council.get('final_recommendation', '') or '').lower()
+        cio_text = (self.council.get('cio_synthesis', '') or '').lower()
+        combined = final_text + ' ' + cio_text
+        if re.search(r'(elevamos?\s+.*oro|oro\s+.*(?:8|9|10)%|sobreponderar\s+oro|ow\s+oro|oro\s+ow)', combined):
+            c['oro_view'] = 'OW'
+        if re.search(r'(reducimos?\s+.*oro|subponderar\s+oro|uw\s+oro|oro\s+uw)', combined):
+            c['oro_view'] = 'UW'
+
+        # RF curva views (authoritative from parser + text mining)
+        c['rf_2_5y_view'] = 'N'
+        c['rf_5_10y_view'] = 'N'
+        c['rf_10y_plus_view'] = 'N'
+        # Extract from fi_views
+        for key in fi_views:
+            kl = key.lower()
+            v = fi_views[key].get('view', 'N') if isinstance(fi_views[key], dict) else 'N'
+            if '2-5' in kl or '2_5' in kl or 'medium' in kl:
+                c['rf_2_5y_view'] = v
+            elif '5-10' in kl or '5_10' in kl:
+                c['rf_5_10y_view'] = v
+            elif '10+' in kl or '10y+' in kl or 'long' in kl:
+                c['rf_10y_plus_view'] = v
+
+        # Text mine RF views from council if still N
+        rf_text = (self.council.get('panel_outputs', {}).get('rf', '') or '').lower()
+        rf_combined = rf_text + ' ' + final_text
+        if c['rf_2_5y_view'] == 'N' and re.search(r'(sobreponderar|ow|preferimos).*2.?5', rf_combined):
+            c['rf_2_5y_view'] = 'OW'
+        # Stagflation check: if top scenario is stagflation, duration long should NOT be OW
+        if re.search(r'estanflaci[oó]n.*(88|85|90|high|alta)', combined):
+            c['stagflation_high'] = True
+            if c['rf_5_10y_view'] == 'OW':
+                c['rf_5_10y_view'] = 'N'
+            if c['rf_10y_plus_view'] == 'OW':
+                c['rf_10y_plus_view'] = 'UW'
+        else:
+            c['stagflation_high'] = False
+
+        # Brazil SELIC trigger check
+        selic = self._q('chile_rates', 'selic') or self._q('rf_data', 'chile_rates', 'selic')
+        c['selic'] = float(selic) if selic is not None else None
+
+        return c
+
+    def _canon_str(self, key: str, fmt: str = '.1f', suffix: str = '') -> str:
+        """Format a canonical value as string, or 'N/D' if missing."""
+        v = self.canon.get(key)
+        if v is None:
+            return 'N/D'
+        try:
+            return f"{float(v):{fmt}}{suffix}"
+        except (TypeError, ValueError):
+            return str(v)
+
+    def _canon_constraints(self) -> str:
+        """Build data constraints string to inject into ALL LLM prompts.
+        This prevents the LLM from fabricating numbers that contradict real data."""
+        c = self.canon
+        lines = ["\n\nDATOS VERIFICADOS (OBLIGATORIO usar estos valores exactos, NO inventar otros):"]
+        if c.get('pe_spx') is not None:
+            lines.append(f"- S&P 500 P/E: {c['pe_spx']:.1f}x")
+        if c.get('pe_stoxx') is not None:
+            lines.append(f"- STOXX 600 P/E: {c['pe_stoxx']:.1f}x")
+        if c.get('pe_em') is not None:
+            lines.append(f"- MSCI EM P/E: {c['pe_em']:.1f}x")
+        if c.get('vix') is not None:
+            lines.append(f"- VIX: {c['vix']:.1f}")
+        if c.get('oil_wti') is not None:
+            lines.append(f"- WTI: ${c['oil_wti']:.1f}/bbl")
+        if c.get('gold') is not None:
+            lines.append(f"- Oro: ${c['gold']:.0f}/oz")
+        if c.get('ust_10y') is not None:
+            lines.append(f"- UST 10Y: {c['ust_10y']}%")
+        if c.get('breakeven_5y') is not None:
+            lines.append(f"- Breakeven 5Y: {c['breakeven_5y']:.2f}%")
+        if c.get('ig_spread') is not None:
+            lines.append(f"- IG Spread: {c['ig_spread']:.0f}bps")
+        if c.get('oro_view'):
+            lines.append(f"- Oro view: {c['oro_view']}")
+        if c.get('usd_view'):
+            lines.append(f"- USD view: {c['usd_view']}")
+        if c.get('rf_2_5y_view'):
+            lines.append(f"- RF 2-5Y view: {c['rf_2_5y_view']}")
+        return "\n".join(lines) if len(lines) > 1 else ""
 
     def _bbg_val(self, campo_id: str, default=None):
         """Get latest Bloomberg value, returns None if unavailable."""
@@ -341,17 +529,16 @@ class AssetAllocationContentGenerator:
     def _generate_region_args(self, region: str, council_ctx: str, quant_ctx: str = "") -> tuple:
         """Generate pro/con arguments via Claude for a region. Returns (favor, contra)."""
         from narrative_engine import generate_narrative
-        args_favor = [{'punto': 'Análisis en proceso', 'dato': '-'}]
-        args_contra = [{'punto': 'Análisis en proceso', 'dato': '-'}]
         if not self._has_council():
-            return args_favor, args_contra
+            return self._fallback_region_args(region)
         args_raw = generate_narrative(
             section_name=f"aa_{region.lower().replace(' ', '_')}_args",
             prompt=(
-                f"Genera argumentos a favor y en contra de invertir en {region} equity como JSON: "
+                f"Genera argumentos a favor y en contra de invertir en {region} como JSON: "
                 '{"favor": [{"punto": "string", "dato": "string"}], '
                 '"contra": [{"punto": "string", "dato": "string"}]}. '
                 "Exactamente 3 en cada lista. Usa datos del council. SOLO JSON, sin texto adicional."
+                + self._canon_constraints()
             ),
             council_context=council_ctx,
             quant_context=quant_ctx,
@@ -359,6 +546,8 @@ class AssetAllocationContentGenerator:
             max_tokens=600,
             temperature=0.2,
         )
+        args_favor = None
+        args_contra = None
         if args_raw:
             parsed = self._clean_json(args_raw)
             if parsed and isinstance(parsed, dict):
@@ -366,7 +555,39 @@ class AssetAllocationContentGenerator:
                     args_favor = parsed['favor']
                 if 'contra' in parsed and isinstance(parsed['contra'], list) and len(parsed['contra']) > 0:
                     args_contra = parsed['contra']
+        # If LLM failed for either side, use data-driven fallback
+        if not args_favor or not args_contra:
+            fb_favor, fb_contra = self._fallback_region_args(region)
+            args_favor = args_favor or fb_favor
+            args_contra = args_contra or fb_contra
         return args_favor, args_contra
+
+    def _fallback_region_args(self, region: str) -> tuple:
+        """Data-driven fallback arguments when LLM fails."""
+        c = self.canon
+        region_l = region.lower()
+        if 'chile' in region_l:
+            favor = [
+                {'punto': 'Carry real positivo', 'dato': f"TPM {self._canon_str('tpm')}%"},
+                {'punto': 'Cobre sólido', 'dato': f"${c.get('copper', 'N/D')}/lb"},
+            ]
+            contra = [
+                {'punto': 'Crecimiento débil', 'dato': 'IMACEC negativo'},
+                {'punto': 'Dependencia commodities', 'dato': 'Riesgo China'},
+            ]
+        elif 'brasil' in region_l:
+            favor = [{'punto': 'Carry atractivo', 'dato': f"SELIC {c.get('selic', 'N/D')}%"}]
+            contra = [{'punto': 'Riesgo fiscal', 'dato': 'Déficit primario persistente'}]
+        elif 'europa' in region_l or 'europe' in region_l:
+            favor = [{'punto': 'Descuento valuación', 'dato': f"STOXX P/E {self._canon_str('pe_stoxx')}x vs S&P {self._canon_str('pe_spx')}x"}]
+            contra = [{'punto': 'Crecimiento débil', 'dato': 'PMI en zona de contracción'}]
+        elif 'us' in region_l or 'estados' in region_l:
+            favor = [{'punto': 'Liquidez profunda', 'dato': 'Mercado más líquido del mundo'}]
+            contra = [{'punto': 'Valuación elevada', 'dato': f"S&P P/E {self._canon_str('pe_spx')}x"}]
+        else:
+            favor = [{'punto': 'Diversificación', 'dato': '-'}]
+            contra = [{'punto': 'Riesgo macro global', 'dato': f"VIX {self._canon_str('vix')}"}]
+        return favor, contra
 
     # =========================================================================
     # SECCION 1: RESUMEN EJECUTIVO
@@ -482,6 +703,7 @@ class AssetAllocationContentGenerator:
                     "(3) mercado destacado y principales riesgos a monitorear. "
                     "Usa datos del council. Separa parrafos con linea vacia. Maximo 200 palabras."
                     "\n\nESTRUCTURA RESUMEN AUTOCONTENIDO: El lector debe entender la postura completa leyendo SOLO esta sección. Incluye: régimen macro + dato, postura general + horizonte, qué cambió vs anterior, oportunidad + dato, riesgo + dato, acción concreta. Escribe 250-350 palabras. Explica jerga técnica (OW, UW, duration, carry, spread, risk-on/off) con paréntesis en primera mención."
+                    + self._canon_constraints()
                 ),
                 council_context=council_ctx,
                 company_name=self.company_name,
@@ -543,6 +765,7 @@ class AssetAllocationContentGenerator:
                     "Usa datos del council — NO inventes numeros. "
                     "Sin bullets ni numeracion."
                     "\n\nCada key point debe incluir: cadena dato→interpretación→acción, convicción (ALTA/MEDIA/BAJA) con evidencia, horizonte temporal (táctico 1-3m o estratégico 6-12m)."
+                    + self._canon_constraints()
                 ),
                 council_context=council_ctx,
                 company_name=self.company_name,
@@ -813,6 +1036,7 @@ class AssetAllocationContentGenerator:
                 f"{self.month_name} {self.date.year}. Cubrir: dinamica de indices (equity, bonos), "
                 "commodities, y cualquier divergencia relevante. Usa datos del council. "
                 "Separa parrafos con linea vacia. Maximo 120 palabras."
+                + self._canon_constraints()
             ),
             council_context=council_ctx,
             company_name=self.company_name,
@@ -930,6 +1154,7 @@ class AssetAllocationContentGenerator:
                 f"{self.date.year} basandote en el council. Cubrir las principales dinamicas: "
                 "tensiones comerciales, politica monetaria, conflictos regionales. "
                 "Separa parrafos con linea vacia. Maximo 150 palabras."
+                + self._canon_constraints()
             ),
             council_context=f"GEO PANEL:\n{geo[:2500]}",
             company_name=self.company_name,
@@ -1601,6 +1826,7 @@ class AssetAllocationContentGenerator:
                     "Usa datos del council. Maximo 70 palabras. "
                     f"IMPORTANTE: La narrativa DEBE ser consistente con {europe_view}. NO contradigas la postura."
                     "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
+                    + self._canon_constraints()
                 ),
                 council_context=council_ctx,
                 company_name=self.company_name,
@@ -2479,14 +2705,19 @@ class AssetAllocationContentGenerator:
                         mapped = fx_view_map.get(info.get('view', '').upper(), 'N/D')
                         view_usd = mapped
                         break
+            # Override with canonical USD view for consistency
+            canon_usd = self.canon.get('usd_view')
+            if canon_usd and canon_usd != 'N/D':
+                view_usd = canon_usd
             return {
                 'view_usd': view_usd,
                 'pares': pares,
             }
 
         # Fallback: minimal structure, no hardcoded targets
+        canon_usd = self.canon.get('usd_view', 'N/D')
         return {
-            'view_usd': 'N/D',
+            'view_usd': canon_usd,
             'pares': [
                 {'par': 'EUR/USD', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': 'Análisis en proceso — datos cuantitativos disponibles'},
                 {'par': 'USD/CLP', 'view': 'N/D', 'target_3m': 'N/D', 'target_12m': 'N/D', 'rationale': f'Spot: {usdclp_str}. Análisis en proceso — datos cuantitativos disponibles'},
@@ -2528,7 +2759,7 @@ class AssetAllocationContentGenerator:
         comm_views = self._extract_commodity_views()
 
         cobre_view = comm_views.get('Cobre', 'NEUTRAL' if self._has_council() else 'N/D')
-        oro_view = comm_views.get('Oro', 'NEUTRAL' if self._has_council() else 'N/D')
+        oro_view = self.canon.get('oro_view', comm_views.get('Oro', 'NEUTRAL' if self._has_council() else 'N/D'))
         oil_view = comm_views.get('Petróleo', 'NEUTRAL' if self._has_council() else 'N/D')
 
         # Generate target ranges from current prices (±5-10% band)
@@ -2982,8 +3213,31 @@ class AssetAllocationContentGenerator:
                 usd_view = 'N'
                 clp_view = 'N'
         conv_fx = 'MEDIA' if self.parser.has_council_text() else 'N/D'
+        # Use canonical USD view for consistency
+        canon_usd = self.canon.get('usd_view', usd_view)
+        if canon_usd != 'N/D':
+            usd_view = canon_usd
+            clp_view = {'OW': 'UW', 'UW': 'OW', 'N': 'N'}.get(usd_view, 'N')
         commodities_fx.append({'asset': 'USD (DXY)', 'view': usd_view, 'cambio': '→', 'conviccion': conv_fx})
         commodities_fx.append({'asset': 'CLP', 'view': clp_view, 'cambio': '→', 'conviccion': conv_fx})
+
+        # Override RF tramo views with canonical values
+        canon_rf = {
+            '2-5Y': self.canon.get('rf_2_5y_view'),
+            '5-10Y': self.canon.get('rf_5_10y_view'),
+            '10Y+': self.canon.get('rf_10y_plus_view'),
+        }
+        for item in renta_fija:
+            for tramo_key, canon_view in canon_rf.items():
+                if tramo_key in item.get('asset', '') and canon_view and canon_view != item.get('view'):
+                    item['view'] = canon_view
+
+        # Override oro view with canonical
+        canon_oro = self.canon.get('oro_view')
+        if canon_oro:
+            for item in commodities_fx:
+                if 'Oro' in item.get('asset', ''):
+                    item['view'] = canon_oro
 
         return {
             'renta_variable': renta_variable,
@@ -3380,7 +3634,207 @@ class AssetAllocationContentGenerator:
         except Exception:
             pass
 
+        # POST-GENERATION: enforce cross-section consistency using canonical data
+        content = self._enforce_consistency(content)
+
         return content
+
+    def _enforce_consistency(self, content: Dict[str, Any]) -> Dict[str, Any]:
+        """Post-generation validator: fix contradictions using canonical data."""
+        c = self.canon
+        fixes = []
+
+        # --- Fix 1: USD view must be same in dashboard and FX section ---
+        usd_view = c.get('usd_view', 'N')
+        dashboard = content.get('dashboard', {})
+        for panel_list in [dashboard.get('commodities_fx', [])]:
+            for item in panel_list:
+                if 'USD' in item.get('asset', '') or 'DXY' in item.get('asset', ''):
+                    if item.get('view') != usd_view:
+                        fixes.append(f"Dashboard USD: {item['view']} → {usd_view}")
+                        item['view'] = usd_view
+        fx = content.get('asset_classes', {}).get('fx', {})
+        if fx.get('view_usd') and fx['view_usd'] != usd_view:
+            fixes.append(f"FX section USD: {fx['view_usd']} → {usd_view}")
+            fx['view_usd'] = usd_view
+
+        # --- Fix 2: Oil price consistency — replace any fabricated price ---
+        oil_real = c.get('oil_wti')
+        if oil_real is not None:
+            oil_str = f"${oil_real:.1f}/bbl"
+            # Fix in narratives (resumen, mes_en_revision, etc.)
+            for section_key in ('resumen_ejecutivo', 'mes_en_revision'):
+                section = content.get(section_key, {})
+                self._replace_fabricated_price(section, 'oil', oil_real, fixes)
+
+        # --- Fix 3: UST 2-5Y view consistency ---
+        rf_2_5y = c.get('rf_2_5y_view', 'N')
+        rf_section = content.get('asset_classes', {}).get('renta_fija', {})
+        for tramo in rf_section.get('curva', []):
+            if tramo.get('tramo') == '2-5Y' and tramo.get('view') != rf_2_5y:
+                fixes.append(f"RF curva 2-5Y: {tramo['view']} → {rf_2_5y}")
+                tramo['view'] = rf_2_5y
+        # Also fix dashboard
+        for item in dashboard.get('renta_fija', []):
+            if '2-5' in item.get('asset', '') and item.get('view') != rf_2_5y:
+                fixes.append(f"Dashboard 2-5Y: {item['view']} → {rf_2_5y}")
+                item['view'] = rf_2_5y
+
+        # --- Fix 4: Gold view consistency ---
+        oro_view = c.get('oro_view', 'N')
+        for item in dashboard.get('commodities_fx', []):
+            if 'Oro' in item.get('asset', '') or 'Gold' in item.get('asset', ''):
+                if item.get('view') != oro_view:
+                    fixes.append(f"Dashboard Oro: {item['view']} → {oro_view}")
+                    item['view'] = oro_view
+        comm_section = content.get('asset_classes', {}).get('commodities', {})
+        if isinstance(comm_section, dict):
+            for comm in comm_section.get('detalle', []):
+                if 'Oro' in comm.get('nombre', ''):
+                    if comm.get('view') != oro_view:
+                        fixes.append(f"Commodities Oro: {comm['view']} → {oro_view}")
+                        comm['view'] = oro_view
+        # Focus list gold
+        fl = content.get('focus_list', {})
+        for cat_list in fl.values():
+            if isinstance(cat_list, list):
+                for item in cat_list:
+                    if item.get('ticker') == 'GLD' or 'oro' in item.get('nombre', '').lower():
+                        if item.get('view') != oro_view:
+                            fixes.append(f"Focus GLD: {item['view']} → {oro_view}")
+                            item['view'] = oro_view
+
+        # --- Fix 5: Brazil SELIC trigger enforcement ---
+        selic = c.get('selic')
+        if selic is not None and selic > 12.5:
+            views = content.get('views_regionales', [])
+            for v in views:
+                if 'Brasil' in v.get('region', ''):
+                    if v.get('view') not in ('UW',):
+                        fixes.append(f"Brasil: {v.get('view')} → UW (SELIC {selic}% > 12.5% trigger)")
+                        v['view'] = 'UW'
+                        v['conviccion'] = 'MEDIA'
+
+        # --- Fix 6: STOXX 600 P/E consistency ---
+        pe_stoxx = c.get('pe_stoxx')
+        if pe_stoxx is not None:
+            self._enforce_pe_in_narratives(content, 'STOXX 600', pe_stoxx, fixes)
+            self._enforce_pe_in_narratives(content, 'Europa', pe_stoxx, fixes)
+
+        # --- Fix 7: Duration vs stagflation ---
+        rf_5_10y = c.get('rf_5_10y_view', 'N')
+        rf_10y_plus = c.get('rf_10y_plus_view', 'N')
+        for tramo in rf_section.get('curva', []):
+            if tramo.get('tramo') == '5-10Y' and tramo.get('view') != rf_5_10y:
+                fixes.append(f"RF curva 5-10Y: {tramo['view']} → {rf_5_10y}")
+                tramo['view'] = rf_5_10y
+            if tramo.get('tramo') == '10Y+' and tramo.get('view') != rf_10y_plus:
+                fixes.append(f"RF curva 10Y+: {tramo['view']} → {rf_10y_plus}")
+                tramo['view'] = rf_10y_plus
+        for item in dashboard.get('renta_fija', []):
+            if '5-10' in item.get('asset', '') and item.get('view') != rf_5_10y:
+                fixes.append(f"Dashboard 5-10Y: {item['view']} → {rf_5_10y}")
+                item['view'] = rf_5_10y
+            if '10+' in item.get('asset', '') or '10Y+' in item.get('asset', ''):
+                if item.get('view') != rf_10y_plus:
+                    fixes.append(f"Dashboard 10Y+: {item['view']} → {rf_10y_plus}")
+                    item['view'] = rf_10y_plus
+
+        # --- Fix 8: VIX consistency in all narratives ---
+        vix = c.get('vix')
+        if vix is not None:
+            self._enforce_numeric_in_narratives(content, 'VIX', vix, fixes)
+
+        # --- Fix 9: Breakevens consistency ---
+        be5 = c.get('breakeven_5y')
+        if be5 is not None:
+            self._enforce_numeric_in_narratives(content, 'breakeven', be5, fixes, fmt='.2f', suffix='%')
+
+        if fixes:
+            import sys
+            for f in fixes:
+                print(f"CONSISTENCY-FIX: {f}", file=sys.stderr)
+
+        return content
+
+    def _replace_fabricated_price(self, section: dict, commodity: str, real_price: float, fixes: list):
+        """Replace fabricated commodity prices in narrative text."""
+        if not isinstance(section, dict):
+            return
+        for key, val in section.items():
+            if isinstance(val, str) and len(val) > 20:
+                # Find price patterns like $97.36, $71.1, etc.
+                import re as _re
+                if commodity == 'oil':
+                    for m in _re.finditer(r'\$(\d+\.?\d*)\s*/?\s*bbl', val):
+                        found_price = float(m.group(1))
+                        if abs(found_price - real_price) > 5:  # >$5 difference = fabricated
+                            old = m.group(0)
+                            new = f"${real_price:.1f}/bbl"
+                            section[key] = val.replace(old, new)
+                            fixes.append(f"Oil price: {old} → {new}")
+                            val = section[key]
+            elif isinstance(val, dict):
+                self._replace_fabricated_price(val, commodity, real_price, fixes)
+            elif isinstance(val, list):
+                for item in val:
+                    if isinstance(item, dict):
+                        self._replace_fabricated_price(item, commodity, real_price, fixes)
+
+    def _enforce_pe_in_narratives(self, content: dict, label: str, real_pe: float, fixes: list):
+        """Enforce consistent P/E value across all narrative text."""
+        if not isinstance(content, dict):
+            return
+        import re as _re
+        pattern = _re.compile(rf'{_re.escape(label)}\s+(?:P/E\s+(?:en\s+)?|a\s+)(\d+\.?\d*)x', _re.IGNORECASE)
+        for key, val in content.items():
+            if isinstance(val, str) and len(val) > 20:
+                for m in pattern.finditer(val):
+                    found = float(m.group(1))
+                    if abs(found - real_pe) > 1.0:  # >1 point difference
+                        old = m.group(0)
+                        new = old.replace(m.group(1) + 'x', f'{real_pe:.1f}x')
+                        content[key] = val.replace(old, new)
+                        fixes.append(f"{label} P/E: {found:.1f}x → {real_pe:.1f}x")
+                        val = content[key]
+            elif isinstance(val, dict):
+                self._enforce_pe_in_narratives(val, label, real_pe, fixes)
+            elif isinstance(val, list):
+                for item in val:
+                    if isinstance(item, dict):
+                        self._enforce_pe_in_narratives(item, label, real_pe, fixes)
+
+    def _enforce_numeric_in_narratives(self, content: dict, metric: str, real_val: float,
+                                        fixes: list, fmt: str = '.1f', suffix: str = ''):
+        """Enforce consistent numeric value for a metric across all narratives."""
+        if not isinstance(content, dict):
+            return
+        import re as _re
+        patterns = {
+            'VIX': r'VIX\s+(?:en\s+)?(\d+\.?\d*)',
+            'breakeven': r'breakeven[s]?\s+(?:de\s+inflaci[oó]n\s+)?5Y?\s+(?:en\s+)?(\d+\.?\d*)%?',
+        }
+        pat = patterns.get(metric)
+        if not pat:
+            return
+        regex = _re.compile(pat, _re.IGNORECASE)
+        for key, val in content.items():
+            if isinstance(val, str) and len(val) > 20:
+                for m in regex.finditer(val):
+                    found = float(m.group(1))
+                    threshold = 0.5 if metric == 'VIX' else 0.05
+                    if abs(found - real_val) > threshold:
+                        old_num = m.group(1)
+                        new_num = f"{real_val:{fmt}}"
+                        content[key] = val.replace(old_num, new_num, 1)
+                        fixes.append(f"{metric}: {old_num}{suffix} → {new_num}{suffix}")
+                        val = content[key]
+            elif isinstance(val, dict):
+                self._enforce_numeric_in_narratives(val, metric, real_val, fixes, fmt, suffix)
+            elif isinstance(val, list):
+                for item in val:
+                    if isinstance(item, dict):
+                        self._enforce_numeric_in_narratives(item, metric, real_val, fixes, fmt, suffix)
 
 
 def main():
