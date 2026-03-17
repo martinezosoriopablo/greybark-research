@@ -17,9 +17,12 @@ Este modulo genera contenido especifico de mercados accionarios.
 
 import json
 import re
+import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class RVContentGenerator:
@@ -446,34 +449,35 @@ class RVContentGenerator:
         if not self._has_council():
             return defaults
 
-        rv = self._panel('rv')
-        geo = self._panel('geo')
-        source = rv + '\n' + geo
+        # Text mining fallback ONLY when structured parser returned nothing
+        if not equity_views:
+            rv = self._panel('rv')
+            geo = self._panel('geo')
+            source = rv + '\n' + geo
 
-        # Try to detect region views from council text
-        region_map = {
-            'Estados Unidos': ('S&P 500', ['estados unidos', 's&p', 'us equity', 'eeuu']),
-            'Europa': ('Stoxx 600', ['europa', 'stoxx', 'europe']),
-            'Emergentes': ('MSCI EM', ['emergentes', 'em ', 'emerging']),
-            'Chile': ('IPSA', ['chile', 'ipsa']),
-        }
-        text_lower = source.lower()
+            # Try to detect region views from council text
+            region_map = {
+                'Estados Unidos': ('S&P 500', ['estados unidos', 's&p', 'us equity', 'eeuu']),
+                'Europa': ('Stoxx 600', ['europa', 'stoxx', 'europe']),
+                'Emergentes': ('MSCI EM', ['emergentes', 'em ', 'emerging']),
+                'Chile': ('IPSA', ['chile', 'ipsa']),
+            }
+            text_lower = source.lower()
 
-        for row in defaults:
-            if row['mercado'] in region_map:
-                _, keywords = region_map[row['mercado']]
-                for kw in keywords:
-                    if kw in text_lower:
-                        # Check for OW (Overweight/Sobreponderar) / UW (Underweight/Subponderar) / Neutral signals near the keyword
-                        idx = text_lower.find(kw)
-                        context = text_lower[max(0, idx-50):idx+100]
-                        if 'underweight' in context or 'uw' in context or 'reducir' in context:
-                            row['view'] = 'UW'
-                        elif 'overweight' in context or ' ow' in context or 'preferimos' in context or 'sobreponderar' in context:
-                            row['view'] = 'OW'
-                        elif 'neutral' in context:
-                            row['view'] = 'NEUTRAL'
-                        break
+            for row in defaults:
+                if row['mercado'] in region_map:
+                    _, keywords = region_map[row['mercado']]
+                    for kw in keywords:
+                        if kw in text_lower:
+                            idx = text_lower.find(kw)
+                            context = text_lower[max(0, idx-50):idx+100]
+                            if 'underweight' in context or 'uw' in context or 'reducir' in context:
+                                row['view'] = 'UW'
+                            elif 'overweight' in context or ' ow' in context or 'preferimos' in context or 'sobreponderar' in context:
+                                row['view'] = 'OW'
+                            elif 'neutral' in context:
+                                row['view'] = 'NEUTRAL'
+                            break
 
         return defaults
 
@@ -1115,6 +1119,20 @@ class RVContentGenerator:
             return default_calendar
 
         entries = calendar.get('entries', [])
+        if not entries:
+            return default_calendar
+
+        # Filter out past dates — only show upcoming earnings
+        from datetime import datetime as _dt
+        today = _dt.now().date()
+
+        def _parse_date_safe(s):
+            try:
+                return _dt.strptime(s, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return _dt.max.date()
+
+        entries = [e for e in entries if _parse_date_safe(e.get('report_date', '')) >= today]
         if not entries:
             return default_calendar
 
@@ -2977,6 +2995,36 @@ class RVContentGenerator:
             'targets': rows,
         }
 
+    def _reconcile_views(self, content: Dict[str, Any]):
+        """Compare summary table views vs regional narrative views; log and fix conflicts."""
+        table_rows = content.get('resumen_ejecutivo', {}).get('summary_table', [])
+        regiones = content.get('regiones', {})
+
+        # Map summary table region names → regional view keys
+        region_key_map = {
+            'Estados Unidos': 'us',
+            'Europa': 'europe',
+            'Emergentes': 'em',
+            'Japon': 'japan',
+            'Chile': 'chile',
+        }
+
+        for row in table_rows:
+            mercado = row.get('mercado', '')
+            rkey = region_key_map.get(mercado)
+            if not rkey:
+                continue
+            regional = regiones.get(rkey, {})
+            table_view = row.get('view', 'N')
+            narrative_view = regional.get('view', 'N')
+
+            if table_view != narrative_view and narrative_view != 'N':
+                logger.warning(
+                    f"VIEW CONFLICT: {mercado} — table={table_view}, narrative={narrative_view}. "
+                    f"Overriding table to match narrative (parser-sourced)."
+                )
+                row['view'] = narrative_view
+
     def generate_all_content(self) -> Dict[str, Any]:
         """Genera todo el contenido del reporte RV."""
         # Set up anti-fabrication filter with verified market data
@@ -3012,6 +3060,9 @@ class RVContentGenerator:
         eq_targets = self.generate_equity_targets()
         if eq_targets.get('available'):
             content['equity_targets'] = eq_targets
+
+        # Reconciliation: compare summary table views vs regional narrative views
+        self._reconcile_views(content)
 
         # Clear anti-fabrication verified data
         try:

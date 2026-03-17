@@ -20,14 +20,8 @@ from bs4 import BeautifulSoup
 import json
 
 
-# Rutas de reportes: se busca en AMBAS carpetas y se combinan resultados
-_LOCAL_HTML_OUT = Path(__file__).resolve().parent / "html_out"
-_LEGACY_HTML_OUT = Path.home() / "OneDrive/Documentos/proyectos/archivo_reportes/html"
-_ALL_REPORT_PATHS = [p for p in [_LOCAL_HTML_OUT, _LEGACY_HTML_OUT] if p.exists()]
-DEFAULT_REPORTS_PATH = os.environ.get(
-    'DAILY_REPORTS_PATH',
-    str(_ALL_REPORT_PATHS[0]) if _ALL_REPORT_PATHS else str(_LOCAL_HTML_OUT)
-)
+# Ruta por defecto de los reportes
+DEFAULT_REPORTS_PATH = os.environ.get('DAILY_REPORTS_PATH', str(Path.home() / "OneDrive/Documentos/proyectos/html_out"))
 
 
 class DailyReportParser:
@@ -35,19 +29,10 @@ class DailyReportParser:
 
     def __init__(self, reports_path: str = DEFAULT_REPORTS_PATH):
         self.reports_path = Path(reports_path)
-        # Search paths: explicit path + all known paths (deduplicated)
-        self._search_paths = []
-        seen = set()
-        for p in [self.reports_path] + _ALL_REPORT_PATHS:
-            rp = p.resolve()
-            if rp not in seen and rp.exists():
-                seen.add(rp)
-                self._search_paths.append(p)
 
     def list_reports(self, report_type: str = "no_finanzas", days: int = 30) -> List[Path]:
         """
         Lista reportes disponibles filtrados por tipo y fecha.
-        Busca en TODAS las rutas conocidas y combina resultados.
 
         Args:
             report_type: "no_finanzas" o "finanzas"
@@ -59,24 +44,18 @@ class DailyReportParser:
         pattern = f"*_{report_type}_*.html"
         cutoff_date = datetime.now() - timedelta(days=days)
 
-        # Collect from all search paths, deduplicate by filename
-        seen_names = set()
         reports = []
-        for search_path in self._search_paths:
-            for f in search_path.glob(pattern):
-                if f.name in seen_names:
+        for f in self.reports_path.glob(pattern):
+            # Extraer fecha del nombre: daily_report_PM_no_finanzas_2026-02-03.html
+            match = re.search(r'(\d{4}-\d{2}-\d{2})', f.name)
+            if match:
+                date_str = match.group(1)
+                try:
+                    file_date = datetime.strptime(date_str, '%Y-%m-%d')
+                    if file_date >= cutoff_date:
+                        reports.append((file_date, f))
+                except ValueError:
                     continue
-                seen_names.add(f.name)
-                # Extraer fecha del nombre: daily_report_PM_no_finanzas_2026-02-03.html
-                match = re.search(r'(\d{4}-\d{2}-\d{2})', f.name)
-                if match:
-                    date_str = match.group(1)
-                    try:
-                        file_date = datetime.strptime(date_str, '%Y-%m-%d')
-                        if file_date >= cutoff_date:
-                            reports.append((file_date, f))
-                    except ValueError:
-                        continue
 
         # Ordenar por fecha
         reports.sort(key=lambda x: x[0])

@@ -1008,7 +1008,7 @@ def generate_narrative(
     council_context: str,
     quant_context: str = "",
     company_name: str = "",
-    max_tokens: int = 1000,
+    max_tokens: int = 4000,
     temperature: float = 0.3,
     correction_directive: str = "",
     verified_data: Dict[str, float] = None,
@@ -1077,6 +1077,15 @@ def generate_narrative(
             messages=[{"role": "user", "content": user_message}],
         )
         text = response.content[0].text.strip()
+
+        # Detect truncation due to max_tokens limit
+        if hasattr(response, 'stop_reason') and response.stop_reason == "max_tokens":
+            logger.warning(
+                f"narrative_engine: {section_name} TRUNCATED at {max_tokens} tokens "
+                f"({len(text)} chars). Consider increasing max_tokens for this section."
+            )
+            text += "\n<p><em>[Sección incompleta — revisar]</em></p>"
+
         logger.info(f"narrative_engine: {section_name} — {len(text)} chars generated")
 
         # Post-generation anti-fabrication filter
@@ -1098,7 +1107,7 @@ def generate_data_driven_narrative(
     prompt: str,
     quant_context: str,
     company_name: str = "",
-    max_tokens: int = 800,
+    max_tokens: int = 4000,
     temperature: float = 0.3,
     verified_data: Dict[str, float] = None,
 ) -> str:

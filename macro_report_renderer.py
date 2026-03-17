@@ -88,6 +88,27 @@ class MacroReportRenderer:
         except Exception:
             self._data_provider = None
 
+        # Inject spot values from quant_data so chart annotations match text
+        if self._data_provider and self.quant_data:
+            spot = {}
+            risk = self.quant_data.get('risk', {})
+            if isinstance(risk, dict):
+                vix_d = risk.get('vix', {})
+                if isinstance(vix_d, dict):
+                    spot['vix'] = vix_d.get('current')
+            chile = self.quant_data.get('chile', {})
+            if isinstance(chile, dict):
+                spot['tpm'] = chile.get('tpm')
+                spot['copper'] = chile.get('copper_price')
+            inflation = self.quant_data.get('inflation', {})
+            if isinstance(inflation, dict):
+                spot['breakeven_5y'] = inflation.get('breakeven_5y')
+                spot['breakeven_10y'] = inflation.get('breakeven_10y')
+            rates = self.quant_data.get('rates', {})
+            if isinstance(rates, dict):
+                spot['ust_10y'] = rates.get('terminal_rate')
+            self._data_provider._injected_spot = {k: v for k, v in spot.items() if v is not None}
+
         # Inicializar generador de contenido (with data provider for real Chile data)
         self.content_generator = MacroContentGenerator(
             self.council_result, quant_data=self.quant_data,

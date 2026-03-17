@@ -28,9 +28,12 @@ Uso:
 import sys
 import os
 import json
+import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Fix Windows console encoding for library modules that use unicode
 os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
@@ -169,7 +172,7 @@ class EquityDataCollector:
                     'pe_trailing': self._safe_float(info.get('trailingPE')),
                     'pe_forward': self._safe_float(info.get('forwardPE')),
                     'pb': self._safe_float(info.get('priceToBook')),
-                    'dividend_yield': (lambda dy: round(dy * 100, 2) if dy < 1 else round(dy, 2))(self._safe_float(info.get('dividendYield'))) if info.get('dividendYield') else None,
+                    'dividend_yield': self._safe_float(info.get('dividendYield', 0)) * 100 if info.get('dividendYield') else None,
                     'returns': {k: round(v, 2) for k, v in returns.items()},
                     'fifty_two_week_high': self._safe_float(info.get('fiftyTwoWeekHigh')),
                     'fifty_two_week_low': self._safe_float(info.get('fiftyTwoWeekLow')),
@@ -318,17 +321,30 @@ class EquityDataCollector:
             var_data = rm.calculate_all_var()
             dd_data = rm.drawdown_analysis()
 
+            var_95_raw = var_data.get('var_95_historical')
+            var_99_raw = var_data.get('var_99_historical')
+            es_95_raw = var_data.get('es_95')
+            dd_max_raw = dd_data.get('max_drawdown')
+            dd_cur_raw = dd_data.get('current_drawdown')
+
             result = {
                 'correlation_matrix': corr_dict,
                 'correlation_period': f'{recent_returns.index[0].strftime("%Y-%m-%d")} to {recent_returns.index[-1].strftime("%Y-%m-%d")}',
-                'var_95_daily': round(var_data.get('var_95_historical', 0) * 100, 3),
-                'var_99_daily': round(var_data.get('var_99_historical', 0) * 100, 3),
-                'cvar_95': round(var_data.get('es_95', 0) * 100, 3),
-                'max_drawdown': round(dd_data.get('max_drawdown', 0) * 100, 2),
-                'current_drawdown': round(dd_data.get('current_drawdown', 0) * 100, 2),
+                'var_95_daily': round(var_95_raw * 100, 3) if var_95_raw is not None else None,
+                'var_99_daily': round(var_99_raw * 100, 3) if var_99_raw is not None else None,
+                'cvar_95': round(es_95_raw * 100, 3) if es_95_raw is not None else None,
+                'max_drawdown': round(dd_max_raw * 100, 2) if dd_max_raw is not None else None,
+                'current_drawdown': round(dd_cur_raw * 100, 2) if dd_cur_raw is not None else None,
                 'diversification_score': round(rm.diversification_score(), 3),
                 'source': 'greybark.risk.metrics (yfinance)',
             }
+
+            # Sanity check: VaR values outside [0.01, 15.0]% are likely errors
+            for k in ('var_95_daily', 'var_99_daily', 'cvar_95'):
+                v = result.get(k)
+                if v is not None and (abs(v) < 0.01 or abs(v) > 15.0):
+                    logger.warning(f"VaR sanity fail: {k}={v}% out of range [0.01-15.0], setting None")
+                    result[k] = None
 
             # VIX actual
             try:
@@ -351,8 +367,9 @@ class EquityDataCollector:
             except Exception as e:
                 self._print(f"    [WARN] VIX: {e}")
 
+            var95_str = f"{result['var_95_daily']}%" if result['var_95_daily'] is not None else "N/D"
             self._print(f"    [OK] Correlación: {len(corr_dict)} activos, "
-                        f"VaR95={result['var_95_daily']}%")
+                        f"VaR95={var95_str}")
             return result
 
         except Exception as e:
@@ -392,15 +409,20 @@ class EquityDataCollector:
                         # 1. Earnings history (EARNINGS endpoint)
                         report = ea.get_earnings_history(ticker)
                         stock_data = {'ticker': ticker}
-                        estimates = {}  # default, overwritten in step 2
 
                         if 'error' not in report:
                             track = report.get('track_record', {})
                             annual = report.get('annual_eps', {})
+                            eps_growth = annual.get('yoy_growth_pct')
+                            # Cap extreme EPS growth outliers (e.g. low-base effect)
+                            if eps_growth is not None and abs(eps_growth) > 500:
+                                logger.warning(f"EPS growth outlier {ticker}: {eps_growth:.0f}%, capping to None")
+                                eps_growth = None
+
                             stock_data.update({
                                 'beat_rate': track.get('beat_rate_pct'),
                                 'avg_surprise': track.get('avg_surprise_pct'),
-                                'eps_growth_yoy': annual.get('yoy_growth_pct'),
+                                'eps_growth_yoy': eps_growth,
                                 'quarters_analyzed': len(report.get('quarterly_earnings', [])),
                             })
                             self._print(f"    [OK] {ticker}: beat={track.get('beat_rate_pct', 'N/A')}%")
@@ -453,49 +475,6 @@ class EquityDataCollector:
                             except Exception as e:
                                 self._print(f"    [WARN] {ticker} income: {e}")
 
-                        # 5. Balance Sheet quality (BALANCE_SHEET endpoint)
-                        bs_quality = {}
-                        try:
-                            bs_quality = ea.get_balance_sheet_quality(ticker)
-                            if 'error' not in bs_quality:
-                                stock_data['debt_to_equity'] = bs_quality.get('debt_to_equity')
-                                stock_data['current_ratio'] = bs_quality.get('current_ratio')
-                                stock_data['bs_quality_grade'] = bs_quality.get('quality_grade')
-                                self._print(f"    [OK] {ticker} BS: D/E={bs_quality.get('debt_to_equity')}, grade={bs_quality.get('quality_grade')}")
-                        except Exception as e:
-                            self._print(f"    [WARN] {ticker} balance sheet: {e}")
-
-                        # 6. Cash Flow quality (CASH_FLOW endpoint)
-                        cf_quality = {}
-                        try:
-                            cf_quality = ea.get_cash_flow_quality(ticker)
-                            if 'error' not in cf_quality:
-                                stock_data['fcf_yield'] = cf_quality.get('fcf_yield_pct')
-                                stock_data['fcf_to_ni'] = cf_quality.get('fcf_to_net_income')
-                                stock_data['cf_quality_grade'] = cf_quality.get('quality_grade')
-                                self._print(f"    [OK] {ticker} CF: FCF yield={cf_quality.get('fcf_yield_pct')}%, grade={cf_quality.get('quality_grade')}")
-                        except Exception as e:
-                            self._print(f"    [WARN] {ticker} cash flow: {e}")
-
-                        # 7. Earnings Quality Composite (0 extra API calls)
-                        try:
-                            # Inject fcf_to_ni into history dict for composite scorer
-                            hist_for_composite = report if 'error' not in report else {}
-                            if cf_quality and 'error' not in cf_quality:
-                                hist_for_composite['fcf_to_net_income'] = cf_quality.get('fcf_to_net_income')
-
-                            est_for_composite = estimates if isinstance(estimates, dict) and 'error' not in estimates else {}
-                            insider_data = ea.get_insider_activity(ticker) if ticker in {'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'META', 'AMZN', 'JPM', 'UNH'} else {}
-
-                            eq_score = ea.get_earnings_quality_composite(
-                                ticker, hist_for_composite, est_for_composite, insider_data
-                            )
-                            stock_data['earnings_quality_score'] = eq_score.get('score')
-                            stock_data['earnings_quality_grade'] = eq_score.get('grade')
-                            self._print(f"    [OK] {ticker} composite: score={eq_score.get('score')}, grade={eq_score.get('grade')}")
-                        except Exception as e:
-                            self._print(f"    [WARN] {ticker} composite: {e}")
-
                         group_data.append(stock_data)
 
                     except Exception as e:
@@ -522,11 +501,6 @@ class EquityDataCollector:
                         'avg_roe': _avg('roe'),
                         'avg_trailing_pe': _avg('trailing_pe'),
                         'avg_forward_pe': _avg('forward_pe'),
-                        # New: AlphaVantage Premium deep-dive
-                        'avg_fcf_yield': _avg('fcf_yield'),
-                        'avg_debt_to_equity': _avg('debt_to_equity'),
-                        'avg_fcf_to_ni': _avg('fcf_to_ni'),
-                        'avg_earnings_quality': _avg('earnings_quality_score'),
                         'source': 'greybark.earnings_analytics (AlphaVantage)',
                     }
                 else:
@@ -854,96 +828,6 @@ class EquityDataCollector:
             return {'error': str(e)}
 
     # =========================================================================
-    # 12. MARKET MOVERS (AlphaVantage TOP_GAINERS_LOSERS)
-    # =========================================================================
-
-    def _collect_market_movers(self) -> Dict[str, Any]:
-        """
-        Obtiene top gainers, losers y most active via AlphaVantage.
-
-        Datos: top 5 de cada categoría + breadth signal.
-        Fuente: AlphaVantage TOP_GAINERS_LOSERS (1 API call total)
-        """
-        self._print("  [12] Market movers (AlphaVantage)...")
-
-        try:
-            from greybark.data_sources.alphavantage_client import AlphaVantageClient
-            client = AlphaVantageClient()
-            raw = client.get_top_gainers_losers()
-
-            if not raw or 'top_gainers' not in raw:
-                return {'error': 'No market movers data returned'}
-
-            top_gainers = raw.get('top_gainers', [])[:5]
-            top_losers = raw.get('top_losers', [])[:5]
-            most_active = raw.get('most_actively_traded', [])[:5]
-
-            # Breadth signal: avg gainer % vs avg loser %
-            def _avg_change(items):
-                vals = []
-                for item in items:
-                    pct = item.get('change_percentage', '0%')
-                    try:
-                        vals.append(float(str(pct).replace('%', '')))
-                    except (ValueError, TypeError):
-                        pass
-                return round(sum(vals) / len(vals), 2) if vals else 0
-
-            avg_gainer_pct = _avg_change(raw.get('top_gainers', [])[:10])
-            avg_loser_pct = _avg_change(raw.get('top_losers', [])[:10])
-
-            breadth_signal = 'BULLISH' if avg_gainer_pct > abs(avg_loser_pct) * 1.2 else (
-                'BEARISH' if abs(avg_loser_pct) > avg_gainer_pct * 1.2 else 'NEUTRAL')
-
-            result = {
-                'top_gainers': top_gainers,
-                'top_losers': top_losers,
-                'most_active': most_active,
-                'avg_gainer_pct': avg_gainer_pct,
-                'avg_loser_pct': avg_loser_pct,
-                'breadth_signal': breadth_signal,
-                'source': 'AlphaVantage TOP_GAINERS_LOSERS',
-            }
-
-            self._print(f"    [OK] Market movers: gainers avg={avg_gainer_pct}%, losers avg={avg_loser_pct}% → {breadth_signal}")
-            return result
-
-        except Exception as e:
-            self._print(f"    [ERR] Market movers: {e}")
-            return {'error': str(e)}
-
-    # =========================================================================
-    # 13. NEWS SENTIMENT (AlphaVantage)
-    # =========================================================================
-
-    def _collect_news_sentiment(self) -> Dict[str, Any]:
-        """
-        Obtiene sentiment por sector via AlphaVantage NEWS_SENTIMENT.
-
-        Reutiliza get_all_sectors_sentiment() ya codificado.
-        Fuente: AlphaVantage NEWS_SENTIMENT (7 API calls, 1 per sector)
-        """
-        self._print("  [13] News sentiment (AlphaVantage)...")
-
-        try:
-            from greybark.data_sources.alphavantage_client import AlphaVantageClient
-            client = AlphaVantageClient()
-            result = client.get_all_sectors_sentiment(days_back=7)
-
-            if not result:
-                return {'error': 'No sentiment data returned'}
-
-            self._print(f"    [OK] News sentiment: {len(result)} sectors")
-            return {
-                'sectors': result,
-                'source': 'AlphaVantage NEWS_SENTIMENT',
-            }
-
-        except Exception as e:
-            self._print(f"    [ERR] News sentiment: {e}")
-            return {'error': str(e)}
-
-    # =========================================================================
     # ORQUESTADOR PRINCIPAL
     # =========================================================================
 
@@ -956,8 +840,7 @@ class EquityDataCollector:
 
         Returns:
             Dict con keys: valuations, sectors, risk, earnings, factors,
-            real_rates, credit, style, df_intelligence, bcch_indices,
-            chile_picks, market_movers, news_sentiment, metadata
+            real_rates, credit, style, df_intelligence, bcch_indices, metadata
         """
         self._print("\n" + "=" * 60)
         self._print("EQUITY DATA COLLECTOR - RECOPILACIÓN DE DATOS")
@@ -989,24 +872,6 @@ class EquityDataCollector:
             data['earnings'] = self.collect_earnings_data()
         except Exception as e:
             data['earnings'] = {'error': str(e)}
-
-        # 4b. PE Forward fallback: ETFs don't have forwardPE in yfinance,
-        #     use avg_forward_pe from mega-cap earnings as proxy
-        try:
-            valuations = data.get('valuations', {})
-            earnings = data.get('earnings', {})
-            region_earnings_map = {'us': 'us_mega', 'europe': 'europe', 'chile': 'chile'}
-            for region, earn_key in region_earnings_map.items():
-                v = valuations.get(region, {})
-                if isinstance(v, dict) and v.get('pe_forward') is None:
-                    earn = earnings.get(earn_key, {})
-                    avg_fwd = earn.get('avg_forward_pe') if isinstance(earn, dict) else None
-                    if avg_fwd is not None:
-                        v['pe_forward'] = round(float(avg_fwd), 2)
-                        v['pe_forward_source'] = f'mega-cap avg ({earn_key})'
-                        self._print(f"    [FWD PE] {region}: {avg_fwd:.1f}x (from {earn_key} mega-caps)")
-        except Exception as e:
-            self._print(f"    [WARN] PE forward fallback: {e}")
 
         # 5. Factor analysis
         try:
@@ -1049,23 +914,6 @@ class EquityDataCollector:
             data['chile_picks'] = self.collect_chile_top_picks()
         except Exception as e:
             data['chile_picks'] = []
-
-        # Rate limit pause before AlphaVantage burst (earnings already used ~45 calls)
-        import time
-        self._print("  -> Rate limit pause (1s) before market movers + sentiment...")
-        time.sleep(1.0)
-
-        # 12. Market Movers (AlphaVantage TOP_GAINERS_LOSERS)
-        try:
-            data['market_movers'] = self._collect_market_movers()
-        except Exception as e:
-            data['market_movers'] = {'error': str(e)}
-
-        # 13. News Sentiment (AlphaVantage NEWS_SENTIMENT)
-        try:
-            data['news_sentiment'] = self._collect_news_sentiment()
-        except Exception as e:
-            data['news_sentiment'] = {'error': str(e)}
 
         # Metadata
         elapsed = (datetime.now() - start).total_seconds()

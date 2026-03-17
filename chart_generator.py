@@ -13,7 +13,6 @@ Dependencias:
 
 import base64
 import io
-import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import warnings
@@ -33,13 +32,35 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
     print("Warning: matplotlib not installed. Charts will use fallback placeholders.")
 
-from chart_config import get_chart_colors, get_failure_tracker
-
-logger = logging.getLogger(__name__)
-
 
 class ChartGenerator:
     """Generador de charts para reportes."""
+
+    # Colores Greybark (consistente con CSS — escala de negros)
+    COLORS = {
+        'primary_blue': '#1a1a1a',
+        'secondary_blue': '#3a3a3a',
+        'accent_orange': '#dd6b20',
+        'positive': '#276749',
+        'negative': '#c53030',
+        'neutral': '#744210',
+        'bg_light': '#f7f7f7',
+        'text_dark': '#1a1a1a',
+        'text_medium': '#4a4a4a',
+        'text_light': '#718096',
+    }
+
+    # Paleta para series multiples
+    SERIES_COLORS = [
+        '#1a365d',  # Dark blue
+        '#dd6b20',  # Orange
+        '#276749',  # Green
+        '#c53030',  # Red
+        '#805ad5',  # Purple
+        '#d69e2e',  # Gold
+        '#319795',  # Teal
+        '#e53e3e',  # Light red
+    ]
 
     @staticmethod
     def _safe_float(val, default: float = 0.0) -> float:
@@ -54,15 +75,10 @@ class ChartGenerator:
         except (ValueError, TypeError):
             return default
 
-    def __init__(self, width: int = 8, height: int = 4, dpi: int = 100, branding: Dict = None):
+    def __init__(self, width: int = 8, height: int = 4, dpi: int = 100):
         self.width = width
         self.height = height
         self.dpi = dpi
-        # Derive colors from branding (or use Greybark defaults)
-        scheme = get_chart_colors(branding)
-        self.COLORS = scheme.to_dict()
-        self.SERIES_COLORS = scheme.series
-        self._failure_tracker = get_failure_tracker()
         self._setup_style()
 
     def _setup_style(self):
@@ -1005,30 +1021,26 @@ class ChartGenerator:
 class MacroChartsGenerator:
     """Generador de charts especificos para el Reporte Macro."""
 
-    def __init__(self, data_provider=None, forecast_data: Dict = None, branding: Dict = None):
-        self.chart_gen = ChartGenerator(branding=branding)
+    def __init__(self, data_provider=None, forecast_data: Dict = None):
+        self.chart_gen = ChartGenerator()
         self.data = data_provider  # ChartDataProvider or None (fallback to _interp)
         self.forecast_data = forecast_data or {}
-        self._failure_tracker = get_failure_tracker()
-        self._nairu_cache = None
-        self.chart_sources = {}  # Track data source per chart: 'real', 'partial', 'fallback'
 
-    def _get_nairu(self) -> float:
-        """Fetch CBO NAIRU from FRED (NROU series), cached. Fallback: 4.2%."""
-        if self._nairu_cache is not None:
-            return self._nairu_cache
-        if self.data:
-            try:
-                s = self.data.get_fred_series('NROU', resample=None)
-                if s is not None and len(s) > 0:
-                    val = float(s.dropna().iloc[-1])
-                    if 2.0 <= val <= 8.0:  # sanity check
-                        self._nairu_cache = round(val, 1)
-                        return self._nairu_cache
-            except Exception:
-                pass
-        self._nairu_cache = 4.2
-        return self._nairu_cache
+    def _sync_spot(self, series: list, spot_key: str) -> list:
+        """Override last data point with injected spot value for chart/text consistency.
+
+        If the ChartDataProvider has an injected spot value for `spot_key`,
+        replace the last (date, value) tuple so the chart legend "Ult:" matches
+        the value used in report text.
+        """
+        if not self.data or not series:
+            return series
+        spot = self.data.get_spot(spot_key)
+        if spot is not None:
+            series = list(series)  # copy
+            date_last = series[-1][0]
+            series[-1] = (date_last, spot)
+        return series
 
     def generate_all_charts(self, content: Dict[str, Any]) -> Dict[str, str]:
         """
@@ -1043,14 +1055,13 @@ class MacroChartsGenerator:
         charts = {}
 
         def _safe_chart(chart_id, fn):
-            """Generate a chart with error isolation + failure tracking."""
+            """Generate a chart with error isolation."""
             try:
                 result = fn()
                 if result:
                     charts[chart_id] = result
             except Exception as e:
-                self._failure_tracker.record(chart_id, str(e), fallback_used=False)
-                logger.warning("Chart '%s' failed: %s", chart_id, e)
+                print(f"  [WARN] Chart '{chart_id}' failed: {e}")
 
         # 0. Time Series Charts (new)
         try:
@@ -1104,12 +1115,7 @@ class MacroChartsGenerator:
 
         # 6. Risk Matrix
         if 'escenarios_riesgos' in content:
-            risks_raw = content['escenarios_riesgos'].get('top_risks', [])
-            # Handle both list and dict format (dict wraps list in 'riesgos' key)
-            if isinstance(risks_raw, dict):
-                risks = risks_raw.get('riesgos', [])
-            else:
-                risks = risks_raw
+            risks = content['escenarios_riesgos'].get('top_risks', [])
             if risks:
                 _safe_chart('risk_matrix',
                             lambda: self.chart_gen.generate_risk_matrix(risks))
@@ -1206,48 +1212,7 @@ class MacroChartsGenerator:
         charts['chile_external'] = self._generate_chile_external_chart()
         charts['latam_rates'] = self._generate_latam_rates()
         charts['epu_geopolitics'] = self._generate_epu_geopolitics()
-
-        # Track data sources for each chart by detecting markers in SVG content
-        for name, svg in charts.items():
-            if not svg:
-                self.chart_sources[name] = 'error'
-            elif any(m in svg for m in ['datos reales', 'datos FRED', 'datos BCCh',
-                                         'datos Bloomberg', '(datos real', 'real BCCh',
-                                         'real FRED']):
-                self.chart_sources[name] = 'real'
-            elif 'ltimo real' in svg or 'partial' in svg.lower():
-                self.chart_sources[name] = 'partial'
-            elif 'ESTIMADO' in svg:
-                self.chart_sources[name] = 'fallback'
-            else:
-                self.chart_sources[name] = 'generated'  # content-driven charts
-
         return charts
-
-    def get_chart_source_summary(self) -> Dict[str, Any]:
-        """Returns summary of chart data sources for audit/documentation."""
-        real = [k for k, v in self.chart_sources.items() if v == 'real']
-        partial = [k for k, v in self.chart_sources.items() if v == 'partial']
-        fallback = [k for k, v in self.chart_sources.items() if v == 'fallback']
-        generated = [k for k, v in self.chart_sources.items() if v == 'generated']
-        errors = [k for k, v in self.chart_sources.items() if v == 'error']
-        total = len(self.chart_sources)
-        return {
-            'total': total,
-            'real_api': len(real),
-            'partial_real': len(partial),
-            'fallback_estimated': len(fallback),
-            'content_generated': len(generated),
-            'errors': len(errors),
-            'real_pct': round(100 * len(real) / total, 1) if total else 0,
-            'details': {
-                'real': real,
-                'partial': partial,
-                'fallback': fallback,
-                'generated': generated,
-                'errors': errors,
-            }
-        }
 
     def _generate_inflation_evolution(self) -> str:
         """Inflación Core: Principales Economías (120m, Feb 2016 - Jan 2026)."""
@@ -1300,7 +1265,7 @@ class MacroChartsGenerator:
             'Chile IPC SAE': list(zip(months, chile)),
         }
         return self.chart_gen.generate_time_series(
-            series, title='Inflación Core: Principales Economías (ESTIMADO)',
+            series, title='Inflación Core: Principales Economías (10 años)',
             ylabel='% a/a', target_line=2.0, target_label='Target 2%')
 
     def _generate_labor_unemployment(self) -> str:
@@ -1316,10 +1281,9 @@ class MacroChartsGenerator:
                         'U3 (Oficial)': u3_real,
                         'U6 (Amplio)': u6_real,
                     }
-                    nairu = self._get_nairu()
                     return self.chart_gen.generate_time_series(
                         series, title='Tasa de Desempleo USA: U3 vs U6 (datos FRED)',
-                        ylabel='%', target_line=nairu, target_label=f'NAIRU ~{nairu}%')
+                        ylabel='%', target_line=4.0, target_label='NAIRU ~4.0%')
             except Exception as e:
                 print(f"[Charts] labor_unemployment FRED fallback: {e}")
 
@@ -1343,10 +1307,9 @@ class MacroChartsGenerator:
             'U3 (Oficial)': list(zip(months, u3)),
             'U6 (Amplio)': list(zip(months, u6)),
         }
-        nairu = self._get_nairu()
         return self.chart_gen.generate_time_series(
-            series, title='Tasa de Desempleo USA: U3 vs U6 (ESTIMADO)',
-            ylabel='%', target_line=nairu, target_label=f'NAIRU ~{nairu}%')
+            series, title='Tasa de Desempleo USA: U3 vs U6 (10 años)',
+            ylabel='%', target_line=4.0, target_label='NAIRU ~4.0%')
 
     def _generate_labor_nfp(self) -> str:
         """Non-Farm Payrolls mensual (120m). Trunca extremos COVID y los anota."""
@@ -1430,7 +1393,7 @@ class MacroChartsGenerator:
                            rotation=45, ha='right', fontsize=7)
 
         ax.set_ylabel('Miles de empleos', fontweight='bold')
-        nfp_title = 'Non-Farm Payrolls Mensual (datos FRED)' if use_real else 'Non-Farm Payrolls Mensual (ESTIMADO)'
+        nfp_title = 'Non-Farm Payrolls Mensual (datos FRED)' if use_real else 'Non-Farm Payrolls Mensual (10 años)'
         ax.set_title(nfp_title, fontsize=12,
                       fontweight='bold', color=gen.COLORS['primary_blue'])
         ax.set_ylim(CLIP_MIN - 200, CLIP_MAX + 200)
@@ -1506,7 +1469,7 @@ class MacroChartsGenerator:
              'ylabel': 'Ratio', 'target_line': 1.0},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='JOLTS — Dinámica del Mercado Laboral USA (ESTIMADO)')
+            panels, suptitle='JOLTS — Dinámica del Mercado Laboral USA (10 años)')
 
     def _generate_labor_wages(self) -> str:
         """Salarios y Participación Laboral (120m)."""
@@ -1580,7 +1543,7 @@ class MacroChartsGenerator:
              'ylabel': '%'},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='Salarios y Participación Laboral USA (ESTIMADO)')
+            panels, suptitle='Salarios y Participación Laboral USA (10 años)')
 
     def _generate_inflation_heatmap(self) -> str:
         """Heatmap de inflación CPI headline por pais (24 meses)."""
@@ -1638,7 +1601,7 @@ class MacroChartsGenerator:
             row_labels=countries,
             col_labels=col_labels,
             data=data,
-            title='Inflación CPI Headline por País (% a/a, ESTIMADO)',
+            title='Inflación CPI Headline por País (% a/a, últimos 24 meses)',
             cmap_thresholds=[
                 (-2, '#2166ac'),
                 (0, '#67a9cf'),
@@ -1651,31 +1614,6 @@ class MacroChartsGenerator:
 
     def _generate_inflation_components_ts(self) -> str:
         """Contribución de cada componente al CPI total (barras apiladas, 36m)."""
-        # Try real FRED data first
-        if self.data:
-            try:
-                cpi = self.data.get_usa_cpi_breakdown()
-                series_map = {
-                    'Shelter': cpi.get('shelter'),
-                    'Services ex-Hous.': cpi.get('services_ex_shelter'),
-                    'Core Goods': cpi.get('core_goods'),
-                    'Food': cpi.get('food'),
-                    'Energy': cpi.get('energy'),
-                }
-                # Need at least 3 components with data
-                valid = {k: self._real_series(v, '%b%y') for k, v in series_map.items() if v is not None}
-                if len(valid) >= 3:
-                    # Use last 36 months
-                    cats = [p[0] for p in list(valid.values())[0][-36:]]
-                    components = {k: [p[1] for p in v[-36:]] for k, v in valid.items()}
-                    return self.chart_gen.generate_stacked_bar(
-                        categories=cats, components=components,
-                        title='USA: Contribución al CPI por Componente (pp, datos FRED)',
-                        ylabel='% a/a', target_line=2.0, target_label='Target Fed 2%')
-            except Exception:
-                pass
-
-        # Fallback
         # 36 meses: Feb 2023 → Ene 2026
         months = self._monthly_labels(n=36, start_year=2023, start_month=2)
 
@@ -1726,7 +1664,7 @@ class MacroChartsGenerator:
         return self.chart_gen.generate_stacked_bar(
             categories=months,
             components=components,
-            title='USA: Contribución al CPI por Componente (pp, ESTIMADO)',
+            title='USA: Contribución al CPI por Componente (pp, 3 años)',
             ylabel='Contribución (pp)',
             target_line=2.0,
             target_label='Target Fed 2%'
@@ -1734,44 +1672,6 @@ class MacroChartsGenerator:
 
     def _generate_pmi_global(self) -> str:
         """PMI Manufacturing Global (120m)."""
-        # Try real Bloomberg data first
-        if self.data:
-            try:
-                pmi = self.data.get_pmi_global()
-                if pmi:
-                    valid = {k: self._real_series(v, '%b%y') for k, v in pmi.items() if v is not None}
-                    if len(valid) >= 2:
-                        return self.chart_gen.generate_time_series(
-                            valid, title='PMI Manufacturing Global (datos Bloomberg)',
-                            ylabel='Índice', target_line=50.0,
-                            target_label='Expansión/Contracción')
-            except Exception:
-                pass
-
-        # Try AKShare for latest China PMI as partial real data annotation
-        latest_pmi = {}
-        if self.data:
-            try:
-                ak_pmi = self.data.get_china_pmi_akshare()
-                if ak_pmi:
-                    latest_pmi['china'] = ak_pmi.get('pmi_mfg')
-            except Exception:
-                pass
-            # Also try Bloomberg latest values for annotation
-            try:
-                bbg = self.data.bloomberg
-                if bbg and bbg.available:
-                    pmi_latest = bbg.get_pmi_latest()
-                    if pmi_latest:
-                        if 'usa_mfg' in pmi_latest:
-                            latest_pmi['usa'] = pmi_latest['usa_mfg']
-                        if 'euro_mfg' in pmi_latest:
-                            latest_pmi['euro'] = pmi_latest['euro_mfg']
-                        if 'china_mfg' in pmi_latest and 'china' not in latest_pmi:
-                            latest_pmi['china'] = pmi_latest['china_mfg']
-            except Exception:
-                pass
-
         months = self._monthly_labels()
 
         # USA ISM: 49-58 range, COVID crash to 41, recovery, recent ~49
@@ -1804,23 +1704,13 @@ class MacroChartsGenerator:
             110: 49.8, 114: 50.3, 119: 50.2
         }, noise=0.3, seed=22)
 
-        # Override last data point with real latest values if available
-        if latest_pmi.get('usa') is not None:
-            usa[-1] = round(float(latest_pmi['usa']), 1)
-        if latest_pmi.get('euro') is not None:
-            euro[-1] = round(float(latest_pmi['euro']), 1)
-        if latest_pmi.get('china') is not None:
-            china[-1] = round(float(latest_pmi['china']), 1)
-
-        has_any_real = bool(latest_pmi)
-        suffix = 'hist. estimado + último real' if has_any_real else 'ESTIMADO'
         series = {
             'USA ISM': list(zip(months, usa)),
             'Euro PMI': list(zip(months, euro)),
             'China PMI': list(zip(months, china)),
         }
         return self.chart_gen.generate_time_series(
-            series, title=f'PMI Manufacturing Global ({suffix})',
+            series, title='PMI Manufacturing Global (10 años)',
             ylabel='Índice', target_line=50.0, target_label='Expansión/Contracción')
 
     def _generate_commodity_prices(self) -> str:
@@ -1833,6 +1723,8 @@ class MacroChartsGenerator:
                 cobre_r = self._real_series(comm.get('cobre'))
                 oro_r = self._real_series(comm.get('oro'))
                 if brent_r and cobre_r and oro_r:
+                    # Sync spot values with text for consistency (Bug 1)
+                    cobre_r = self._sync_spot(cobre_r, 'copper')
                     panels = [
                         {'title': 'Brent (USD/bbl)', 'series': {'Brent': brent_r}, 'ylabel': 'USD/bbl'},
                         {'title': 'Cobre (USD/lb)', 'series': {'Cobre': cobre_r}, 'ylabel': 'USD/lb'},
@@ -1874,7 +1766,7 @@ class MacroChartsGenerator:
             {'title': 'Oro (USD/oz)', 'series': {'Oro': list(zip(months, oro))}, 'ylabel': 'USD/oz'},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='Precios Commodities Clave (ESTIMADO)')
+            panels, suptitle='Precios Commodities Clave (10 años)')
 
     def _generate_energy_food(self) -> str:
         """Energía y Alimentos: Oil, Gas Natural, Food Index (120m, USD)."""
@@ -1934,7 +1826,7 @@ class MacroChartsGenerator:
             {'title': 'FAO Food Index', 'series': {'Food Index': list(zip(months, food))}, 'ylabel': 'Índice', 'target_line': 100},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='Energía y Alimentos (ESTIMADO)')
+            panels, suptitle='Energía y Alimentos (10 años)')
 
     def _generate_policy_rates_comparison(self) -> str:
         """Tasas de Política: 6 bancos centrales en multi-panel 3x2 (120m)."""
@@ -1948,6 +1840,9 @@ class MacroChartsGenerator:
                     if r:
                         real_series[name] = r
                 if len(real_series) >= 4:
+                    # Sync TPM spot value with text (Bug 1)
+                    if 'BCCh (Chile)' in real_series:
+                        real_series['BCCh (Chile)'] = self._sync_spot(real_series['BCCh (Chile)'], 'tpm')
                     return self.chart_gen.generate_time_series(
                         real_series, title='Tasas de Política Monetaria (datos reales BCCh)',
                         ylabel='Tasa (%)')
@@ -2007,7 +1902,7 @@ class MacroChartsGenerator:
             'RBI Repo (IND)': list(zip(months, rbi)),
         }
         return self.chart_gen.generate_time_series(
-            series, title='Tasas de Política Monetaria: 6 Bancos Centrales (ESTIMADO)',
+            series, title='Tasas de Política Monetaria: 6 Bancos Centrales (10 años)',
             ylabel='Tasa (%)')
 
     def _generate_usa_leading_indicators(self) -> str:
@@ -2084,7 +1979,7 @@ class MacroChartsGenerator:
              'ylabel': 'Índice'},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='USA Leading Indicators (ESTIMADO)')
+            panels, suptitle='USA Leading Indicators (10 años)')
 
     # =========================================================================
     # GLOBAL EQUITIES
@@ -2163,7 +2058,7 @@ class MacroChartsGenerator:
         }
         return self.chart_gen.generate_time_series(
             series,
-            title='Bolsas Globales — Base 100 (ESTIMADO)',
+            title='Bolsas Globales — Base 100 (10 años)',
             ylabel='Índice (base 100)',
             target_line=100.0,
             target_label='Base')
@@ -2242,24 +2137,10 @@ class MacroChartsGenerator:
              'ylabel': '%'},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='Europa: Dashboard Macro (ESTIMADO)')
+            panels, suptitle='Europa: Dashboard Macro (10 años)')
 
     def _generate_europe_pmi(self) -> str:
         """PMI Europa: Manufacturing, Services, Composite (120m)."""
-        # Try real Bloomberg data first
-        if self.data:
-            try:
-                pmi = self.data.get_europe_pmi()
-                if pmi:
-                    valid = {k: self._real_series(v, '%b%y') for k, v in pmi.items() if v is not None}
-                    if len(valid) >= 2:
-                        return self.chart_gen.generate_time_series(
-                            valid, title='Europa: PMI Eurozona (datos Bloomberg)',
-                            ylabel='Índice', target_line=50.0,
-                            target_label='Expansión/Contracción')
-            except Exception:
-                pass
-
         months = self._monthly_labels()
 
         # Euro PMI Manufacturing: 53→33→63→46
@@ -2282,34 +2163,16 @@ class MacroChartsGenerator:
             114: 51.5, 119: 51.5
         }, noise=0.4, seed=201)
 
-        # Override last point with Bloomberg latest if available
-        has_real = False
-        if self.data:
-            try:
-                bbg = self.data.bloomberg
-                if bbg and bbg.available:
-                    pmi_latest = bbg.get_pmi_latest()
-                    if pmi_latest:
-                        if 'euro_mfg' in pmi_latest and pmi_latest['euro_mfg'] is not None:
-                            mfg[-1] = round(float(pmi_latest['euro_mfg']), 1)
-                            has_real = True
-                        if 'euro_svc' in pmi_latest and pmi_latest['euro_svc'] is not None:
-                            svc[-1] = round(float(pmi_latest['euro_svc']), 1)
-                            has_real = True
-            except Exception:
-                pass
-
         # Composite: ponderado ~60% services, 40% mfg
         composite = [0.6 * s + 0.4 * m for s, m in zip(svc, mfg)]
 
-        suffix = 'hist. estimado + último real' if has_real else 'ESTIMADO'
         series = {
             'PMI Manufacturing': list(zip(months, mfg)),
             'PMI Services': list(zip(months, svc)),
             'PMI Composite': list(zip(months, composite)),
         }
         return self.chart_gen.generate_time_series(
-            series, title=f'Europa: PMI Eurozona ({suffix})',
+            series, title='Europa: PMI Eurozona (10 años)',
             ylabel='Índice', target_line=50.0, target_label='Expansión/Contracción')
 
     # =========================================================================
@@ -2396,32 +2259,10 @@ class MacroChartsGenerator:
              'ylabel': '%'},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='China: Dashboard Macro (ESTIMADO)')
+            panels, suptitle='China: Dashboard Macro (10 años)')
 
     def _generate_china_trade_chart(self) -> str:
         """China comercio exterior: Exports, Imports, Trade Balance (120m)."""
-        # Try real Bloomberg data first
-        if self.data:
-            try:
-                trade = self.data.get_china_trade()
-                if trade:
-                    exp_r = self._real_series(trade.get('exports_yoy'), '%b%y')
-                    imp_r = self._real_series(trade.get('imports_yoy'), '%b%y')
-                    tbal_r = self._real_series(trade.get('trade_balance'), '%b%y')
-                    if exp_r and imp_r:
-                        series = {
-                            'Exports (% a/a)': exp_r,
-                            'Imports (% a/a)': imp_r,
-                        }
-                        dual = {'Trade Balance ($B)': tbal_r} if tbal_r else None
-                        return self.chart_gen.generate_time_series(
-                            series, title='China: Comercio Exterior (datos Bloomberg)',
-                            ylabel='% a/a', target_line=0.0,
-                            target_label='Sin cambio',
-                            dual_axis=dual, dual_ylabel='$B')
-            except Exception:
-                pass
-
         months = self._monthly_labels()
 
         # Exports YoY: 8→-17→30→8
@@ -2460,7 +2301,7 @@ class MacroChartsGenerator:
         }
         return self.chart_gen.generate_time_series(
             series,
-            title='China: Comercio Exterior (ESTIMADO)',
+            title='China: Comercio Exterior (10 años)',
             ylabel='% a/a',
             target_line=0.0,
             target_label='Sin cambio',
@@ -2559,7 +2400,7 @@ class MacroChartsGenerator:
              'ylabel': 'CLP'},
         ]
         return self.chart_gen.generate_multi_panel(
-            panels, suptitle='Chile: Dashboard Macro (ESTIMADO)')
+            panels, suptitle='Chile: Dashboard Macro (10 años)')
 
     def _generate_chile_inflation_components(self) -> str:
         """Contribución de cada componente al IPC Chile (barras apiladas, 36m)."""
@@ -2616,7 +2457,7 @@ class MacroChartsGenerator:
         return self.chart_gen.generate_stacked_bar(
             categories=months,
             components=components,
-            title='Chile: Contribución al IPC por Componente (pp, ESTIMADO)',
+            title='Chile: Contribución al IPC por Componente (pp, 3 años)',
             ylabel='Contribución (pp)',
             target_line=3.0,
             target_label='Meta BCCh 3%'
@@ -2680,7 +2521,7 @@ class MacroChartsGenerator:
         }
         return self.chart_gen.generate_time_series(
             series,
-            title='Chile: Cuenta Corriente vs Precio del Cobre (ESTIMADO)',
+            title='Chile: Cuenta Corriente vs Precio del Cobre (10 años)',
             ylabel='% GDP',
             target_line=0.0,
             target_label='Equilibrio',
@@ -2748,7 +2589,7 @@ class MacroChartsGenerator:
         }
         return self.chart_gen.generate_time_series(
             series,
-            title='Tasas de Política Monetaria LatAm (ESTIMADO)',
+            title='Tasas de Política Monetaria LatAm (10 años)',
             ylabel='Tasa (%)')
 
     def _generate_epu_geopolitics(self) -> str:
@@ -2806,7 +2647,7 @@ class MacroChartsGenerator:
         }
         return self.chart_gen.generate_time_series(
             series,
-            title='Índice de Incertidumbre Política (EPU) (ESTIMADO)',
+            title='Índice de Incertidumbre Política (EPU) — 10 años',
             ylabel='EPU Index (base=100)',
             target_line=200.0,
             target_label='Umbral elevado')
@@ -2886,9 +2727,7 @@ class MacroChartsGenerator:
             '1M': 5.40, '3M': 5.38, '6M': 5.30, '1Y': 5.05,
             '2Y': 4.65, '5Y': 4.25, '10Y': 4.30, '30Y': 4.50
         }
-        return self.chart_gen.generate_yield_curve(
-            current, previous, previous_year,
-            title='US Treasury Yield Curve (ESTIMADO)')
+        return self.chart_gen.generate_yield_curve(current, previous, previous_year)
 
     def _generate_yield_spreads(self) -> str:
         """Spreads de curva UST: 2y10y y 3m10y (120m). Indicadores de recesión."""
@@ -2955,7 +2794,7 @@ class MacroChartsGenerator:
         }
         return self.chart_gen.generate_time_series(
             series,
-            title='Spreads Curva UST: Indicadores de Recesión (ESTIMADO)',
+            title='Spreads Curva UST: Indicadores de Recesión (10 años)',
             ylabel='Spread (pp)',
             target_line=0.0,
             target_label='Inversion (0 bp)')

@@ -25,7 +25,10 @@ First occurrence wins — refinador/CIO blocks take priority over panel blocks.
 """
 
 import re
+import logging
 from typing import Dict, List, Optional, Any
+
+logger = logging.getLogger(__name__)
 
 
 class CouncilParser:
@@ -172,6 +175,7 @@ class CouncilParser:
         """
         block = self._get_block('EQUITY_VIEWS')
         if not block:
+            logger.warning("council_parser: EQUITY_VIEWS block not found, returning None")
             return None
 
         views = {}
@@ -185,6 +189,10 @@ class CouncilParser:
                 'rationale': match.group(4).strip(),
             }
 
+        if views:
+            logger.info(f"council_parser: get_equity_views parsed {len(views)} regions")
+        else:
+            logger.warning("council_parser: EQUITY_VIEWS block found but no views parsed")
         return views if views else None
 
     def get_sector_views(self) -> Optional[Dict]:
@@ -246,6 +254,7 @@ class CouncilParser:
         """
         block = self._get_block('FI_POSITIONING')
         if not block:
+            logger.warning("council_parser: FI_POSITIONING block not found, returning None")
             return None
 
         views = {}
@@ -409,6 +418,8 @@ class CouncilParser:
                 raw_view = m2.group(1).upper()
                 view = {'OVERWEIGHT': 'OW', 'UNDERWEIGHT': 'UW'}.get(raw_view, raw_view)
                 conv = self._find_conviction_near(text, m2.start(), m2.end())
+                matched_text = text[m2.start():m2.end()]
+                logger.info(f"council_parser: text mining for '{region}' -> view={view}, context='{matched_text[:60]}'")
                 return {'view': view, 'conviction': conv, 'rationale': 'Extracted from council text'}
 
             # Forward: "{region}...OW/UW/NEUTRAL" within same sentence (~60 chars)
@@ -418,6 +429,8 @@ class CouncilParser:
                 raw_view = m.group(1).upper()
                 view = {'OVERWEIGHT': 'OW', 'UNDERWEIGHT': 'UW'}.get(raw_view, raw_view)
                 conv = self._find_conviction_near(text, m.start(), m.end())
+                matched_text = text[m.start():m.end()]
+                logger.info(f"council_parser: text mining for '{region}' -> view={view}, context='{matched_text[:60]}'")
                 return {'view': view, 'conviction': conv, 'rationale': 'Extracted from council text'}
 
         return None

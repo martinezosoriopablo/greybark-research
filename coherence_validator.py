@@ -115,6 +115,109 @@ SHARED_METRICS = [
                 r"TPM\s+(\d+[\.,]\d+)%"),
         },
     },
+    # ── New metrics (7) ──
+    {
+        "id": "vix",
+        "name": "VIX",
+        "tolerance_abs": 1.5,
+        "unit": "",
+        "extractors": {
+            "source": lambda d: _deep_get(d, "equity_data.risk.vix.current"),
+            "rv": lambda c: _search_number(str(c), r"VIX.*?(\d+[\.,]\d+)"),
+            "macro": lambda c: _search_number(str(c), r"VIX.*?(\d+[\.,]\d+)"),
+        },
+    },
+    {
+        "id": "wti",
+        "name": "WTI Crude",
+        "tolerance_abs": 2.0,
+        "unit": "USD/bbl",
+        "extractors": {
+            "source": lambda d: _deep_get(d, "equity_data.bcch_indices.oil_wti.value"),
+            "macro": lambda c: _search_number(
+                str(_deep_get(c, "temas_clave", {})),
+                r"(?:WTI|petr[óo]leo).*?(\d+[\.,]\d+)"),
+            "aa": lambda c: _search_number(
+                str(_deep_get(c, "asset_classes", {})),
+                r"(?:WTI|petr[óo]leo).*?(\d+[\.,]\d+)"),
+        },
+    },
+    {
+        "id": "copper",
+        "name": "Cobre",
+        "tolerance_abs": 0.10,
+        "unit": "USD/lb",
+        "extractors": {
+            "source": lambda d: _deep_get(d, "equity_data.bcch_indices.copper.value")
+                or _deep_get(d, "quant_data.chile.copper_price"),
+            "macro": lambda c: _search_number(
+                str(_deep_get(c, "chile_latam", {})),
+                r"[Cc]obre.*?(\d+[\.,]\d+)"),
+            "aa": lambda c: _search_number(
+                str(_deep_get(c, "asset_classes", {})),
+                r"[Cc]obre.*?(\d+[\.,]\d+)"),
+        },
+    },
+    {
+        "id": "breakeven_5y",
+        "name": "Breakeven 5Y",
+        "tolerance_abs": 0.05,
+        "unit": "%",
+        "extractors": {
+            "source": lambda d: _deep_get(d, "rf_data.inflation.breakeven_5y")
+                or _deep_get(d, "quant_data.inflation.breakeven_5y"),
+            "rf": lambda c: _search_number(
+                str(_deep_get(c, "inflación", {})),
+                r"[Bb]reakeven\s*5[Yy].*?(\d+[\.,]\d+)%"),
+            "macro": lambda c: _search_number(
+                str(_deep_get(c, "estados_unidos", {})),
+                r"[Bb]reakeven\s*5[Yy].*?(\d+[\.,]\d+)%"),
+        },
+    },
+    {
+        "id": "breakeven_10y",
+        "name": "Breakeven 10Y",
+        "tolerance_abs": 0.05,
+        "unit": "%",
+        "extractors": {
+            "source": lambda d: _deep_get(d, "rf_data.inflation.breakeven_10y")
+                or _deep_get(d, "quant_data.inflation.breakeven_10y"),
+            "rf": lambda c: _search_number(
+                str(_deep_get(c, "inflación", {})),
+                r"[Bb]reakeven\s*10[Yy].*?(\d+[\.,]\d+)%"),
+            "macro": lambda c: _search_number(
+                str(_deep_get(c, "estados_unidos", {})),
+                r"[Bb]reakeven\s*10[Yy].*?(\d+[\.,]\d+)%"),
+        },
+    },
+    {
+        "id": "tips_10y",
+        "name": "TIPS 10Y Yield",
+        "tolerance_abs": 0.05,
+        "unit": "%",
+        "extractors": {
+            "source": lambda d: _deep_get(d, "rf_data.inflation.tips_10y")
+                or _deep_get(d, "equity_data.real_rates.current.tips_10y"),
+            "rf": lambda c: _search_number(
+                str(_deep_get(c, "inflación", {})),
+                r"TIPS\s*10[Yy].*?(\d+[\.,]\d+)%"),
+        },
+    },
+    {
+        "id": "selic",
+        "name": "SELIC Brasil",
+        "tolerance_abs": 0.25,
+        "unit": "%",
+        "extractors": {
+            "source": lambda d: _deep_get(d, "rf_data.chile_rates.intl_policy_rates.bcb"),
+            "rf": lambda c: _search_number(
+                str(_deep_get(c, "latam", {})),
+                r"SELIC.*?(\d+[\.,]\d+)%"),
+            "macro": lambda c: _search_number(
+                str(_deep_get(c, "chile_latam", {})),
+                r"SELIC.*?(\d+[\.,]\d+)%"),
+        },
+    },
 ]
 
 
@@ -373,6 +476,13 @@ def validate_coherence(
     ok = len([r for r in results if r["status"] == "OK"])
     score = ok / max(total, 1)
 
+    if score < 0.75:
+        disc_ids = [r['id'] for r in results if r['status'] == 'DISCREPANCY']
+        logger.warning(
+            f"COHERENCE ALERT: score={score:.2f} < 0.75. "
+            f"Discrepant metrics: {disc_ids}"
+        )
+
     return {
         "status": "completed",
         "metrics": results,
@@ -384,7 +494,7 @@ def validate_coherence(
 
 def _is_critical(metric_id: str) -> bool:
     """Determine if a metric discrepancy is critical."""
-    return metric_id in ("fed_funds", "tpm_chile", "core_cpi")
+    return metric_id in ("fed_funds", "tpm_chile", "core_cpi", "vix", "wti")
 
 
 def _build_summary(results: List[Dict], flags: List[Dict]) -> str:

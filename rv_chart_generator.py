@@ -13,7 +13,6 @@ Dependencias:
 
 import base64
 import io
-import logging
 from typing import Dict, Any, List, Optional
 import warnings
 
@@ -29,13 +28,33 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
-from chart_config import get_chart_colors, get_failure_tracker
-
-logger = logging.getLogger(__name__)
-
 
 class RVChartsGenerator:
     """Generador de charts para el reporte de Renta Variable."""
+
+    # Colores Greybark (consistente con design system)
+    COLORS = {
+        'primary': '#1a1a1a',
+        'accent': '#dd6b20',
+        'positive': '#276749',
+        'negative': '#c53030',
+        'neutral': '#744210',
+        'bg_light': '#f7f7f7',
+        'text_dark': '#1a1a1a',
+        'text_medium': '#4a4a4a',
+        'text_light': '#718096',
+    }
+
+    SERIES_COLORS = [
+        '#1a365d',  # Dark blue
+        '#dd6b20',  # Orange
+        '#276749',  # Green
+        '#c53030',  # Red
+        '#805ad5',  # Purple
+        '#d69e2e',  # Gold
+        '#319795',  # Teal
+        '#e53e3e',  # Light red
+    ]
 
     # Regiones para charts regionales (orden display)
     REGIONS = ['us', 'europe', 'em', 'japan', 'latam', 'chile']
@@ -55,19 +74,8 @@ class RVChartsGenerator:
         'consumer_staples': 'Cons. Básico'
     }
 
-    def __init__(self, market_data: Dict = None, branding: Dict = None):
+    def __init__(self, market_data: Dict = None):
         self.data = market_data or {}
-        # Derive colors from branding (or use Greybark defaults)
-        scheme = get_chart_colors(branding)
-        self.COLORS = {
-            'primary': scheme.primary, 'accent': scheme.accent,
-            'positive': scheme.positive, 'negative': scheme.negative,
-            'neutral': scheme.neutral, 'bg_light': scheme.bg_light,
-            'text_dark': scheme.text_dark, 'text_medium': scheme.text_medium,
-            'text_light': scheme.text_light,
-        }
-        self.SERIES_COLORS = scheme.series
-        self._failure_tracker = get_failure_tracker()
         self._setup_style()
 
     def _setup_style(self):
@@ -140,8 +148,7 @@ class RVChartsGenerator:
             try:
                 charts[chart_id] = method()
             except Exception as e:
-                self._failure_tracker.record(chart_id, str(e), fallback_used=True)
-                logger.warning("Chart '%s' failed: %s", chart_id, e)
+                print(f"  [WARN] Chart {chart_id}: {e}")
                 charts[chart_id] = self._create_placeholder(chart_id)
         return charts
 

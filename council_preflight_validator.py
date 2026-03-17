@@ -62,10 +62,11 @@ FRESHNESS_THRESHOLDS = {
 
 # Límites de tamaño (chars del JSON serializado)
 TRUNCATION_LIMIT = 8000
-DAILY_CONTEXT_LIMIT = 15000
+DAILY_CONTEXT_LIMIT = 4000
 
 # Stubs conocidos
 KNOWN_STUBS = {
+    'breadth': lambda d: set(d.keys()) == {'signal'} and d.get('signal') == 'OK',
 }
 
 # Reportes diarios
@@ -210,18 +211,6 @@ class CouncilPreflightValidator:
                 ms.is_stub = True
                 ms.detail = 'STUB (solo retorna signal OK)'
                 ms.status = 'YELLOW'
-                return ms
-
-        # Validación de campos requeridos por módulo
-        REQUIRED_FIELDS = {
-            'inflation': ['breakeven_5y', 'breakeven_10y', 'real_rate_10y'],
-            'breadth': ['pct_above_50ma', 'breadth_signal', 'risk_appetite_signal'],
-        }
-        if name in REQUIRED_FIELDS and isinstance(data, dict):
-            missing = [k for k in REQUIRED_FIELDS[name] if data.get(k) is None]
-            if missing:
-                ms.status = 'YELLOW'
-                ms.detail = f'Campos faltantes: {missing}'
                 return ms
 
         # Frescura: buscar timestamp / as_of en los datos

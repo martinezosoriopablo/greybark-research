@@ -536,68 +536,6 @@ class RFDataCollector:
             self._print(f"  [ERR] Chile Rates: {e}")
             return {'error': str(e)}
 
-    def collect_nyfed(self) -> Dict[str, Any]:
-        """Módulo 13: NY Fed — R-star, GSCPI, Term Premia, Reference Rates."""
-        self._print("[13/13] NY Fed Data (R-star, GSCPI, Term Premia)...")
-        try:
-            from greybark.data_sources.nyfed_client import NYFedClient
-            client = NYFedClient()
-
-            result = {}
-
-            # R-star (Laubach-Williams natural rate)
-            rstar = client.get_rstar(quarters=20)
-            if rstar and rstar.get('value') is not None:
-                result['rstar'] = {
-                    'value': rstar['value'],
-                    'date': rstar.get('date'),
-                    'trend_growth': rstar.get('trend_growth'),
-                }
-                self._print(f"    R-star: {rstar['value']}% ({rstar.get('date')})")
-
-            # GSCPI (Global Supply Chain Pressure Index)
-            gscpi = client.get_gscpi(months=24)
-            if gscpi and gscpi.get('value') is not None:
-                result['gscpi'] = {
-                    'value': gscpi['value'],
-                    'date': gscpi.get('date'),
-                    'prev_value': gscpi.get('prev_value'),
-                    'trend': gscpi.get('trend'),
-                }
-                self._print(f"    GSCPI: {gscpi['value']} ({gscpi.get('trend', 'N/D')})")
-
-            # Term Premia (ACM model via FRED)
-            tp = client.get_term_premia(months=24)
-            if tp:
-                result['term_premia'] = {
-                    'tp_2y': tp.get('tp_2y'),
-                    'tp_5y': tp.get('tp_5y'),
-                    'tp_10y': tp.get('tp_10y'),
-                    'date': tp.get('date'),
-                }
-                self._print(f"    Term Premia 10Y: {tp.get('tp_10y', 'N/D')}%")
-
-            # Reference rates (SOFR, EFFR)
-            rates = client.get_reference_rates()
-            if rates:
-                sofr = rates.get('sofr', {})
-                effr = rates.get('effr', {})
-                result['reference_rates'] = {
-                    'sofr': sofr.get('rate'),
-                    'effr': effr.get('rate'),
-                    'date': sofr.get('date'),
-                }
-                self._print(f"    SOFR: {sofr.get('rate', 'N/D')}%, EFFR: {effr.get('rate', 'N/D')}%")
-
-            if not result:
-                return {'error': 'NY Fed returned no data'}
-
-            self._print(f"  [OK] NY Fed: {len(result)} categories")
-            return result
-        except Exception as e:
-            self._print(f"  [ERR] NY Fed: {e}")
-            return {'error': str(e)}
-
     # =========================================================================
     # ORQUESTADOR: collect_all()
     # =========================================================================
@@ -669,9 +607,6 @@ class RFDataCollector:
 
         # Módulo 12: Chile Rates & Indicators (BCCh)
         data['chile_rates'] = self.collect_chile_rates()
-
-        # Módulo 13: NY Fed Data (R-star, GSCPI, Term Premia)
-        data['nyfed'] = self.collect_nyfed()
 
         # Metadata
         elapsed = (datetime.now() - t0).total_seconds()

@@ -519,27 +519,13 @@ class TaylorRule:
         if self.verbose:
             print(f"  [Taylor] {msg}")
 
-    def _fetch_nairu(self, default: float = 4.2) -> float:
-        """Fetch CBO NAIRU from FRED (NROU quarterly). Fallback to default."""
-        try:
-            fred = self._get_fred()
-            s = fred.get_series('NROU', start_date=date(2020, 1, 1))
-            if s is not None and len(s) > 0:
-                val = float(s.dropna().iloc[-1])
-                if 2.0 <= val <= 8.0:
-                    self._log(f"CBO NAIRU from FRED: {val:.1f}%")
-                    return round(val, 2)
-        except Exception as e:
-            self._log(f"NAIRU fetch failed: {e}")
-        return default
-
     def fed_rate(
         self,
         inflation: float = None,
         unemployment: float = None,
         inflation_target: float = 2.0,
         r_star: float = 0.5,
-        nairu: float = None,
+        nairu: float = 4.2,
         okun_coef: float = 2.0,
     ) -> Dict[str, Any]:
         """
@@ -552,11 +538,9 @@ class TaylorRule:
             unemployment: Current unemployment rate (%)
             inflation_target: Fed target (2%)
             r_star: Real neutral rate estimate (0.5%)
-            nairu: Natural rate of unemployment (None = fetch from FRED NROU)
+            nairu: Natural rate of unemployment (4.2%)
             okun_coef: Okun coefficient (2.0)
         """
-        if nairu is None:
-            nairu = self._fetch_nairu(default=4.2)
         fred = self._get_fred()
 
         # Fetch current values if not provided
@@ -830,7 +814,7 @@ class PhillipsCurve:
     def estimate_and_forecast(
         self,
         unemployment_forecast: float = None,
-        nairu: float = None,
+        nairu: float = 4.2,
     ) -> Optional[Dict[str, Any]]:
         """
         Estima Phillips Curve con datos históricos y genera forecast.
@@ -841,24 +825,11 @@ class PhillipsCurve:
 
         Args:
             unemployment_forecast: Unemployment rate esperado en 12M
-            nairu: NAIRU (None = fetch from FRED NROU, fallback 4.2%)
+            nairu: Assumed NAIRU (4.2% para USA)
 
         Returns:
             Dict con forecast, coefficient, R², etc.
         """
-        if nairu is None:
-            # Fetch CBO NAIRU from FRED
-            try:
-                fred = self._get_fred()
-                nrou = fred.get_series('NROU', start_date=date(2020, 1, 1))
-                if nrou is not None and len(nrou) > 0:
-                    nairu = round(float(nrou.dropna().iloc[-1]), 2)
-                    self._log(f"Phillips: CBO NAIRU from FRED: {nairu}%")
-            except Exception:
-                pass
-            if nairu is None:
-                nairu = 4.2
-
         try:
             from statsmodels.regression.linear_model import OLS
             import statsmodels.api as sm
@@ -1084,111 +1055,6 @@ class EconometricSuite:
         results['metadata']['models_ok'] = models_ok
 
         return results
-
-
-# =========================================================================
-# 5. EQUITY VALUATION MODEL (Fair P/E)
-# =========================================================================
-
-class EquityValuationModel:
-    """
-    Modelo de valuación fair value para P/E por región.
-    Combina Fed Model, Mean Reversion, y Earnings Growth.
-
-    Fair P/E = weighted average de 3 enfoques:
-    1. Fed Model (40%): Fair P/E = 1 / (UST_10Y + ERP_equilibrium)
-    2. Mean Reversion (40%): PE_10Y_avg × (1 + ajuste_macro)
-    3. Earnings Growth (20%): PE × (1 + EPS_growth) / (1 + required_return)
-    """
-
-    PE_10Y_AVERAGES = {
-        'us': 21.5,       # S&P 500 10Y avg trailing PE
-        'europe': 15.8,   # Stoxx 600
-        'em': 13.2,       # MSCI EM
-        'japan': 16.5,    # Topix
-        'chile': 14.0,    # IPSA
-    }
-
-    def fair_pe(
-        self,
-        region: str,
-        ust_10y: float,
-        current_pe: float,
-        eps_growth: float = None,
-        gdp_vs_trend: float = 0,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Calcula fair P/E para una región.
-
-        Args:
-            region: 'us', 'europe', 'em', 'japan', 'chile'
-            ust_10y: UST 10Y yield en % (e.g. 4.3)
-            current_pe: P/E trailing actual
-            eps_growth: EPS growth YoY en % (e.g. 8.0)
-            gdp_vs_trend: GDP gap vs trend en % (positivo = above trend)
-
-        Returns:
-            Dict con fair_pe, upside_pct, signal, components
-        """
-        if not current_pe or current_pe <= 0:
-            return None
-
-        erp = 0.045  # equilibrium ERP (4.5%)
-
-        # 1. Fed Model: Fair P/E = 1 / (10Y yield + ERP)
-        fed_pe = None
-        if ust_10y and ust_10y > 0:
-            fed_pe = 1 / (ust_10y / 100 + erp)
-
-        # 2. Mean Reversion: PE_10Y_avg * (1 + macro_adjustment)
-        avg_pe = self.PE_10Y_AVERAGES.get(region, 17.0)
-        macro_adj = 1 + (gdp_vs_trend / 100) * 0.5  # ±5% adj per 10% GDP gap
-        mean_rev_pe = avg_pe * macro_adj
-
-        # 3. Earnings Growth Model
-        eg_pe = None
-        if eps_growth is not None and current_pe > 0:
-            req_return = (ust_10y or 4.0) / 100 + erp
-            if req_return > 0:
-                eg_pe = current_pe * (1 + eps_growth / 100) / (1 + req_return)
-
-        # Weighted average
-        components = []
-        if fed_pe and fed_pe > 0:
-            components.append((fed_pe, 0.4))
-        if mean_rev_pe and mean_rev_pe > 0:
-            components.append((mean_rev_pe, 0.4))
-        if eg_pe and eg_pe > 0:
-            components.append((eg_pe, 0.2))
-
-        if not components:
-            return None
-
-        total_weight = sum(w for _, w in components)
-        fair = sum(v * w for v, w in components) / total_weight
-
-        upside_pct = round((fair / current_pe - 1) * 100, 1) if current_pe else None
-
-        if upside_pct is not None:
-            if upside_pct > 10:
-                signal = 'BARATO'
-            elif upside_pct < -10:
-                signal = 'CARO'
-            else:
-                signal = 'FAIR'
-        else:
-            signal = 'N/D'
-
-        return {
-            'fair_pe': round(fair, 1),
-            'upside_pct': upside_pct,
-            'signal': signal,
-            'components': {
-                'fed_model': round(fed_pe, 1) if fed_pe else None,
-                'mean_reversion': round(mean_rev_pe, 1),
-                'earnings_growth': round(eg_pe, 1) if eg_pe else None,
-            },
-        }
 
 
 # =========================================================================

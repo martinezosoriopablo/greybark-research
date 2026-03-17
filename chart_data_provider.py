@@ -24,23 +24,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 
 from greybark.data_sources.bcch_client import BCChClient
 from greybark.data_sources.fred_client import FREDClient
-from greybark.data_sources.akshare_client import AKShareClient
 from greybark.config import BCChSeries, FREDSeries
 
 
 class ChartDataProvider:
     """Provee series de tiempo reales para charts del macro report."""
 
-    def __init__(self, lookback_months: int = 120, bloomberg=None):
+    def __init__(self, lookback_months: int = 120, injected_spot: Dict[str, float] = None):
         self.bcch = BCChClient()
         self.fred = FREDClient()
-        self.akshare = AKShareClient()
-        self.bloomberg = bloomberg  # Optional BloombergData instance
         self.lookback_days = lookback_months * 31  # ~10 years
         self.start = date.today() - timedelta(days=self.lookback_days)
         self.end = date.today()
         self._cache: Dict[str, pd.Series] = {}
         self._usa_latest = None  # Lazy-loaded USA data cache
+        self._injected_spot = injected_spot or {}
+
+    def get_spot(self, key: str, default=None):
+        """Return injected spot value if available, else default."""
+        return self._injected_spot.get(key, default)
 
     def get_series(self, series_id: str, resample: str = None) -> Optional[pd.Series]:
         """
@@ -162,80 +164,16 @@ class ChartDataProvider:
     def get_chile_latest(self) -> Dict[str, Optional[float]]:
         """
         Últimos valores de indicadores Chile para narrativas/tablas.
-        Incluye campos _prev (periodo anterior) cuando la serie tiene
-        al menos 2 observaciones.
         """
-        result = {
+        return {
+            'imacec_yoy': self.bcch.get_imacec(),
+            'desempleo': self.bcch.get_latest_value(BCChSeries.DESEMPLEO),
             'ipc_yoy': self.bcch.get_ipc_yoy(),
             'ipc_mom': self.bcch.get_ipc_mom(),
             'usd_clp': self.bcch.get_usd_clp(),
             'tpm': self.bcch.get_tpm(),
             'uf': self.bcch.get_uf(),
         }
-
-        # IMACEC con valor anterior
-        imacec_s = self.bcch.get_series(BCChSeries.IMACEC_YOY, days_back=120)
-        if imacec_s is not None and len(imacec_s) >= 1:
-            result['imacec_yoy'] = round(float(imacec_s.iloc[-1]), 1)
-            if len(imacec_s) >= 2:
-                result['imacec_yoy_prev'] = round(float(imacec_s.iloc[-2]), 1)
-        else:
-            result['imacec_yoy'] = self.bcch.get_imacec()
-
-        # Desempleo con valor anterior
-        desemp_s = self.bcch.get_series(BCChSeries.DESEMPLEO, days_back=120)
-        if desemp_s is not None and len(desemp_s) >= 1:
-            result['desempleo'] = round(float(desemp_s.iloc[-1]), 1)
-            if len(desemp_s) >= 2:
-                result['desempleo_prev'] = round(float(desemp_s.iloc[-2]), 1)
-        else:
-            result['desempleo'] = self.bcch.get_latest_value(BCChSeries.DESEMPLEO)
-
-        # IPC YoY anterior: sumar meses -13 a -2 (vs -12 a -1 para actual)
-        ipc_var = self.bcch.get_series(BCChSeries.IPC_VAR, days_back=400)
-        if ipc_var is not None and len(ipc_var) >= 13:
-            result['ipc_yoy_prev'] = round(float(ipc_var.iloc[-13:-1].sum()), 1)
-
-        # PIB trimestral: YoY y QoQ desde serie de nivel encadenado
-        try:
-            pib_s = self.bcch.get_series(BCChSeries.PIB_REAL_TRIM, days_back=730)
-            if pib_s is not None and len(pib_s) >= 5:
-                # YoY: current quarter / same quarter previous year - 1
-                # Quarterly: -1=Q0, -2=Q-1, -3=Q-2, -4=Q-3, -5=same Q last year
-                pib_curr = float(pib_s.iloc[-1])
-                pib_yago = float(pib_s.iloc[-5])  # same quarter previous year
-                pib_yoy = (pib_curr / pib_yago - 1) * 100
-                result['pib_trim_yoy'] = round(pib_yoy, 1)
-                # QoQ: current / previous quarter
-                pib_prev = float(pib_s.iloc[-2])
-                pib_qoq = (pib_curr / pib_prev - 1) * 100
-                result['pib_trim_qoq'] = round(pib_qoq, 1)
-                # Previous YoY: q-1 vs same quarter 2 years ago
-                if len(pib_s) >= 6:
-                    pib_prev_yoy = (pib_prev / float(pib_s.iloc[-6]) - 1) * 100
-                    result['pib_trim_yoy_prev'] = round(pib_prev_yoy, 1)
-        except Exception:
-            pass
-
-        # Consumo Privado (YoY variation series)
-        try:
-            cp_s = self.bcch.get_series('F033.CPR.V12.R.Z.2018.0.T', days_back=730)
-            if cp_s is not None and len(cp_s) >= 2:
-                result['consumo_privado_yoy'] = round(float(cp_s.iloc[-1]), 1)
-                result['consumo_privado_yoy_prev'] = round(float(cp_s.iloc[-2]), 1)
-        except Exception:
-            pass
-
-        # Formación Bruta de Capital Fijo (YoY variation series)
-        try:
-            fbcf_s = self.bcch.get_series('F033.FKF.V12.R.Z.2018.0.T', days_back=730)
-            if fbcf_s is not None and len(fbcf_s) >= 2:
-                result['fbcf_yoy'] = round(float(fbcf_s.iloc[-1]), 1)
-                result['fbcf_yoy_prev'] = round(float(fbcf_s.iloc[-2]), 1)
-        except Exception:
-            pass
-
-        return result
 
     # =========================================================================
     # CHILE IPC COMPONENTS (COICOP divisions)
@@ -670,103 +608,6 @@ class ChartDataProvider:
         }
 
     # =========================================================================
-    # USA CPI COMPONENTS TIME SERIES (FRED)
-    # =========================================================================
-
-    def get_usa_cpi_breakdown(self) -> Dict[str, Optional[pd.Series]]:
-        """CPI component time series (YoY) for stacked chart: Shelter, Services, Goods, Food, Energy."""
-        components = [
-            ('shelter', FREDSeries.CPI_SHELTER),
-            ('services_ex_shelter', FREDSeries.CPI_SERVICES_EX_ENERGY),
-            ('core_goods', FREDSeries.CPI_COMMODITIES_EX_FOOD_ENERGY),
-            ('food', FREDSeries.CPI_FOOD),
-            ('energy', FREDSeries.CPI_ENERGY),
-        ]
-        result = {}
-        for key, sid in components:
-            s = self.get_fred_series(sid)
-            if s is not None and len(s) >= 13:
-                yoy = s.pct_change(12) * 100
-                result[key] = yoy.dropna()
-            else:
-                result[key] = None
-        return result
-
-    # =========================================================================
-    # PMI GLOBAL (Bloomberg)
-    # =========================================================================
-
-    def get_pmi_global(self) -> Optional[Dict[str, pd.Series]]:
-        """PMI Manufacturing time series: USA, Euro, China from Bloomberg."""
-        if self.bloomberg is None or not self.bloomberg.available:
-            return None
-        result = {}
-        mapping = {'USA': 'pmi_usa_mfg', 'Eurozona': 'pmi_euro_mfg', 'China': 'pmi_china_mfg'}
-        for label, campo in mapping.items():
-            s = self.bloomberg.get_series(campo)
-            if s is not None and len(s) > 0:
-                result[label] = s
-        return result if len(result) >= 2 else None
-
-    # =========================================================================
-    # EUROPE PMI (Bloomberg)
-    # =========================================================================
-
-    def get_europe_pmi(self) -> Optional[Dict[str, pd.Series]]:
-        """Euro PMI time series: Manufacturing, Services, Composite from Bloomberg."""
-        if self.bloomberg is None or not self.bloomberg.available:
-            return None
-        result = {}
-        mapping = {
-            'PMI Manufacturing': 'pmi_euro_mfg',
-            'PMI Services': 'pmi_euro_svc',
-            'PMI Composite': 'pmi_euro_comp',
-        }
-        for label, campo in mapping.items():
-            s = self.bloomberg.get_series(campo)
-            if s is not None and len(s) > 0:
-                result[label] = s
-        return result if len(result) >= 2 else None
-
-    # =========================================================================
-    # CHINA PMI (AKShare NBS — fallback when Bloomberg unavailable)
-    # =========================================================================
-
-    def get_china_pmi_akshare(self) -> Optional[Dict[str, float]]:
-        """Get latest China PMI values from AKShare (NBS). Returns dict with latest values, not time series."""
-        try:
-            data = self.akshare.get_pmi()
-            if data and isinstance(data, dict):
-                result = {}
-                for key in ['pmi_mfg', 'pmi_svc', 'caixin_mfg', 'caixin_svc']:
-                    if key in data and data[key] is not None:
-                        result[key] = float(data[key])
-                return result if result else None
-        except Exception as e:
-            print(f"[ChartDataProvider] AKShare China PMI failed: {e}")
-        return None
-
-    # =========================================================================
-    # CHINA TRADE (Bloomberg)
-    # =========================================================================
-
-    def get_china_trade(self) -> Optional[Dict[str, pd.Series]]:
-        """China trade time series: Exports YoY, Imports YoY, Trade Balance from Bloomberg."""
-        if self.bloomberg is None or not self.bloomberg.available:
-            return None
-        result = {}
-        mapping = {
-            'exports_yoy': 'china_exp_yoy',
-            'imports_yoy': 'china_imp_yoy',
-            'trade_balance': 'china_trade_bal',
-        }
-        for label, campo in mapping.items():
-            s = self.bloomberg.get_series(campo)
-            if s is not None and len(s) > 0:
-                result[label] = s
-        return result if len(result) >= 2 else None
-
-    # =========================================================================
     # USA LEADING INDICATORS (FRED)
     # =========================================================================
 
@@ -917,9 +758,6 @@ class ChartDataProvider:
             if s is not None and len(s) >= 13:
                 yoy = float(s.iloc[-1] / s.iloc[-13] - 1) * 100
                 result[f'{key}_yoy'] = round(yoy, 1)
-            if s is not None and len(s) >= 14:
-                yoy_prev = float(s.iloc[-2] / s.iloc[-14] - 1) * 100
-                result[f'{key}_yoy_prev'] = round(yoy_prev, 1)
             if s is not None and len(s) >= 2:
                 mom = float(s.iloc[-1] / s.iloc[-2] - 1) * 100
                 result[f'{key}_mom'] = round(mom, 2)
@@ -941,9 +779,6 @@ class ChartDataProvider:
             if len(gdp_clean) >= 2:
                 qoq = ((float(gdp_clean.iloc[-1]) / float(gdp_clean.iloc[-2])) ** 4 - 1) * 100
                 result['gdp_qoq'] = round(qoq, 1)
-            if len(gdp_clean) >= 3:
-                qoq_prev = ((float(gdp_clean.iloc[-2]) / float(gdp_clean.iloc[-3])) ** 4 - 1) * 100
-                result['gdp_qoq_prev'] = round(qoq_prev, 1)
 
         # Manufacturers' New Orders (billions)
         ism = self.get_fred_series(FREDSeries.ISM_NEW_ORDERS)
@@ -1081,172 +916,6 @@ class ChartDataProvider:
                 result['epu_china'] = round(float(epu_cn.iloc[-1]), 1)
         except Exception:
             pass
-
-        # AKShare: PMI, trade, credit, policy rates, property, activity
-        try:
-            ak_data = self.akshare.get_china_monthly()
-            # Merge — AKShare fills gaps, BCCh takes priority for overlapping keys
-            for k, v in ak_data.items():
-                if v is not None and k not in result:
-                    result[k] = v
-        except Exception:
-            pass
-
-        return result
-
-    # =========================================================================
-    # USA CPI COMPONENTS (FRED)
-    # =========================================================================
-
-    def get_usa_cpi_components(self) -> Dict[str, Optional[float]]:
-        """Latest CPI component YoY values for detailed inflation breakdown."""
-        result = {}
-        components = [
-            ('shelter', FREDSeries.CPI_SHELTER),
-            ('services_ex_energy', FREDSeries.CPI_SERVICES_EX_ENERGY),
-            ('goods_ex_food_energy', FREDSeries.CPI_COMMODITIES_EX_FOOD_ENERGY),
-            ('food', FREDSeries.CPI_FOOD),
-            ('energy', FREDSeries.CPI_ENERGY),
-        ]
-        for key, sid in components:
-            s = self.get_fred_series(sid)
-            if s is not None and len(s) >= 13:
-                yoy = float(s.iloc[-1] / s.iloc[-13] - 1) * 100
-                result[key] = round(yoy, 1)
-            else:
-                result[key] = None
-        return result
-
-    # =========================================================================
-    # USA FISCAL (FRED)
-    # =========================================================================
-
-    def get_usa_fiscal(self) -> Dict[str, Optional[float]]:
-        """Latest US fiscal indicators: deficit/GDP, debt/GDP, interest/GDP."""
-        result = {}
-        for key, sid in [('deficit_gdp', FREDSeries.DEFICIT_GDP),
-                         ('debt_gdp', FREDSeries.DEBT_GDP),
-                         ('interest_gdp', FREDSeries.INTEREST_GDP)]:
-            s = self.get_fred_series(sid, resample=None)
-            if s is not None:
-                clean = s.dropna()
-                if len(clean) > 0:
-                    result[key] = round(float(clean.iloc[-1]), 1)
-                if len(clean) >= 2:
-                    result[f'{key}_prev'] = round(float(clean.iloc[-2]), 1)
-            else:
-                result[key] = None
-        return result
-
-    # =========================================================================
-    # USA GDP NOWCAST (FRED)
-    # =========================================================================
-
-    def get_usa_gdpnow(self) -> Optional[float]:
-        """Atlanta Fed GDPNow real-time estimate."""
-        s = self.get_fred_series(FREDSeries.GDPNOW, resample=None)
-        if s is not None and len(s) > 0:
-            return round(float(s.dropna().iloc[-1]), 1)
-        return None
-
-    # =========================================================================
-    # LATAM MACRO (BCCh)
-    # =========================================================================
-
-    def get_latam_macro(self) -> Dict[str, Dict[str, Optional[float]]]:
-        """Latest macro data for Brasil, Mexico, Colombia, Peru from BCCh."""
-        countries = {
-            'Brasil': {
-                'gdp': None, 'cpi': BCChSeries.IPC_INTL_BRASIL,
-                'tasa': BCChSeries.TPM_BRASIL, 'bond10y': BCChSeries.BOND10_BRASIL,
-            },
-            'Mexico': {
-                'gdp': None, 'cpi': BCChSeries.IPC_INTL_MEXICO,
-                'tasa': BCChSeries.TPM_MEXICO, 'bond10y': BCChSeries.BOND10_MEXICO,
-            },
-            'Colombia': {
-                'gdp': None, 'cpi': BCChSeries.IPC_INTL_COLOMBIA,
-                'tasa': BCChSeries.TPM_COLOMBIA, 'bond10y': BCChSeries.BOND10_COLOMBIA,
-            },
-            'Peru': {
-                'gdp': None, 'cpi': BCChSeries.IPC_INTL_PERU,
-                'tasa': BCChSeries.TPM_PERU, 'bond10y': BCChSeries.BOND10_PERU,
-            },
-        }
-        result = {}
-        for country, sids in countries.items():
-            data = {}
-            data['gdp'] = None  # BCCh doesn't have LatAm GDP series
-            for key in ['cpi', 'tasa', 'bond10y']:
-                sid = sids[key]
-                if sid:
-                    s = self.get_series(sid, resample='M')
-                    if s is not None and len(s) > 0:
-                        data[key] = round(float(s.iloc[-1]), 2)
-                    else:
-                        data[key] = None
-                else:
-                    data[key] = None
-            result[country] = data
-        return result
-
-    # =========================================================================
-    # PREVIOUS MONTH RETURNS (yfinance)
-    # =========================================================================
-
-    def get_previous_month_returns(self, tickers: List[str] = None) -> Dict[str, Optional[float]]:
-        """Real previous month returns from yfinance.
-
-        Args:
-            tickers: List of ticker symbols. Defaults to major indices/ETFs.
-
-        Returns:
-            Dict[ticker -> return_pct] for the previous calendar month.
-        """
-        if tickers is None:
-            tickers = [
-                'SPY', 'QQQ', 'EFA', 'EEM', 'AGG', 'HYG',
-                'TLT', 'GLD', 'USO', 'ECH', 'EWZ',
-            ]
-
-        result = {}
-        try:
-            import yfinance as yf
-            from datetime import date
-
-            today = date.today()
-            # Previous month
-            if today.month == 1:
-                prev_month = 12
-                prev_year = today.year - 1
-            else:
-                prev_month = today.month - 1
-                prev_year = today.year
-
-            # Start = first day of prev month, end = first day of current month
-            start = date(prev_year, prev_month, 1)
-            end = date(today.year, today.month, 1)
-
-            for ticker in tickers:
-                try:
-                    data = yf.download(ticker, start=start, end=end,
-                                       progress=False, auto_adjust=True)
-                    if data is not None and len(data) >= 2:
-                        first_close = float(data['Close'].iloc[0])
-                        last_close = float(data['Close'].iloc[-1])
-                        if first_close > 0:
-                            ret = round((last_close / first_close - 1) * 100, 2)
-                            result[ticker] = ret
-                        else:
-                            result[ticker] = None
-                    else:
-                        result[ticker] = None
-                except Exception:
-                    result[ticker] = None
-        except ImportError:
-            # yfinance not installed
-            for t in tickers:
-                result[t] = None
 
         return result
 
