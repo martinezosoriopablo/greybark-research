@@ -810,10 +810,39 @@ class MonthlyPipeline:
         blocked_reports = self.pre_council.get_blocked_reports()
 
         if blocked_reports:
-            print(f"\n  [WARN] Reportes bloqueados por datos faltantes: {', '.join(blocked_reports)}")
             for br in blocked_reports:
-                missing = self.pre_council_pkg['validation'][br].get('missing', [])
-                print(f"    {br}: {', '.join(missing[:5])}")
+                val = self.pre_council_pkg['validation'].get(br, {})
+                missing = val.get('missing', [])
+                total = val.get('total_required', 0)
+                generated = val.get('generated', 0)
+
+                print(f"\n  [WARN] {br.upper()}: {len(missing)}/{total} charts faltantes:")
+                for m in missing:
+                    print(f"    - {m}")
+
+                # Decision logic: ask user or auto-approve
+                if self.no_confirm:
+                    # Auto mode: tolerate up to 3 missing required charts
+                    if len(missing) <= 3:
+                        print(f"  [AUTO] {br.upper()}: {len(missing)} faltantes (tolerancia ≤3), aprobado con advertencia")
+                        approved_reports.append(br)
+                    else:
+                        print(f"  [AUTO] {br.upper()}: {len(missing)} faltantes (>3), BLOQUEADO")
+                        self.errors.append(f"Fase 2 - {br}: {len(missing)} charts sin datos")
+                else:
+                    # Interactive mode: ask user
+                    try:
+                        print(f"\n  El reporte {br.upper()} tiene {generated} de {total} charts.")
+                        print(f"  Faltan {len(missing)} charts required.")
+                        resp = input(f"  ¿Generar {br.upper()} de todas formas? (s/n): ").strip().lower()
+                        if resp in ('s', 'si', 'sí', 'y', 'yes'):
+                            approved_reports.append(br)
+                            print(f"  [OK] {br.upper()}: aprobado manualmente por el usuario")
+                        else:
+                            print(f"  [SKIP] {br.upper()}: omitido por el usuario")
+                            self.errors.append(f"Fase 2 - {br}: omitido por usuario ({len(missing)} charts faltantes)")
+                    except (EOFError, KeyboardInterrupt):
+                        print(f"\n  [SKIP] {br.upper()}: omitido (sin input)")
 
         if not approved_reports:
             print("\n  [NO_GO] Ningún reporte pasó la validación de datos. Abortando.")
