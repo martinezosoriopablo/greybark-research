@@ -660,6 +660,29 @@ class ChartDataProvider:
         }
 
     # =========================================================================
+    # USA CPI BREAKDOWN (FRED)
+    # =========================================================================
+
+    def get_usa_cpi_breakdown(self) -> Dict[str, Optional[pd.Series]]:
+        """CPI component time series (YoY) for stacked chart."""
+        components = [
+            ('shelter', FREDSeries.CPI_SHELTER),
+            ('services_ex_shelter', FREDSeries.CPI_SERVICES_EX_ENERGY),
+            ('core_goods', FREDSeries.CPI_COMMODITIES_EX_FOOD_ENERGY),
+            ('food', FREDSeries.CPI_FOOD),
+            ('energy', FREDSeries.CPI_ENERGY),
+        ]
+        result = {}
+        for key, sid in components:
+            s = self.get_fred_series(sid)
+            if s is not None and len(s) >= 13:
+                yoy = s.pct_change(12) * 100
+                result[key] = yoy.dropna()
+            else:
+                result[key] = None
+        return result
+
+    # =========================================================================
     # YIELD CURVE (FRED)
     # =========================================================================
 

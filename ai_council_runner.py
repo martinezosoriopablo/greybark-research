@@ -51,7 +51,8 @@ from narrative_engine import validate_narrative
 
 DEFAULT_MODEL = "claude-sonnet-4-6"          # Panel (5 agentes)
 SYNTHESIS_MODEL = "claude-opus-4-6"          # CIO + Contrarian + Refinador
-MAX_TOKENS = 2500
+MAX_TOKENS = 4000           # Panel agents (5 analysts)
+REFINADOR_MAX_TOKENS = 12000  # Refinador final document (~8K words)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
@@ -116,7 +117,7 @@ class AICouncilRunner:
         self.session_log = []
         self.panel_outputs = {}
         self.synthesis_outputs = {}
-        self.refinador_max_tokens = MAX_TOKENS
+        self.refinador_max_tokens = REFINADOR_MAX_TOKENS
 
         # Cargar prompts
         self.prompts = self._load_prompts()
@@ -202,13 +203,14 @@ class AICouncilRunner:
             return f"Error: {str(e)}"
 
     def _call_llm_sync(self, system_prompt: str, user_prompt: str,
-                       model: str = None) -> str:
+                       model: str = None, max_tokens: int = None) -> str:
         """Llama a Claude API de forma sincrónica."""
         use_model = model or self.model
+        use_tokens = max_tokens or MAX_TOKENS
         try:
             response = self.client.messages.create(
                 model=use_model,
-                max_tokens=MAX_TOKENS,
+                max_tokens=use_tokens,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]
             )

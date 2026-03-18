@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Estado del Sistema{% endblock %}
+{% block nav_status %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Estado del Sistema</h1>
+    <p class="subtitle">Checks de salud, API keys y recursos</p>
+</div>
+
+<section class="card">
+    <h2>Fuentes de Datos y Dependencias</h2>
+    <div class="checks-list">
+        {% for check in checks %}
+        <div class="check-row {% if check.ok %}check-ok{% else %}check-fail{% endif %}">
+            <span class="check-icon">{% if check.ok %}&#9989;{% else %}&#10060;{% endif %}</span>
+            <span class="check-name">{{ check.name }}</span>
+            <span class="check-detail">{{ check.detail }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card">
+    <h2>Espacio en Disco</h2>
+    <div class="checks-list">
+        {% for d in disk_usage %}
+        <div class="check-row check-ok">
+            <span class="check-icon">&#128193;</span>
+            <span class="check-name">{{ d.label }}</span>
+            <span class="check-detail">{{ d.size_fmt }} ({{ d.n_files }} archivos)</span>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

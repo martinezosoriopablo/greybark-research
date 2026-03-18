@@ -82,8 +82,7 @@ class MacroReportRenderer:
 
         # Initialize ChartDataProvider for real data (with Bloomberg for PMI/trade)
         try:
-            self._data_provider = ChartDataProvider(
-                lookback_months=120, bloomberg=self._bloomberg)
+            self._data_provider = ChartDataProvider(lookback_months=120)
         except Exception:
             self._data_provider = None
 

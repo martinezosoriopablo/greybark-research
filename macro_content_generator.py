@@ -796,7 +796,7 @@ class MacroContentGenerator:
                 "\n\nSigue la cadena dato→interpretación→implicación. Especifica horizonte temporal (táctico 1-3m o estratégico 6-12m)."
             ),
             council_context="", quant_context=f"Job Openings: {jo_str} (prev {jo_prev_str}). Quits Rate: {qr_str} (prev {qr_prev_str}).",
-            company_name=self.company_name, max_tokens=250,
+            company_name=self.company_name, max_tokens=500,
         ) or f"Job Openings: {jo_str}. Quits Rate: {qr_str}."
 
         narrativa_salarios = generate_narrative(
@@ -806,7 +806,7 @@ class MacroContentGenerator:
                 "\n\nSigue la cadena dato→interpretación→implicación. Especifica horizonte temporal (táctico 1-3m o estratégico 6-12m)."
             ),
             council_context="", quant_context=f"AHE YoY: {ahe_str} (prev {ahe_prev_str}).",
-            company_name=self.company_name, max_tokens=250,
+            company_name=self.company_name, max_tokens=500,
         ) or f"AHE: {ahe_str}."
 
         def _trend(curr, prev):
@@ -1504,7 +1504,7 @@ class MacroContentGenerator:
                 ),
                 council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
                 quant_context='. '.join(parts) + '.',
-                company_name=self.company_name, max_tokens=250,
+                company_name=self.company_name, max_tokens=500,
             ) or f"Sector inmobiliario China: {'. '.join(parts)}."
         else:
             narrativa = "Datos de sector inmobiliario no disponibles."
@@ -1571,7 +1571,7 @@ class MacroContentGenerator:
                 ),
                 council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
                 quant_context=', '.join(parts),
-                company_name=self.company_name, max_tokens=250,
+                company_name=self.company_name, max_tokens=500,
             ) or f"Impulso crediticio China: {', '.join(parts)}."
         else:
             narrativa = "Datos de impulso crediticio chino no disponibles."
@@ -1624,7 +1624,7 @@ class MacroContentGenerator:
                 ),
                 council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
                 quant_context=', '.join(parts),
-                company_name=self.company_name, max_tokens=250,
+                company_name=self.company_name, max_tokens=500,
             ) or f"Comercio exterior China: {', '.join(parts)}."
         else:
             narrativa = "Datos de comercio exterior chino no disponibles."
@@ -1673,7 +1673,7 @@ class MacroContentGenerator:
             ),
             council_context=self.council.get('panel_outputs', {}).get('geo', '')[:500],
             quant_context=quant_ctx,
-            company_name=self.company_name, max_tokens=250,
+            company_name=self.company_name, max_tokens=500,
         ) or f"PBOC Rate: {pboc_rate}. LPR 1Y: {lpr_1y}. CNY/USD: {cny_val}."
 
         return {
@@ -2382,7 +2382,7 @@ class MacroContentGenerator:
             ),
             quant_context=quant_ctx,
             company_name=self.company_name,
-            max_tokens=200,
+            max_tokens=400,
         )
         if not intro:
             intro = f"Las conclusiones de {self.month_name} {self.year} reflejan el análisis de las principales variables macro."
@@ -2414,7 +2414,7 @@ class MacroContentGenerator:
             ),
             quant_context=quant_ctx,
             company_name=self.company_name,
-            max_tokens=100,
+            max_tokens=200,
         )
         if not pos:
             pos = f"Posicionamiento basado en: {quant_ctx}."

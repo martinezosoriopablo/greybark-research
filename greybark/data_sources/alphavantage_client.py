@@ -127,6 +127,26 @@ class AlphaVantageClient:
         return result
     
     # =========================================================================
+    # MARKET MOVERS
+    # =========================================================================
+
+    def get_top_gainers_losers(self) -> Dict:
+        """
+        Get top gainers, losers, and most actively traded tickers.
+
+        Returns:
+            Dict with 'top_gainers', 'top_losers', 'most_actively_traded' lists.
+            Each item has: ticker, price, change_amount, change_percentage, volume.
+        """
+        params = {'function': 'TOP_GAINERS_LOSERS'}
+        data = self._request(params)
+        return {
+            'top_gainers': data.get('top_gainers', []),
+            'top_losers': data.get('top_losers', []),
+            'most_actively_traded': data.get('most_actively_traded', []),
+        }
+
+    # =========================================================================
     # SECTOR SENTIMENT
     # =========================================================================
     

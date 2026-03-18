@@ -532,7 +532,7 @@ class AssetAllocationContentGenerator:
             ),
             council_context=council_ctx,
             company_name=self.company_name,
-            max_tokens=150,
+            max_tokens=300,
         )
         return trigger if trigger else 'Monitorear datos macro del período.'
 
@@ -2451,7 +2451,7 @@ class AssetAllocationContentGenerator:
                 council_context=f"RF PANEL:\n{rf[:1500]}",
                 quant_context=carry_str,
                 company_name=self.company_name,
-                max_tokens=100,
+                max_tokens=200,
             )
             if rec:
                 chile['recomendacion'] = rec.strip()

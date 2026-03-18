@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Bienvenido, {{ company_name }}</h1>
+    <p class="subtitle">Panel de control</p>
+</div>
+
+<!-- Stats cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <span class="stat-value">{{ usage.daily_am_count|default(0) }}</span>
+        <span class="stat-label">Reportes AM</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-value">{{ usage.daily_pm_count|default(0) }}</span>
+        <span class="stat-label">Reportes PM</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-value">{{ usage.ai_council_count|default(0) }}</span>
+        <span class="stat-label">AI Council</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-value">{{ usage.podcast_count|default(0) }}</span>
+        <span class="stat-label">Podcasts</span>
+    </div>
+</div>
+
+<!-- Quick links -->
+<div class="quick-links">
+    {% if client.product_ai_council %}
+    <a href="/pipeline" class="quick-link-card">
+        <span class="quick-icon">&#9881;</span>
+        <span class="quick-label">Pipeline</span>
+        <span class="quick-desc">Ejecutar AI Council</span>
+    </a>
+    {% endif %}
+    {% if client.product_daily_am or client.product_daily_pm %}
+    <a href="/daily" class="quick-link-card">
+        <span class="quick-icon">&#128202;</span>
+        <span class="quick-label">Daily</span>
+        <span class="quick-desc">Reporte diario AM/PM</span>
+    </a>
+    {% endif %}
+    <a href="/reports" class="quick-link-card">
+        <span class="quick-icon">&#128196;</span>
+        <span class="quick-label">Reportes</span>
+        <span class="quick-desc">Ver reportes generados</span>
+    </a>
+    <a href="/historico" class="quick-link-card">
+        <span class="quick-icon">&#128197;</span>
+        <span class="quick-label">Historico</span>
+        <span class="quick-desc">Archivo por fecha</span>
+    </a>
+    <a href="/settings" class="quick-link-card">
+        <span class="quick-icon">&#127912;</span>
+        <span class="quick-label">Configuracion</span>
+        <span class="quick-desc">Branding y prompts</span>
+    </a>
+    <a href="/system-status" class="quick-link-card">
+        <span class="quick-icon">&#128994;</span>
+        <span class="quick-label">Estado</span>
+        <span class="quick-desc">Checks del sistema</span>
+    </a>
+</div>
+
+<!-- Pipeline launcher (simple) -->
+{% if client.product_ai_council %}
+<section class="card">
+    <div class="card-header">
+        <h2>Generar Reporte Rapido</h2>
+        <a href="/pipeline" class="btn btn-outline btn-sm">Pipeline completo</a>
+    </div>
+    <form method="post" action="/run-pipeline" class="pipeline-form">
+        <div class="form-group">
+            <label for="directives">Directivas adicionales (opcional)</label>
+            <textarea id="directives" name="directives" rows="3"
+                      placeholder="Ej: Enfoque en renta fija local, horizonte 6 meses"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Generar reporte</button>
+    </form>
+</section>
+{% endif %}
+
+<!-- Recent reports -->
+<section class="card">
+    <div class="card-header">
+        <h2>Reportes recientes</h2>
+        <a href="/reports" class="btn btn-outline">Ver todos</a>
+    </div>
+    {% if reports %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Fecha</th>
+                <th>Tamano</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in reports %}
+            <tr>
+                <td>{{ r.name }}</td>
+                <td>{{ r.modified.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ r.size_fmt }}</td>
+                <td>
+                    <a href="/reports/{{ r.rel_path }}" class="btn btn-sm">Ver</a>
+                    <a href="/download/{{ r.rel_path }}" class="btn btn-sm btn-outline">Descargar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No hay reportes disponibles aun.</p>
+    {% endif %}
+</section>
+
+<!-- Recent jobs -->
+{% if recent_jobs %}
+<section class="card">
+    <h2>Ejecuciones recientes</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for j in recent_jobs[:5] %}
+            <tr>
+                <td>{{ j.product }}</td>
+                <td>
+                    <span class="badge badge-{{ j.status }}">{{ j.status }}</span>
+                </td>
+                <td>{{ j.completed_at or "en progreso" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+{% endblock %}

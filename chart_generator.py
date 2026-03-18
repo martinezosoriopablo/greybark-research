@@ -1108,9 +1108,7 @@ class MacroChartsGenerator:
         except Exception as e:
             print(f"  [WARN] Time series charts failed: {e}")
 
-        # 1. Yield Curve + Spreads
-        _safe_chart('yield_curve', self._generate_yield_curve)
-        _safe_chart('yield_spreads', self._generate_yield_spreads)
+        # 1. Yield Curve + Spreads (now in generate_macro_time_series_charts)
 
         # 2. GDP Comparison
         if 'resumen_ejecutivo' in content:
@@ -1253,6 +1251,8 @@ class MacroChartsGenerator:
             'chile_external': self._generate_chile_external_chart,
             'latam_rates': self._generate_latam_rates,
             'epu_geopolitics': self._generate_epu_geopolitics,
+            'yield_curve': self._generate_yield_curve,
+            'yield_spreads': self._generate_yield_spreads,
         }
         for chart_id, method in chart_methods.items():
             try:
@@ -1469,40 +1469,44 @@ class MacroChartsGenerator:
 
     def _generate_inflation_components_ts(self) -> str:
         """Contribución de cada componente al CPI total (barras apiladas, 36m)."""
-        # Bloomberg-only chart (CPI subcomponents are proprietary)
-        if not self.bloomberg:
-            raise ChartDataError("inflation_components_ts: Bloomberg not available")
+        # Try FRED first (free CPI subcomponent indices)
+        if self.data:
+            try:
+                breakdown = self.data.get_usa_cpi_breakdown()
+                weights = {
+                    'Shelter': ('shelter', 0.36),
+                    'Services ex-Hous.': ('services_ex_shelter', 0.25),
+                    'Core Goods': ('core_goods', 0.18),
+                    'Food': ('food', 0.14),
+                    'Energy': ('energy', 0.07),
+                }
+                components = {}
+                all_ok = True
+                for label, (key, weight) in weights.items():
+                    s = breakdown.get(key)
+                    if s is not None and len(s) >= 12:
+                        vals = self._real_series(s, date_fmt='%b%y')
+                        if vals:
+                            components[label] = [(d, round(v * weight, 2)) for d, v in vals[-36:]]
+                        else:
+                            all_ok = False
+                    else:
+                        all_ok = False
+                if all_ok and len(components) == 5:
+                    categories = [d for d, _ in list(components.values())[0]]
+                    comp_dict = {k: [v for _, v in pts] for k, pts in components.items()}
+                    self.chart_sources['inflation_components_ts'] = 'fred'
+                    return self.chart_gen.generate_stacked_bar(
+                        categories=categories,
+                        components=comp_dict,
+                        title='USA: Contribución al CPI por Componente',
+                        ylabel='Contribución (pp)',
+                        target_line=2.0,
+                        target_label='Target Fed 2%')
+            except Exception as e:
+                logger.warning("inflation_components_ts FRED fallback failed: %s", e)
 
-        comp_map = {
-            'Shelter': ('cpi_shelter', 0.36),
-            'Services ex-Hous.': ('cpi_services_ex_housing', 0.25),
-            'Core Goods': ('cpi_core_goods', 0.18),
-            'Food': ('cpi_food', 0.14),
-            'Energy': ('cpi_energy', 0.07),
-        }
-        components = {}
-        all_ok = True
-        for label, (campo, weight) in comp_map.items():
-            s = self.bloomberg.get_series(campo)
-            if s is not None and len(s) >= 12:
-                vals = self._real_series(s, date_fmt='%b%y')
-                if vals:
-                    components[label] = [(d, round(v * weight, 2)) for d, v in vals[-36:]]
-            else:
-                all_ok = False
-        if not (all_ok and len(components) == 5):
-            raise ChartDataError("inflation_components_ts: Bloomberg returned incomplete data")
-
-        categories = [d for d, _ in list(components.values())[0]]
-        comp_dict = {k: [v for _, v in pts] for k, pts in components.items()}
-        self.chart_sources['inflation_components_ts'] = 'bloomberg'
-        return self.chart_gen.generate_stacked_bar(
-            categories=categories,
-            components=comp_dict,
-            title='USA: Contribución al CPI por Componente (datos Bloomberg)',
-            ylabel='Contribución (pp)',
-            target_line=2.0,
-            target_label='Target Fed 2%')
+        raise ChartDataError("inflation_components_ts: no data source available")
 
     def _generate_pmi_global(self) -> str:
         """PMI Manufacturing Global (120m). Bloomberg-only (ISM PMI is proprietary)."""

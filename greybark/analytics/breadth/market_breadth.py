@@ -140,7 +140,8 @@ class MarketBreadthAnalytics:
         for period, days in periods.items():
             if days is None:  # YTD
                 # Find first trading day of year
-                year_start = datetime(prices.index[-1].year, 1, 1)
+                last_ts = prices.index[-1]
+                year_start = last_ts.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
                 mask = prices.index >= year_start
                 if mask.any():
                     start_price = prices[mask].iloc[0]

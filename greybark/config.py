@@ -189,6 +189,13 @@ class FREDSeries:
     # Housing
     HOUSING_STARTS = "HOUST"
 
+    # CPI Components (for inflation breakdown chart)
+    CPI_SHELTER = "CUSR0000SAH1"
+    CPI_SERVICES_EX_ENERGY = "CUSR0000SAS"
+    CPI_COMMODITIES_EX_FOOD_ENERGY = "CUSR0000SACL1E"
+    CPI_FOOD = "CPIUFDSL"
+    CPI_ENERGY = "CPIENGSL"
+
     # Forecast Engine — Expectations & Nowcasts
     GDPNOW = "GDPNOW"                   # Atlanta Fed GDP Nowcast (real-time)
     EXPINF1YR = "EXPINF1YR"             # Cleveland Fed 1Y expected inflation
@@ -224,6 +231,46 @@ class BCChSeries:
     EEE_IPC_12M = "F089.IPC.V12.Z.M"          # EEE IPC 12 meses
     EEE_IPC_24M = "F089.IPC.V24.Z.M"          # EEE IPC 24 meses
     EEE_TCN_12M = "F089.TCN.VAL.Z.M"          # EEE USD/CLP 12 meses
+
+    # EEE Horizons (mediana encuesta, series validadas 2026-03-18)
+    EEE_IPC_11M = "F089.IPC.V12.14.M"         # Inflación en 11 meses (var 12m)
+    EEE_IPC_23M = "F089.IPC.V12.15.M"         # Inflación en 23 meses (var 12m)
+    EEE_IPC_35M = "F089.IPC.V12.35.M"         # Inflación en 35 meses (var 12m)
+    EEE_IPC_LP = "F089.IPC.V12.LP.M"          # Inflación promedio largo plazo
+    EEE_TPM_PROX = "F089.TPM.TAS.11.M"        # TPM siguiente reunión
+    EEE_TPM_11M = "F089.TPM.TAS.14.M"         # TPM dentro de 11 meses
+    EEE_TPM_23M = "F089.TPM.TAS.15.M"         # TPM dentro de 23 meses
+    EEE_TPM_35M = "F089.TPM.TAS.35.M"         # TPM dentro de 35 meses
+    EEE_TPM_LP = "F089.TPM.TAS.LP.M"          # TPM promedio largo plazo (neutral)
+    EEE_PIB_2026 = "F089.PIB.V12.2026.M"      # PIB año 2026
+    EEE_PIB_2027 = "F089.PIB.V12.2027.M"      # PIB año 2027
+    EEE_PIB_LP = "F089.PIB.V12.LP.M"          # PIB promedio largo plazo (potencial)
+    EEE_TCN_LP = "F089.TCN.V12.LP.M"          # Tipo de cambio var 12m largo plazo
+
+    # EOF (Encuesta Operadores Financieros, mediana, diaria)
+    EOF_TPM_ACTUAL = "F089.EOF.TPM.MA.D"           # TPM mes actual
+    EOF_TPM_1REU = "F089.EOF.TPM.1REU.D"           # TPM 1 reunión adelante
+    EOF_TPM_3M = "F089.EOF.TPM.3MS.D"              # TPM 2 reuniones (3 meses)
+    EOF_TPM_3REU = "F089.EOF.TPM.3REU.D"           # TPM 3 reuniones adelante
+    EOF_TPM_6M = "F089.EOF.TPM.6MS.D"              # TPM 4 reuniones (6 meses)
+    EOF_TPM_12M = "F089.EOF.TPM.12MS.D"            # TPM 12 meses
+    EOF_TPM_24M = "F089.EOF.TPM.24MS.D"            # TPM 24 meses
+    EOF_TC_7D = "F089.EOF.TC.7DA.D"                # USD/CLP 7 días
+    EOF_TC_28D = "F089.EOF.TC.28DA.D"              # USD/CLP 28 días
+    EOF_TC_3M = "F089.EOF.TC.7MA.D"                # USD/CLP 3 meses
+    EOF_BTP_5Y = "F089.EOF.RF_BTP_5Y.14D.D"       # BTP 5Y 14 días adelante
+    EOF_BTP_10Y = "F089.EOF.RF_BTP_10Y.14D.D"     # BTP 10Y 14 días adelante
+    EOF_BTU_5Y = "F089.EOF.RF_BTU_5Y.14D.D"       # BTU 5Y 14 días adelante
+    EOF_BTU_10Y = "F089.EOF.RF_BTU_10Y.14D.D"     # BTU 10Y 14 días adelante
+    EOF_SESGO_BCCh = "F089.EOF.PS_TPM.CMA.D"      # Percepción sesgo comunicados BCCh
+
+    # IMCE (Índice Mensual Confianza Empresarial, ICARE-UAI)
+    IMCE_TOTAL = "G089.IME.IND.A0.M"              # IMCE Total
+    IMCE_COMERCIO = "G089.IME.IND.A1.M"           # IMCE Comercio
+    IMCE_INDUSTRIA = "G089.IME.IND.A2.M"          # IMCE Industria
+    IMCE_CONSTRUCCION = "G089.IME.IND.A3.M"       # IMCE Construcción
+    IMCE_MINERIA = "G089.IME.IND.A4.M"            # IMCE Minería
+    IMCE_SIN_MINERIA = "G089.IME.IND.A04.M"       # IMCE Sin Minería
 
     # Actividad
     IMACEC_YOY = "F032.IMC.V12.Z.Z.2018.Z.Z.0.M"

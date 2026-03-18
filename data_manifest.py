@@ -181,12 +181,12 @@ RF_MANIFEST: List[DataField] = [
     # BCRP EMBI + Bloomberg curves (via bloomberg_reader → bcrp_embi_client.py + Bloomberg)
     DataField("bloomberg_context", "EMBI spreads (BCRP) + Bund/Gilt/JGB curvas + EM credit", "BCRP:EMBI+Bloomberg:intl_curves", "text", FieldPriority.IMPORTANT),
     # EOF Bond Expectations (BCCh Encuesta Operadores Financieros)
-    DataField("chile_extended.eof_expectations.btp_5y", "Exp. tasa BTP 5Y (EOF)", "BCCh:F089.EOF.RF_BTP_5Y", "%", FieldPriority.IMPORTANT),
-    DataField("chile_extended.eof_expectations.btp_10y", "Exp. tasa BTP 10Y (EOF)", "BCCh:F089.EOF.RF_BTP_10Y", "%", FieldPriority.IMPORTANT),
-    DataField("chile_extended.eof_expectations.btu_5y", "Exp. tasa BTU 5Y (EOF)", "BCCh:F089.EOF.RF_BTU_5Y", "%", FieldPriority.IMPORTANT),
-    DataField("chile_extended.eof_expectations.btu_10y", "Exp. tasa BTU 10Y (EOF)", "BCCh:F089.EOF.RF_BTU_10Y", "%", FieldPriority.IMPORTANT),
-    DataField("chile_extended.eof_expectations.tpm_12m", "Exp. TPM 12M (EOF operadores)", "BCCh:F089.EOF.TPM.12MS", "%", FieldPriority.IMPORTANT),
-    DataField("chile_extended.eof_expectations.ipc_12m", "Exp. inflacion 12M (EOF operadores)", "BCCh:F089.EOF.VII.12MS", "%", FieldPriority.IMPORTANT),
+    DataField("chile_extended.eof_expectations.btp_5y", "Exp. tasa BTP 5Y (EOF)", "BCCh:F089.EOF.RF_BTP_5Y.14D.D", "%", FieldPriority.IMPORTANT),
+    DataField("chile_extended.eof_expectations.btp_10y", "Exp. tasa BTP 10Y (EOF)", "BCCh:F089.EOF.RF_BTP_10Y.14D.D", "%", FieldPriority.IMPORTANT),
+    DataField("chile_extended.eof_expectations.btu_5y", "Exp. tasa BTU 5Y (EOF)", "BCCh:F089.EOF.RF_BTU_5Y.14D.D", "%", FieldPriority.IMPORTANT),
+    DataField("chile_extended.eof_expectations.btu_10y", "Exp. tasa BTU 10Y (EOF)", "BCCh:F089.EOF.RF_BTU_10Y.14D.D", "%", FieldPriority.IMPORTANT),
+    DataField("chile_extended.eof_expectations.tpm_12m", "Exp. TPM 12M (EOF operadores)", "BCCh:F089.EOF.TPM.12MS.D", "%", FieldPriority.IMPORTANT),
+    DataField("chile_extended.eof_expectations.tpm_1reu", "Exp. TPM prox reunion (EOF)", "BCCh:F089.EOF.TPM.1REU.D", "%", FieldPriority.IMPORTANT),
     # IPC Detail Chile for RF (services inflation matters for rates)
     DataField("chile_extended.ipc_detail.ipc_sae", "IPC SAE Chile (core) para RF", "BCCh:F074.IPCSAE", "%", FieldPriority.IMPORTANT),
     # NY Fed / OECD for RF
@@ -203,8 +203,7 @@ RF_MANIFEST: List[DataField] = [
     # intl curves already covered by bonds_intl (BCCh) + international_yields (rf_data)
     # --- OPTIONAL ---
     DataField("rf_data.tpm_expectations", "Expectativas TPM Chile", "internal:tpm_expectations", "dict", FieldPriority.OPTIONAL),
-    DataField("chile_extended.eof_expectations.tc_28d", "Exp. USD/CLP 28 dias (EOF)", "BCCh:F089.EOF.TC.28DA", "CLP", FieldPriority.OPTIONAL),
-    DataField("chile_extended.eof_expectations.tc_28d", "Exp. USD/CLP 28 dias (EOF)", "BCCh:F089.EOF.TC.28DA", "CLP", FieldPriority.OPTIONAL),
+    DataField("chile_extended.eof_expectations.tc_28d", "Exp. USD/CLP 28 dias (EOF)", "BCCh:F089.EOF.TC.28DA.D", "CLP", FieldPriority.OPTIONAL),
 ]
 
 RIESGO_MANIFEST: List[DataField] = [
@@ -361,8 +360,8 @@ MACRO_CHART_MANIFEST: List[ChartDependency] = [
     ChartDependency("yield_spreads", "Spreads: 2Y-10Y, 3M-10Y", "fred",
                     ["get_yield_spreads"]),
     # Bloomberg charts (4)
-    ChartDependency("inflation_components_ts", "USA CPI Components (Shelter, Services...)", "bloomberg",
-                    ["cpi_shelter", "cpi_services_ex_housing", "cpi_core_goods", "cpi_food", "cpi_energy"]),
+    ChartDependency("inflation_components_ts", "USA CPI Components (Shelter, Services...)", "fred",
+                    ["CUSR0000SAH1", "CUSR0000SAS", "CUSR0000SACL1E", "CPIUFDSL", "CPIENGSL"]),
     ChartDependency("pmi_global", "PMI Global: USA, Euro, China", "bloomberg",
                     ["pmi_usa_mfg", "pmi_euro_mfg", "pmi_china_mfg"]),
     ChartDependency("europe_pmi", "PMI Europa: Mfg, Svc, Composite", "bloomberg",

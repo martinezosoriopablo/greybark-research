@@ -662,7 +662,7 @@ elif page == "Estado":
     checks.append(('AlphaVantage API', has_av, 'Earnings, factor analysis'))
 
     # Check daily reports
-    html_out = Path(os.environ.get('DAILY_REPORTS_PATH', str(Path.home() / "OneDrive/Documentos/proyectos/html_out")))
+    html_out = Path(os.environ.get('DAILY_REPORTS_PATH', str(Path.home() / "OneDrive/Documentos/proyectos/archivo_reportes/html")))
     if html_out.exists():
         recent_reports = list(html_out.glob("*.html"))
         n_recent = len([f for f in recent_reports

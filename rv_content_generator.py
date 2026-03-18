@@ -1857,7 +1857,7 @@ class RVContentGenerator:
                 council_context=rv_panel[:1500],
                 quant_context="",
                 company_name=self.company_name,
-                max_tokens=200
+                max_tokens=400
             )
         else:
             # Fallback: build from parser factor views
@@ -2922,7 +2922,7 @@ class RVContentGenerator:
                 ),
                 council_context=council_ctx,
                 company_name=self.company_name,
-                max_tokens=200,
+                max_tokens=400,
             )
 
         # Fallbacks

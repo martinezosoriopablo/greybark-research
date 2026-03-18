@@ -21,7 +21,7 @@ import json
 
 
 # Ruta por defecto de los reportes
-DEFAULT_REPORTS_PATH = os.environ.get('DAILY_REPORTS_PATH', str(Path.home() / "OneDrive/Documentos/proyectos/html_out"))
+DEFAULT_REPORTS_PATH = os.environ.get('DAILY_REPORTS_PATH', str(Path.home() / "OneDrive/Documentos/proyectos/archivo_reportes/html"))
 
 
 class DailyReportParser:

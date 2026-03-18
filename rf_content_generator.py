@@ -1115,7 +1115,7 @@ class RFContentGenerator:
             prompt='Genera 2 riesgos de duration basados en datos. JSON: ["riesgo 1", "riesgo 2"]. SOLO JSON.',
             quant_context=quant_ctx,
             company_name=self.company_name,
-            max_tokens=200,
+            max_tokens=400,
         )
         riesgos = ['Monitorear niveles de tasas soberanas para ajustar duration']
         if risks_result:
@@ -1478,7 +1478,7 @@ class RFContentGenerator:
                 prompt='Genera 2 observaciones sobre refinanciamiento basadas en spreads. JSON: ["obs1", "obs2"]. SOLO JSON.',
                 quant_context=quant_ctx,
                 company_name=self.company_name,
-                max_tokens=200,
+                max_tokens=400,
             )
             if result:
                 try:
@@ -2030,7 +2030,7 @@ class RFContentGenerator:
                 council_context=rf_panel[:1500],
                 quant_context=' '.join(parts),
                 company_name=self.company_name,
-                max_tokens=250
+                max_tokens=500
             )
             if narrative:
                 return narrative
@@ -2514,7 +2514,7 @@ class RFContentGenerator:
             ),
             council_context=self.council.get('panel_outputs', {}).get('rf', '')[:1000],
             quant_context=f"Chile BCU 10Y real yield: {bcu_str}.",
-            company_name=self.company_name, max_tokens=200,
+            company_name=self.company_name, max_tokens=400,
         )
         return narrativa or f"Chile BCU 10Y real yield: {bcu_str}."
 
@@ -2830,7 +2830,7 @@ class RFContentGenerator:
                 ),
                 council_context=f"RF PANEL:\n{rf_panel[:1500]}\n\nFINAL:\n{final[:1000]}",
                 company_name=self.company_name,
-                max_tokens=200,
+                max_tokens=400,
             )
             if result:
                 return result

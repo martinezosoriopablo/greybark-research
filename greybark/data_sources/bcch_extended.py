@@ -436,6 +436,101 @@ class BCChExtendedClient:
         return self._fetch_multiple(series)
 
     # =========================================================================
+    # EEE — ENCUESTA DE EXPECTATIVAS ECONÓMICAS
+    # =========================================================================
+
+    def get_eee_expectations(self) -> Dict[str, Optional[float]]:
+        """
+        Encuesta de Expectativas Económicas (EEE) del BCCh.
+        Mediana de expectativas de analistas sobre inflación, TPM, PIB, tipo de cambio.
+        """
+        return {
+            'ipc_11m': self.get_latest(BCChSeries.EEE_IPC_11M),
+            'ipc_23m': self.get_latest(BCChSeries.EEE_IPC_23M),
+            'ipc_35m': self.get_latest(BCChSeries.EEE_IPC_35M),
+            'ipc_lp': self.get_latest(BCChSeries.EEE_IPC_LP),
+            'tpm_prox_reunion': self.get_latest(BCChSeries.EEE_TPM_PROX),
+            'tpm_11m': self.get_latest(BCChSeries.EEE_TPM_11M),
+            'tpm_23m': self.get_latest(BCChSeries.EEE_TPM_23M),
+            'tpm_35m': self.get_latest(BCChSeries.EEE_TPM_35M),
+            'tpm_lp': self.get_latest(BCChSeries.EEE_TPM_LP),
+            'pib_2026': self.get_latest(BCChSeries.EEE_PIB_2026),
+            'pib_2027': self.get_latest(BCChSeries.EEE_PIB_2027),
+            'pib_lp': self.get_latest(BCChSeries.EEE_PIB_LP),
+            'tcn_lp': self.get_latest(BCChSeries.EEE_TCN_LP),
+        }
+
+    # =========================================================================
+    # EOF — ENCUESTA DE OPERADORES FINANCIEROS
+    # =========================================================================
+
+    def get_eof_expectations(self) -> Dict[str, Optional[float]]:
+        """
+        Encuesta de Operadores Financieros (EOF) del BCCh.
+        Mediana de expectativas de operadores sobre TPM, tipo de cambio y tasas RF.
+        """
+        return {
+            'tpm_actual': self.get_latest(BCChSeries.EOF_TPM_ACTUAL),
+            'tpm_1reu': self.get_latest(BCChSeries.EOF_TPM_1REU),
+            'tpm_3m': self.get_latest(BCChSeries.EOF_TPM_3M),
+            'tpm_3reu': self.get_latest(BCChSeries.EOF_TPM_3REU),
+            'tpm_6m': self.get_latest(BCChSeries.EOF_TPM_6M),
+            'tpm_12m': self.get_latest(BCChSeries.EOF_TPM_12M),
+            'tpm_24m': self.get_latest(BCChSeries.EOF_TPM_24M),
+            'tc_7d': self.get_latest(BCChSeries.EOF_TC_7D),
+            'tc_28d': self.get_latest(BCChSeries.EOF_TC_28D),
+            'tc_3m': self.get_latest(BCChSeries.EOF_TC_3M),
+            'btp_5y': self.get_latest(BCChSeries.EOF_BTP_5Y),
+            'btp_10y': self.get_latest(BCChSeries.EOF_BTP_10Y),
+            'btu_5y': self.get_latest(BCChSeries.EOF_BTU_5Y),
+            'btu_10y': self.get_latest(BCChSeries.EOF_BTU_10Y),
+            'sesgo_bcch': self.get_latest(BCChSeries.EOF_SESGO_BCCh),
+        }
+
+    # =========================================================================
+    # IMCE — CONFIANZA EMPRESARIAL
+    # =========================================================================
+
+    def get_imce(self) -> Dict[str, Optional[float]]:
+        """
+        Índice Mensual de Confianza Empresarial (IMCE, ICARE-UAI).
+        Valores >50 = optimismo, <50 = pesimismo.
+        """
+        return {
+            'total': self.get_latest(BCChSeries.IMCE_TOTAL),
+            'comercio': self.get_latest(BCChSeries.IMCE_COMERCIO),
+            'industria': self.get_latest(BCChSeries.IMCE_INDUSTRIA),
+            'construccion': self.get_latest(BCChSeries.IMCE_CONSTRUCCION),
+            'mineria': self.get_latest(BCChSeries.IMCE_MINERIA),
+            'sin_mineria': self.get_latest(BCChSeries.IMCE_SIN_MINERIA),
+        }
+
+    # =========================================================================
+    # INTERNATIONAL GDP & UNEMPLOYMENT
+    # =========================================================================
+
+    def get_international_gdp(self) -> Dict[str, Optional[float]]:
+        """GDP QoQ % trimestral por país (BCCh series internacionales)."""
+        return {
+            'eurozona': self.get_latest(BCChSeries.GDP_EUROZONA),
+            'alemania': self.get_latest(BCChSeries.GDP_ALEMANIA),
+            'francia': self.get_latest(BCChSeries.GDP_FRANCIA),
+            'uk': self.get_latest(BCChSeries.GDP_UK),
+            'japon': self.get_latest(BCChSeries.GDP_JAPON),
+            'china': self.get_latest(BCChSeries.GDP_CHINA),
+        }
+
+    def get_international_unemployment(self) -> Dict[str, Optional[float]]:
+        """Desempleo mensual % por país (BCCh series internacionales)."""
+        return {
+            'eurozona': self.get_latest(BCChSeries.DESEMP_EUROZONA),
+            'alemania': self.get_latest(BCChSeries.DESEMP_ALEMANIA),
+            'uk': self.get_latest(BCChSeries.DESEMP_UK),
+            'japon': self.get_latest(BCChSeries.DESEMP_JAPON),
+            'china': self.get_latest(BCChSeries.DESEMP_CHINA),
+        }
+
+    # =========================================================================
     # DASHBOARDS CONSOLIDADOS
     # =========================================================================
 
