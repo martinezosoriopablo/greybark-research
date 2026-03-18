@@ -269,6 +269,14 @@ class AICouncilRunner:
         if wsj_context:
             context_for_agents += f"\n\n## WSJ SUMMARIES (últimos 7 días)\n{wsj_context[:3000]}"
 
+        # Inject pre-council briefing (section-specific for this agent)
+        pre_council_briefing = council_input.get('pre_council_briefing', {})
+        pre_council_stats = council_input.get('pre_council_stats', {})
+        agent_briefing = pre_council_briefing.get(agent, '') or pre_council_briefing.get(
+            {'macro': 'macro', 'rv': 'rv', 'rf': 'rf', 'riesgo': 'riesgo', 'geo': 'chile'}.get(agent, ''), '')
+        if agent_briefing:
+            context_for_agents += f"\n\n## BRIEFING DEPARTAMENTO DE ESTUDIOS ({agent.upper()})\n{agent_briefing}"
+
         # Extraer bloomberg_context ANTES de serializar a JSON
         bloomberg_context = agent_data.pop('bloomberg_context', '')
 
@@ -280,17 +288,30 @@ class AICouncilRunner:
         if len(data_json) > 6000:
             data_json = data_json[:6000] + "\n... [truncado]"
 
+        # Format pre-council market stats
+        stats_text = ''
+        if pre_council_stats:
+            stats_lines = []
+            for k, v in pre_council_stats.items():
+                if v is not None:
+                    stats_lines.append(f"  {k}: {v}")
+            if stats_lines:
+                stats_text = '\n'.join(stats_lines)
+
         prompt = f"""
 Aquí tienes la información para tu análisis:
 
 {data_inventory}
+
+## DATOS DE MERCADO VERIFICADOS (Pre-Council)
+{stats_text if stats_text else '(no disponibles)'}
 
 ## DATOS CUANTITATIVOS COMPLETOS (referencia — los datos clave ya están arriba)
 ```json
 {data_json}
 ```
 
-## INTELLIGENCE BRIEFING (Contexto de Reportes Diarios)
+## INTELLIGENCE BRIEFING (Contexto de Reportes Diarios + Departamento de Estudios)
 {context_for_agents}
 """
 

@@ -797,13 +797,42 @@ class MonthlyPipeline:
         else:
             self.data = self.collect_all_data()
 
-        # ---- FASE 2: Preflight ----
+        # ---- FASE 2: Pre-Council Package ----
+        # Generate ALL charts, tables, and intelligence briefing BEFORE council
+        from pre_council_package import PreCouncilPackage
+        self.pre_council = PreCouncilPackage(
+            data=self.data, reports=self.reports, verbose=True
+        )
+        self.pre_council_pkg = self.pre_council.build()
+
+        # Check which reports passed validation
+        approved_reports = self.pre_council.get_approved_reports()
+        blocked_reports = self.pre_council.get_blocked_reports()
+
+        if blocked_reports:
+            print(f"\n  [WARN] Reportes bloqueados por datos faltantes: {', '.join(blocked_reports)}")
+            for br in blocked_reports:
+                missing = self.pre_council_pkg['validation'][br].get('missing', [])
+                print(f"    {br}: {', '.join(missing[:5])}")
+
+        if not approved_reports:
+            print("\n  [NO_GO] Ningún reporte pasó la validación de datos. Abortando.")
+            return 1
+
+        self.reports = approved_reports
+
+        # ---- FASE 3: Preflight (council-specific checks) ----
         verdict = self.preflight_check(self.data)
 
         if verdict in ('NO_GO', 'CANCELLED') or self.dry_run:
             return 1 if verdict == 'NO_GO' else 0
 
-        # ---- FASE 3: AI Council ----
+        # ---- FASE 4: AI Council (receives pre-built briefing) ----
+        # Inject pre-council briefing into data so council agents receive it
+        self.data['pre_council_briefing'] = self.pre_council_pkg.get('briefing', {})
+        self.data['pre_council_stats'] = self.pre_council_pkg.get('data_stats', {})
+        self.data['pre_council_summary'] = self.pre_council.format_for_council()
+
         self.council_result = self.run_council(self.data)
 
         if self.council_result is None:
@@ -813,7 +842,7 @@ class MonthlyPipeline:
             print("\n  [NO-GO] Council abortó por preflight. Generando reportes con defaults...")
             self.council_result = None
 
-        # ---- FASE 3.5: Report Data Gate ----
+        # ---- FASE 5: Ensamblar Reportes (charts ya pre-generados) ----
         equity_data = self.data.get('equity')
         if isinstance(equity_data, dict) and 'error' in equity_data:
             equity_data = None
@@ -822,20 +851,11 @@ class MonthlyPipeline:
         if isinstance(forecast_data, dict) and 'error' in forecast_data:
             forecast_data = None
 
-        approved_reports = self._validate_report_data(equity_data)
-
-        if not approved_reports:
-            print("\n  [NO_GO] Ningún reporte pasó la validación de datos. Abortando.")
-            return 1
-
-        # ---- FASE 4: Reportes (solo los aprobados) ----
-        self.reports = approved_reports
-
         self.report_results = self.generate_reports(
             self.council_result, equity_data, forecast_data
         )
 
-        # ---- FASE 5: Resumen ----
+        # ---- FASE 6: Resumen ----
         self.print_summary(self.report_results)
 
         has_errors = any(r['status'] == 'ERROR' for r in self.report_results)
