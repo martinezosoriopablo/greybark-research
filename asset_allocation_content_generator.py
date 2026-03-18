@@ -141,20 +141,20 @@ class AssetAllocationContentGenerator:
             vix = self._q('chile_rates', 'vix')
         if vix is None:
             vix = self._q('equity', 'risk', 'vix')
-        c['vix'] = float(vix) if vix is not None else None
+        c['vix'] = self._safe_float(vix)
 
         # --- Commodities (authoritative prices) ---
         c['copper'] = self._q('equity', 'bcch_indices', 'copper', 'value')
         gold = self._q('equity', 'bcch_indices', 'gold', 'value')
-        c['gold'] = float(gold) if gold is not None else None
+        c['gold'] = self._safe_float(gold)
         oil = self._q('equity', 'bcch_indices', 'oil_wti', 'value')
-        c['oil_wti'] = float(oil) if oil is not None else None
+        c['oil_wti'] = self._safe_float(oil)
 
         # --- Breakevens (authoritative, single value) ---
         be5 = self._q('inflation', 'breakevens', '5y') or self._q('chile_rates', 'breakeven_5y')
         if be5 is None:
             be5 = self._q('rf_data', 'inflation', 'breakeven_5y')
-        c['breakeven_5y'] = float(be5) if be5 is not None else None
+        c['breakeven_5y'] = self._safe_float(be5)
 
         # --- FX ---
         c['usdclp'] = self._q('chile', 'usd_clp') or self._q('equity', 'bcch_indices', 'usd_clp', 'value')
@@ -231,9 +231,19 @@ class AssetAllocationContentGenerator:
 
         # Brazil SELIC trigger check
         selic = self._q('chile_rates', 'selic') or self._q('rf_data', 'chile_rates', 'selic')
-        c['selic'] = float(selic) if selic is not None else None
+        c['selic'] = self._safe_float(selic)
 
         return c
+
+    @staticmethod
+    def _safe_float(v):
+        """Convert to float safely, returning None for dicts/lists/unconvertible types."""
+        if v is None or isinstance(v, (dict, list)):
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
 
     def _canon_str(self, key: str, fmt: str = '.1f', suffix: str = '') -> str:
         """Format a canonical value as string, or 'N/D' if missing."""

@@ -695,6 +695,9 @@ class CouncilDataCollector:
                 # NUEVO: AlphaVantage Premium deep-dive
                 'market_movers': self._equity_data.get('market_movers', {}),
                 'news_sentiment': self._equity_data.get('news_sentiment', {}),
+                # BCCh indices (IPSA, S&P, etc.) + chile picks
+                'bcch_indices': self._equity_data.get('bcch_indices', {}),
+                'chile_picks': self._equity_data.get('chile_picks', {}),
             }
             # Also give riesgo agent the risk metrics
             riesgo_agent = council_input['agent_data'].get('riesgo', {})

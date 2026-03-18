@@ -912,7 +912,7 @@ class MacroContentGenerator:
 
     def _get_fed_neutral(self, dots: dict) -> str:
         """Fed neutral rate: dots longer_run > NY Fed r-star > forecast terminal."""
-        if self.data and dots.get('longer_run'):
+        if self.data and dots and dots.get('longer_run'):
             return f"{dots['longer_run']}%"
         # NY Fed r-star from quant_data
         rstar = self.quant.get('nyfed_rstar', {})
@@ -943,6 +943,7 @@ class MacroContentGenerator:
             '2027': {'mediana': 'N/D', 'rango': 'N/D'},
             'largo_plazo': {'mediana': 'N/D', 'rango': 'N/D'}
         }
+        dots = None
         if self.data:
             try:
                 dots = self.data.fred.get_fed_dots()

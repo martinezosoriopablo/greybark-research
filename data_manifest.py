@@ -143,10 +143,10 @@ MACRO_MANIFEST: List[DataField] = [
 RV_MANIFEST: List[DataField] = [
     # --- REQUIRED ---
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
-    DataField("indices", "Indices equity internacionales", "BCCh:stock_indices", "dict", FieldPriority.REQUIRED),
-    DataField("breadth.pct_above_50ma", "% acciones sobre 50MA", "yfinance:breadth", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=100.0),
-    DataField("breadth.breadth_signal", "Senal de breadth", "yfinance:breadth", "label", FieldPriority.REQUIRED),
-    DataField("breadth.cyclical_defensive_spread", "Spread ciclicos vs defensivos", "yfinance:breadth", "%", FieldPriority.REQUIRED, min_value=-50.0, max_value=50.0),
+    DataField("equity_data.bcch_indices", "Indices equity internacionales", "BCCh:stock_indices", "dict", FieldPriority.REQUIRED),
+    DataField("breadth.pct_above_50ma", "% acciones sobre 50MA", "yfinance:breadth", "%", FieldPriority.IMPORTANT, min_value=0.0, max_value=100.0),
+    DataField("breadth.breadth_signal", "Senal de breadth", "yfinance:breadth", "label", FieldPriority.IMPORTANT),
+    DataField("breadth.cyclical_defensive_spread", "Spread ciclicos vs defensivos", "yfinance:breadth", "%", FieldPriority.IMPORTANT, min_value=-50.0, max_value=50.0),
     # --- IMPORTANT ---
     DataField("equity_data.valuations.us.pe_trailing", "P/E trailing S&P 500", "yfinance:SPY", "x", FieldPriority.IMPORTANT, min_value=5.0, max_value=60.0),
     DataField("equity_data.valuations.europe.pe_trailing", "P/E trailing STOXX 600", "yfinance:VGK", "x", FieldPriority.IMPORTANT, min_value=3.0, max_value=50.0),
@@ -168,8 +168,8 @@ RF_MANIFEST: List[DataField] = [
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
     DataField("rates.fed_expectations", "Expectativas Fed", "internal:rate_expectations", "dict", FieldPriority.REQUIRED),
     DataField("rates.terminal_rate", "Fed Funds Rate terminal", "internal:rate_expectations", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
-    DataField("bonds_intl", "Bonos 10Y internacionales (incl UST)", "BCCh:international_bonds", "dict", FieldPriority.REQUIRED),
-    DataField("chile_extended.spc_curve", "BCP + BCU curva Chile", "BCCh:SPC", "dict", FieldPriority.REQUIRED),
+    DataField("bonds_intl", "Bonos 10Y internacionales (incl UST)", "BCCh:international_bonds", "dict", FieldPriority.IMPORTANT),
+    DataField("chile_extended.spc_curve", "BCP + BCU curva Chile", "BCCh:SPC", "dict", FieldPriority.IMPORTANT),
     DataField("chile.tpm", "TPM Chile", "BCCh:TPM", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
     # --- IMPORTANT ---
     DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT, min_value=-2.0, max_value=10.0),
@@ -240,8 +240,8 @@ RIESGO_MANIFEST: List[DataField] = [
 
 GEO_MANIFEST: List[DataField] = [
     # --- REQUIRED ---
-    DataField("daily_context", "Contexto de reportes diarios", "internal:daily_reports", "dict", FieldPriority.REQUIRED),
-    DataField("commodities", "Commodities (cobre, petroleo, oro)", "BCCh:commodities", "dict", FieldPriority.REQUIRED),
+    DataField("daily_context", "Contexto de reportes diarios", "internal:daily_reports", "dict", FieldPriority.IMPORTANT),
+    DataField("commodities", "Commodities (cobre, petroleo, oro)", "BCCh:commodities", "dict", FieldPriority.IMPORTANT),
     DataField("regime.current_regime", "Regimen macro actual", "internal:regime_classification", "label", FieldPriority.REQUIRED),
     # --- IMPORTANT ---
     DataField("epu", "EPU Index (USA, China)", "FRED:EPU", "dict", FieldPriority.IMPORTANT),

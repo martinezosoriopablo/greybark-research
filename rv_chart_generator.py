@@ -74,8 +74,9 @@ class RVChartsGenerator:
         'consumer_staples': 'Cons. Básico'
     }
 
-    def __init__(self, market_data: Dict = None):
+    def __init__(self, market_data: Dict = None, branding: dict = None):
         self.data = market_data or {}
+        self.branding = branding or {}
         self._setup_style()
 
     def _setup_style(self):
