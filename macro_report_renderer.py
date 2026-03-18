@@ -632,7 +632,7 @@ class MacroReportRenderer:
             else:
                 self._print("  [INFO] Sin ChartDataProvider — charts usaran fallback")
 
-            macro_charts = MacroChartsGenerator(data_provider=provider, forecast_data=self.forecast_data, branding=self.branding)
+            macro_charts = MacroChartsGenerator(data_provider=provider, forecast_data=self.forecast_data, branding=self.branding, bloomberg=self._bloomberg)
             all_charts = macro_charts.generate_all_charts(content)
             for placeholder, chart_id in chart_map.items():
                 replacements[placeholder] = all_charts.get(chart_id, '')

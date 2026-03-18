@@ -13,9 +13,12 @@ Dependencias:
 
 import base64
 import io
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import warnings
+
+logger = logging.getLogger(__name__)
 
 # Suprimir warnings de matplotlib
 warnings.filterwarnings('ignore')
@@ -1021,10 +1024,37 @@ class ChartGenerator:
 class MacroChartsGenerator:
     """Generador de charts especificos para el Reporte Macro."""
 
-    def __init__(self, data_provider=None, forecast_data: Dict = None):
+    def __init__(self, data_provider=None, forecast_data: Dict = None,
+                 branding: Dict = None, bloomberg=None):
         self.chart_gen = ChartGenerator()
         self.data = data_provider  # ChartDataProvider or None (fallback to _interp)
         self.forecast_data = forecast_data or {}
+        self.branding = branding or {}
+        self.bloomberg = bloomberg  # BloombergData instance for PMI, CPI components, China trade
+        self.chart_sources: Dict[str, str] = {}  # chart_id → 'real_api' | 'bloomberg' | 'fallback'
+
+    def get_chart_source_summary(self) -> Dict[str, Any]:
+        """Return summary of data sources used across all charts."""
+        real = [k for k, v in self.chart_sources.items() if v == 'real_api']
+        bbg = [k for k, v in self.chart_sources.items() if v == 'bloomberg']
+        fallback = [k for k, v in self.chart_sources.items() if v == 'fallback']
+        content = [k for k, v in self.chart_sources.items() if v == 'content']
+        total = len(self.chart_sources) or 1
+        real_count = len(real) + len(bbg)
+        return {
+            'real_api': len(real),
+            'bloomberg': len(bbg),
+            'partial_real': 0,
+            'fallback_estimated': len(fallback),
+            'content_generated': len(content),
+            'real_pct': round(real_count / total * 100),
+            'details': {
+                'real': real,
+                'bloomberg': bbg,
+                'fallback': fallback,
+                'content': content,
+            },
+        }
 
     def _sync_spot(self, series: list, spot_key: str) -> list:
         """Override last data point with injected spot value for chart/text consistency.
@@ -1233,8 +1263,8 @@ class MacroChartsGenerator:
                     return self.chart_gen.generate_time_series(
                         series, title='Inflación: Principales Economías (datos reales BCCh)',
                         ylabel='% a/a', target_line=2.0, target_label='Target 2%')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_inflation_evolution: API fallback — %s', e)
 
         # Fallback: interpolated data
         months = self._monthly_labels()
@@ -1566,8 +1596,8 @@ class MacroChartsGenerator:
                             (5, '#b2182b'),
                         ],
                         fmt='.1f')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_inflation_heatmap: API fallback — %s', e)
 
         # Fallback: hardcoded data
         months_abbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -1614,6 +1644,43 @@ class MacroChartsGenerator:
 
     def _generate_inflation_components_ts(self) -> str:
         """Contribución de cada componente al CPI total (barras apiladas, 36m)."""
+        # Try Bloomberg data first
+        if self.bloomberg:
+            try:
+                comp_map = {
+                    'Shelter': ('cpi_shelter', 0.36),
+                    'Services ex-Hous.': ('cpi_services_ex_housing', 0.25),
+                    'Core Goods': ('cpi_core_goods', 0.18),
+                    'Food': ('cpi_food', 0.14),
+                    'Energy': ('cpi_energy', 0.07),
+                }
+                components = {}
+                all_ok = True
+                for label, (campo, weight) in comp_map.items():
+                    s = self.bloomberg.get_series(campo)
+                    if s is not None and len(s) >= 12:
+                        # Convert to contribution: weight × YoY rate
+                        vals = self._real_series(s, date_fmt='%b%y')
+                        if vals:
+                            components[label] = [(d, round(v * weight, 2)) for d, v in vals[-36:]]
+                    else:
+                        all_ok = False
+                if all_ok and len(components) == 5:
+                    # Extract categories (dates) from first component
+                    categories = [d for d, _ in list(components.values())[0]]
+                    comp_dict = {k: [v for _, v in pts] for k, pts in components.items()}
+                    self.chart_sources['inflation_components_ts'] = 'bloomberg'
+                    return self.chart_gen.generate_stacked_bar(
+                        categories=categories,
+                        components=comp_dict,
+                        title='USA: Contribución al CPI por Componente (datos Bloomberg)',
+                        ylabel='Contribución (pp)',
+                        target_line=2.0,
+                        target_label='Target Fed 2%')
+            except Exception as e:
+                logger.warning("Chart inflation_components_ts: Bloomberg fallback — %s", e)
+
+        self.chart_sources['inflation_components_ts'] = 'fallback'
         # 36 meses: Feb 2023 → Ene 2026
         months = self._monthly_labels(n=36, start_year=2023, start_month=2)
 
@@ -1664,7 +1731,7 @@ class MacroChartsGenerator:
         return self.chart_gen.generate_stacked_bar(
             categories=months,
             components=components,
-            title='USA: Contribución al CPI por Componente (pp, 3 años)',
+            title='USA: Contribución al CPI por Componente (ESTIMADO)',
             ylabel='Contribución (pp)',
             target_line=2.0,
             target_label='Target Fed 2%'
@@ -1672,6 +1739,30 @@ class MacroChartsGenerator:
 
     def _generate_pmi_global(self) -> str:
         """PMI Manufacturing Global (120m)."""
+        # Try Bloomberg data first
+        if self.bloomberg:
+            try:
+                usa_s = self.bloomberg.get_series('pmi_usa_mfg')
+                euro_s = self.bloomberg.get_series('pmi_euro_mfg')
+                china_s = self.bloomberg.get_series('pmi_china_mfg')
+                usa_r = self._real_series(usa_s)
+                euro_r = self._real_series(euro_s)
+                china_r = self._real_series(china_s)
+                if usa_r and euro_r and china_r:
+                    series = {
+                        'USA ISM Mfg': usa_r,
+                        'Euro PMI Mfg': euro_r,
+                        'China PMI Mfg': china_r,
+                    }
+                    self.chart_sources['pmi_global'] = 'bloomberg'
+                    return self.chart_gen.generate_time_series(
+                        series, title='PMI Manufacturing Global (datos Bloomberg)',
+                        ylabel='Índice', target_line=50.0,
+                        target_label='Expansión/Contracción')
+            except Exception as e:
+                logger.warning("Chart pmi_global: Bloomberg fallback — %s", e)
+
+        self.chart_sources['pmi_global'] = 'fallback'
         months = self._monthly_labels()
 
         # USA ISM: 49-58 range, COVID crash to 41, recovery, recent ~49
@@ -1710,7 +1801,7 @@ class MacroChartsGenerator:
             'China PMI': list(zip(months, china)),
         }
         return self.chart_gen.generate_time_series(
-            series, title='PMI Manufacturing Global (10 años)',
+            series, title='PMI Manufacturing Global (ESTIMADO)',
             ylabel='Índice', target_line=50.0, target_label='Expansión/Contracción')
 
     def _generate_commodity_prices(self) -> str:
@@ -1732,8 +1823,8 @@ class MacroChartsGenerator:
                     ]
                     return self.chart_gen.generate_multi_panel(
                         panels, suptitle='Precios Commodities Clave (datos reales BCCh)')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_commodity_prices: API fallback — %s', e)
 
         # Fallback
         months = self._monthly_labels()
@@ -1793,8 +1884,8 @@ class MacroChartsGenerator:
                     ]
                     return self.chart_gen.generate_multi_panel(
                         panels, suptitle='Energía y Alimentos (datos parciales BCCh)')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_energy_food: API fallback — %s', e)
 
         # Fallback
         months = self._monthly_labels()
@@ -1846,8 +1937,8 @@ class MacroChartsGenerator:
                     return self.chart_gen.generate_time_series(
                         real_series, title='Tasas de Política Monetaria (datos reales BCCh)',
                         ylabel='Tasa (%)')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_policy_rates_comparison: API fallback — %s', e)
 
         # Fallback
         months = self._monthly_labels()
@@ -2017,8 +2108,8 @@ class MacroChartsGenerator:
                         ylabel='Índice (base 100)',
                         target_line=100.0,
                         target_label='Base')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_global_equities: API fallback — %s', e)
 
         # Fallback
         months = self._monthly_labels()
@@ -2093,8 +2184,8 @@ class MacroChartsGenerator:
                     ]
                     return self.chart_gen.generate_multi_panel(
                         panels, suptitle='Europa: Dashboard Macro (datos BCCh)')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_europe_dashboard: API fallback — %s', e)
 
         # Fallback hardcoded
         months = self._monthly_labels()
@@ -2141,6 +2232,29 @@ class MacroChartsGenerator:
 
     def _generate_europe_pmi(self) -> str:
         """PMI Europa: Manufacturing, Services, Composite (120m)."""
+        # Try Bloomberg data first
+        if self.bloomberg:
+            try:
+                mfg_s = self.bloomberg.get_series('pmi_euro_mfg')
+                svc_s = self.bloomberg.get_series('pmi_euro_svc')
+                comp_s = self.bloomberg.get_series('pmi_euro_comp')
+                mfg_r = self._real_series(mfg_s)
+                svc_r = self._real_series(svc_s)
+                if mfg_r and svc_r:
+                    series = {'PMI Manufacturing': mfg_r, 'PMI Services': svc_r}
+                    if comp_s is not None:
+                        comp_r = self._real_series(comp_s)
+                        if comp_r:
+                            series['PMI Composite'] = comp_r
+                    self.chart_sources['europe_pmi'] = 'bloomberg'
+                    return self.chart_gen.generate_time_series(
+                        series, title='Europa: PMI Eurozona (datos Bloomberg)',
+                        ylabel='Índice', target_line=50.0,
+                        target_label='Expansión/Contracción')
+            except Exception as e:
+                logger.warning("Chart europe_pmi: Bloomberg fallback — %s", e)
+
+        self.chart_sources['europe_pmi'] = 'fallback'
         months = self._monthly_labels()
 
         # Euro PMI Manufacturing: 53→33→63→46
@@ -2172,7 +2286,7 @@ class MacroChartsGenerator:
             'PMI Composite': list(zip(months, composite)),
         }
         return self.chart_gen.generate_time_series(
-            series, title='Europa: PMI Eurozona (10 años)',
+            series, title='Europa: PMI Eurozona (ESTIMADO)',
             ylabel='Índice', target_line=50.0, target_label='Expansión/Contracción')
 
     # =========================================================================
@@ -2206,8 +2320,8 @@ class MacroChartsGenerator:
                     ]
                     return self.chart_gen.generate_multi_panel(
                         panels, suptitle='China: Dashboard Macro (datos BCCh)')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_china_dashboard: API fallback — %s', e)
 
         # Fallback: hardcoded _interp() data
         months = self._monthly_labels()
@@ -2263,6 +2377,35 @@ class MacroChartsGenerator:
 
     def _generate_china_trade_chart(self) -> str:
         """China comercio exterior: Exports, Imports, Trade Balance (120m)."""
+        # Try Bloomberg data first
+        if self.bloomberg:
+            try:
+                exp_s = self.bloomberg.get_series('china_exp_yoy')
+                imp_s = self.bloomberg.get_series('china_imp_yoy')
+                tbal_s = self.bloomberg.get_series('china_trade_bal')
+                exp_r = self._real_series(exp_s)
+                imp_r = self._real_series(imp_s)
+                if exp_r and imp_r:
+                    series = {
+                        'Exports (% a/a)': exp_r,
+                        'Imports (% a/a)': imp_r,
+                    }
+                    dual = None
+                    if tbal_s is not None:
+                        tbal_r = self._real_series(tbal_s)
+                        if tbal_r:
+                            dual = {'Trade Balance ($B)': tbal_r}
+                    self.chart_sources['china_trade'] = 'bloomberg'
+                    return self.chart_gen.generate_time_series(
+                        series, title='China: Comercio Exterior (datos Bloomberg)',
+                        ylabel='% a/a', target_line=0.0,
+                        target_label='Sin cambio',
+                        dual_axis=dual,
+                        dual_ylabel='$B' if dual else None)
+            except Exception as e:
+                logger.warning("Chart china_trade: Bloomberg fallback — %s", e)
+
+        self.chart_sources['china_trade'] = 'fallback'
         months = self._monthly_labels()
 
         # Exports YoY: 8→-17→30→8
@@ -2301,7 +2444,7 @@ class MacroChartsGenerator:
         }
         return self.chart_gen.generate_time_series(
             series,
-            title='China: Comercio Exterior (10 años)',
+            title='China: Comercio Exterior (ESTIMADO)',
             ylabel='% a/a',
             target_line=0.0,
             target_label='Sin cambio',
@@ -2339,8 +2482,8 @@ class MacroChartsGenerator:
                     ]
                     return self.chart_gen.generate_multi_panel(
                         panels, suptitle='Chile: Dashboard Macro (datos reales BCCh)')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_chile_dashboard: API fallback — %s', e)
 
         # Fallback
         months = self._monthly_labels()
@@ -2417,8 +2560,8 @@ class MacroChartsGenerator:
                         target_line=3.0,
                         target_label='Meta BCCh 3%'
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_chile_inflation_components: API fallback — %s', e)
 
         # Fallback: hardcoded interpolation
         months = self._monthly_labels(n=36, start_year=2023, start_month=2)
@@ -2495,8 +2638,8 @@ class MacroChartsGenerator:
                             target_label='Equilibrio',
                             dual_axis={'Cobre (USD/lb)': cobre_r},
                             dual_ylabel='USD/lb')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_chile_external_chart: API fallback — %s', e)
 
         # Fallback: Cuenta Corriente estimada + Cobre interpolado
         months = self._monthly_labels()
@@ -2544,8 +2687,8 @@ class MacroChartsGenerator:
                         real_series,
                         title='Tasas de Política Monetaria LatAm (datos reales BCCh)',
                         ylabel='Tasa (%)')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('Chart _generate_latam_rates: API fallback — %s', e)
 
         # Fallback
         months = self._monthly_labels()
