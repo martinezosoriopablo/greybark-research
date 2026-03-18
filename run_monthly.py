@@ -542,6 +542,76 @@ class MonthlyPipeline:
             return None
 
     # =====================================================================
+    # FASE 3.5: REPORT DATA VALIDATION GATE
+    # =====================================================================
+
+    def _validate_report_data(self, equity_data: Optional[Dict] = None) -> List[str]:
+        """
+        Validates that all required data is available for each report.
+        Returns list of report types that passed validation.
+        Reports that fail are logged and excluded.
+        """
+        self._print_header("FASE 3.5", "VALIDACIÓN DE DATOS POR REPORTE")
+
+        try:
+            from report_data_validator import ReportDataValidator
+            from chart_data_provider import ChartDataProvider
+        except ImportError as e:
+            print(f"  [WARN] Validator not available ({e}), skipping gate")
+            return list(self.reports)
+
+        # Build dependencies
+        cdp = None
+        bbg = None
+        bloomberg_path = str(BASE_DIR / "input" / "bloomberg_data.xlsx")
+
+        try:
+            cdp = ChartDataProvider()
+        except Exception as e:
+            print(f"  [WARN] ChartDataProvider init failed: {e}")
+
+        try:
+            from bloomberg_reader import BloombergData
+            bbg = BloombergData()
+        except Exception as e:
+            print(f"  [WARN] Bloomberg reader init failed: {e}")
+
+        rf_data = self.data.get('rf', {})
+        if isinstance(rf_data, dict) and 'error' in rf_data:
+            rf_data = {}
+
+        validator = ReportDataValidator(
+            chart_data_provider=cdp,
+            bloomberg=bbg,
+            rf_data=rf_data,
+            equity_data=equity_data or {},
+            bloomberg_path=bloomberg_path,
+        )
+
+        approved = []
+        for report_type in self.reports:
+            result = validator.validate(report_type)
+            if result.blocked:
+                print(f"\n  [BLOCKED] {report_type.upper()}: {result.failed} charts sin datos")
+                for r in result.results:
+                    if not r.ok and r.error and "(optional" not in r.error:
+                        print(f"    - {r.chart_id}: {r.error}")
+                self.errors.append(
+                    f"Fase 3.5 - {report_type}: BLOCKED ({result.failed} charts sin datos: "
+                    f"{', '.join(result.missing)})"
+                )
+            else:
+                print(f"  [OK] {report_type.upper()}: {result.passed}/{result.checked} charts validados")
+                approved.append(report_type)
+
+        if len(approved) < len(self.reports):
+            blocked = set(self.reports) - set(approved)
+            print(f"\n  Reportes bloqueados: {', '.join(blocked)}")
+            print(f"  Reportes aprobados:  {', '.join(approved) if approved else 'ninguno'}")
+
+        return approved
+
+    # =====================================================================
     # FASE 4: GENERACIÓN DE REPORTES
     # =====================================================================
 
@@ -743,7 +813,7 @@ class MonthlyPipeline:
             print("\n  [NO-GO] Council abortó por preflight. Generando reportes con defaults...")
             self.council_result = None
 
-        # ---- FASE 4: Reportes ----
+        # ---- FASE 3.5: Report Data Gate ----
         equity_data = self.data.get('equity')
         if isinstance(equity_data, dict) and 'error' in equity_data:
             equity_data = None
@@ -751,6 +821,15 @@ class MonthlyPipeline:
         forecast_data = self.data.get('forecasts')
         if isinstance(forecast_data, dict) and 'error' in forecast_data:
             forecast_data = None
+
+        approved_reports = self._validate_report_data(equity_data)
+
+        if not approved_reports:
+            print("\n  [NO_GO] Ningún reporte pasó la validación de datos. Abortando.")
+            return 1
+
+        # ---- FASE 4: Reportes (solo los aprobados) ----
+        self.reports = approved_reports
 
         self.report_results = self.generate_reports(
             self.council_result, equity_data, forecast_data

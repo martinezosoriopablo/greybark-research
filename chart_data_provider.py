@@ -13,11 +13,15 @@ Cada método retorna datos en formato listo para charts:
 """
 
 import sys
+import time
+import logging
 from pathlib import Path
 from datetime import date, timedelta
 from typing import Dict, Optional, List, Tuple
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # Setup paths
 sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
@@ -30,6 +34,9 @@ from greybark.config import BCChSeries, FREDSeries
 class ChartDataProvider:
     """Provee series de tiempo reales para charts del macro report."""
 
+    MAX_RETRIES = 3
+    RETRY_DELAYS = [1.0, 2.0, 4.0]  # Exponential backoff
+
     def __init__(self, lookback_months: int = 120, injected_spot: Dict[str, float] = None):
         self.bcch = BCChClient()
         self.fred = FREDClient()
@@ -39,6 +46,31 @@ class ChartDataProvider:
         self._cache: Dict[str, pd.Series] = {}
         self._usa_latest = None  # Lazy-loaded USA data cache
         self._injected_spot = injected_spot or {}
+        self._fetch_stats = {'ok': 0, 'retried': 0, 'failed': 0}
+
+    def _retry_fetch(self, fn, label: str):
+        """Execute fn() with up to MAX_RETRIES retries + exponential backoff."""
+        last_err = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                result = fn()
+                if attempt > 0:
+                    self._fetch_stats['retried'] += 1
+                    logger.info("ChartDataProvider: %s succeeded on attempt %d", label, attempt + 1)
+                self._fetch_stats['ok'] += 1
+                return result
+            except Exception as e:
+                last_err = e
+                if attempt < self.MAX_RETRIES:
+                    delay = self.RETRY_DELAYS[min(attempt, len(self.RETRY_DELAYS) - 1)]
+                    logger.warning(
+                        "ChartDataProvider: %s attempt %d failed (%s), retrying in %.1fs",
+                        label, attempt + 1, e, delay
+                    )
+                    time.sleep(delay)
+        self._fetch_stats['failed'] += 1
+        logger.error("ChartDataProvider: %s FAILED after %d attempts: %s", label, self.MAX_RETRIES + 1, last_err)
+        return None
 
     def get_spot(self, key: str, default=None):
         """Return injected spot value if available, else default."""
@@ -59,14 +91,17 @@ class ChartDataProvider:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        data = self.bcch.get_series(
-            series_id,
-            start_date=self.start,
-            end_date=self.end,
-            days_back=self.lookback_days
+        data = self._retry_fetch(
+            lambda: self.bcch.get_series(
+                series_id,
+                start_date=self.start,
+                end_date=self.end,
+                days_back=self.lookback_days
+            ),
+            f"BCCh:{series_id}"
         )
 
-        if data is None or len(data) == 0:
+        if data is None or (hasattr(data, '__len__') and len(data) == 0):
             return None
 
         # Only resample if data is truly high-frequency (daily).
@@ -482,17 +517,16 @@ class ChartDataProvider:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        try:
-            data = self.fred.get_series(
+        data = self._retry_fetch(
+            lambda: self.fred.get_series(
                 series_id,
                 start_date=self.start,
                 end_date=self.end
-            )
-        except Exception as e:
-            print(f"[ChartDataProvider] FRED {series_id} failed: {e}")
-            return None
+            ),
+            f"FRED:{series_id}"
+        )
 
-        if data is None or len(data) == 0:
+        if data is None or (hasattr(data, '__len__') and len(data) == 0):
             return None
 
         # Drop NaN values from FRED (common in daily series)

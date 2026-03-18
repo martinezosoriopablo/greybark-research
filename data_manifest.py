@@ -296,3 +296,170 @@ def get_all_agents() -> List[str]:
 def get_fields_by_priority(agent: str, priority: FieldPriority) -> List[DataField]:
     """Get fields of a specific priority for an agent."""
     return [f for f in get_manifest(agent) if f.priority == priority]
+
+
+# =============================================================================
+# REPORT CHART/TABLE MANIFEST — No-Fallback Architecture
+# =============================================================================
+# Each report declares EXACTLY what charts and tables it needs, their data
+# source, and whether they are required. If a required chart's data source
+# is unavailable after retries, the report WILL NOT generate.
+
+@dataclass
+class ChartDependency:
+    chart_id: str           # Key in charts dict: "inflation_evolution"
+    label: str              # Human-readable: "Inflación Core: Principales Economías"
+    source: str             # "bcch", "fred", "bloomberg", "content"
+    series: List[str] = field(default_factory=list)  # API series/fields needed
+    required: bool = True   # If True, report blocks without this chart
+
+
+# ---------------------------------------------------------------------------
+# MACRO REPORT — 24 charts + 2 content-derived
+# ---------------------------------------------------------------------------
+MACRO_CHART_MANIFEST: List[ChartDependency] = [
+    # BCCh charts (13)
+    ChartDependency("inflation_evolution", "Inflación Core: Principales Economías", "bcch+fred",
+                    ["get_inflation_intl", "get_chile_ipc_yoy"]),
+    ChartDependency("inflation_heatmap", "Heatmap Inflación Global", "bcch",
+                    ["get_inflation_heatmap_data"]),
+    ChartDependency("commodity_prices", "Commodities: Petróleo, Cobre, Oro", "bcch",
+                    ["get_commodities"]),
+    ChartDependency("energy_food", "Energía y Alimentos", "bcch",
+                    ["get_energy"]),
+    ChartDependency("fed_vs_ecb_bcch", "Tasas de Política: 6 Bancos Centrales", "bcch+fred",
+                    ["get_policy_rates"]),
+    ChartDependency("europe_dashboard", "Europa: PIB, CPI, Desempleo", "bcch",
+                    ["get_europe_dashboard"]),
+    ChartDependency("global_equities", "Índices Accionarios Globales", "bcch",
+                    ["get_series:SP500,DAX,SHANGHAI,IPSA"]),
+    ChartDependency("china_dashboard", "China: PIB, CPI, PPI, Desempleo", "bcch",
+                    ["get_china_dashboard_data"]),
+    ChartDependency("chile_dashboard", "Chile: IMACEC, Desempleo, IPC, USD/CLP", "bcch",
+                    ["get_chile_dashboard"]),
+    ChartDependency("chile_inflation_components", "Chile IPC: 13 Divisiones COICOP", "bcch",
+                    ["get_chile_ipc_components"]),
+    ChartDependency("chile_external", "Chile: Comercio Exterior + Cobre", "bcch",
+                    ["get_chile_external"]),
+    ChartDependency("latam_rates", "LatAm: Tasas de Política Monetaria", "bcch",
+                    ["get_latam_rates"]),
+    ChartDependency("epu_geopolitics", "EPU: USA, China, Europa, Global", "bcch+fred",
+                    ["get_epu_intl"]),
+    # FRED charts (7)
+    ChartDependency("labor_unemployment", "Desempleo USA: U3 + U6", "fred",
+                    ["get_usa_unemployment"]),
+    ChartDependency("labor_nfp", "Nóminas No Agrícolas (NFP)", "fred",
+                    ["get_usa_nfp"]),
+    ChartDependency("labor_jolts", "JOLTS: Ofertas, Renuncias, Ratio", "fred",
+                    ["get_usa_jolts"]),
+    ChartDependency("labor_wages", "Salarios: AHE, ECI, LFPR", "fred",
+                    ["get_usa_wages"]),
+    ChartDependency("usa_leading_indicators", "USA: Indicadores Líderes", "fred",
+                    ["get_usa_leading"]),
+    ChartDependency("yield_curve", "Curva de Rendimiento UST", "fred",
+                    ["get_yield_curve_historical"]),
+    ChartDependency("yield_spreads", "Spreads: 2Y-10Y, 3M-10Y", "fred",
+                    ["get_yield_spreads"]),
+    # Bloomberg charts (4)
+    ChartDependency("inflation_components_ts", "USA CPI Components (Shelter, Services...)", "bloomberg",
+                    ["cpi_shelter", "cpi_services_ex_housing", "cpi_core_goods", "cpi_food", "cpi_energy"]),
+    ChartDependency("pmi_global", "PMI Global: USA, Euro, China", "bloomberg",
+                    ["pmi_usa_mfg", "pmi_euro_mfg", "pmi_china_mfg"]),
+    ChartDependency("europe_pmi", "PMI Europa: Mfg, Svc, Composite", "bloomberg",
+                    ["pmi_euro_mfg", "pmi_euro_svc", "pmi_euro_comp"]),
+    ChartDependency("china_trade", "China: Exportaciones, Importaciones, Balanza", "bloomberg",
+                    ["china_exp_yoy", "china_imp_yoy", "china_trade_bal"]),
+    # Content-derived charts (2) — depend on council output, not API
+    ChartDependency("gdp_comparison", "Comparación PIB por Región", "content",
+                    ["resumen_ejecutivo.forecasts_table"], required=False),
+    ChartDependency("scenarios_pie", "Escenarios Probabilísticos", "content",
+                    ["pronóstico_ponderado.escenarios"], required=False),
+]
+
+# ---------------------------------------------------------------------------
+# RV REPORT — 12 charts (all from equity_data via yfinance/AV/BCCh/FRED)
+# ---------------------------------------------------------------------------
+RV_CHART_MANIFEST: List[ChartDependency] = [
+    ChartDependency("rv_regional_performance", "Performance Regional", "yfinance",
+                    ["valuations.*.returns"]),
+    ChartDependency("rv_pe_valuations", "Valuaciones P/E por Región", "yfinance",
+                    ["valuations.*.pe_trailing", "valuations.*.pe_fwd"]),
+    ChartDependency("rv_sector_heatmap", "Heatmap Sectorial", "yfinance",
+                    ["sectors"]),
+    ChartDependency("rv_earnings_beat", "Earnings Beat Rate", "alphavantage",
+                    ["earnings.beat_rate"]),
+    ChartDependency("rv_style_box", "Style Box: Value vs Growth", "yfinance",
+                    ["factors"]),
+    ChartDependency("rv_correlation", "Matriz de Correlación", "yfinance",
+                    ["valuations.*.returns"]),
+    ChartDependency("rv_vix_range", "VIX Rango Histórico", "yfinance",
+                    ["risk.vix"]),
+    ChartDependency("rv_chile_ipsa_copper", "Chile: IPSA vs Cobre", "bcch",
+                    ["bcch_indices"]),
+    ChartDependency("rv_credit_risk", "Credit Risk: IG vs HY Spreads", "fred",
+                    ["credit"]),
+    ChartDependency("rv_drawdown", "Drawdown Análisis", "yfinance",
+                    ["risk.drawdown"]),
+    ChartDependency("rv_factor_radar", "Factor Radar: Value/Growth/Mom/Quality", "yfinance",
+                    ["factors"]),
+    ChartDependency("rv_earnings_revisions", "Revisiones de Earnings", "alphavantage",
+                    ["earnings.revisions"]),
+]
+
+# ---------------------------------------------------------------------------
+# RF REPORT — 8 charts (FRED + BCCh + rf_data)
+# ---------------------------------------------------------------------------
+RF_CHART_MANIFEST: List[ChartDependency] = [
+    ChartDependency("rf_yield_curve", "Curva UST: Actual vs Anterior vs 1Y", "fred",
+                    ["DGS3MO", "DGS1", "DGS2", "DGS5", "DGS10", "DGS30"]),
+    ChartDependency("rf_credit_spreads", "Credit Spreads: IG vs HY", "fred",
+                    ["BAMLC0A0CM", "BAMLH0A0HYM2"]),
+    ChartDependency("rf_breakevens", "Breakevens: 5Y, 10Y + TIPS", "fred",
+                    ["T5YIE", "T10YIE", "DFII10"]),
+    ChartDependency("rf_chile_curves", "Chile: BCP + BCU Curvas", "bcch",
+                    ["F022.BCLP.*", "F022.BUF.*"]),
+    ChartDependency("rf_policy_rates", "Tasas de Política: Fed, ECB, BoE, BCCh", "bcch+fred",
+                    ["policy_rates"]),
+    ChartDependency("rf_fed_expectations", "Expectativas Fed: Dots + Futuros", "fred",
+                    ["fed_expectations"]),
+    ChartDependency("rf_tpm_expectations", "Expectativas TPM Chile", "bcch",
+                    ["tpm_expectations"]),
+    ChartDependency("rf_intl_yields", "Rendimientos Internacionales 10Y", "bcch",
+                    ["F019.TBG.TAS.*.D"]),
+]
+
+# ---------------------------------------------------------------------------
+# AA REPORT — No charts (tables/cards only, data from council output)
+# ---------------------------------------------------------------------------
+AA_CHART_MANIFEST: List[ChartDependency] = []
+
+# ---------------------------------------------------------------------------
+# REPORT MANIFEST REGISTRY
+# ---------------------------------------------------------------------------
+REPORT_CHART_MANIFESTS: Dict[str, List[ChartDependency]] = {
+    'macro': MACRO_CHART_MANIFEST,
+    'rv': RV_CHART_MANIFEST,
+    'rf': RF_CHART_MANIFEST,
+    'aa': AA_CHART_MANIFEST,
+}
+
+
+def get_report_manifest(report_type: str) -> List[ChartDependency]:
+    """Get chart dependencies for a report type."""
+    return REPORT_CHART_MANIFESTS.get(report_type, [])
+
+
+def get_required_charts(report_type: str) -> List[ChartDependency]:
+    """Get only required chart dependencies for a report type."""
+    return [c for c in get_report_manifest(report_type) if c.required]
+
+
+def get_required_sources(report_type: str) -> Dict[str, List[str]]:
+    """Get required data sources grouped by source type."""
+    sources: Dict[str, List[str]] = {}
+    for c in get_required_charts(report_type):
+        src = c.source.split('+')[0]  # "bcch+fred" → "bcch"
+        if src not in sources:
+            sources[src] = []
+        sources[src].extend(c.series)
+    return sources
