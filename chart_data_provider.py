@@ -24,7 +24,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # Setup paths
-sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
+sys.path.insert(0, str(Path(__file__).parent))
 
 from greybark.data_sources.bcch_client import BCChClient
 from greybark.data_sources.fred_client import FREDClient

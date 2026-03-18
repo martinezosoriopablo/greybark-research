@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 # Agregar greybark al path para acceder a config
-GREYBARK_PATH = Path(__file__).parent.parent / "02_greybark_library"
+GREYBARK_PATH = Path(__file__).parent
 sys.path.insert(0, str(GREYBARK_PATH))
 
 try:

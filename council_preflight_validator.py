@@ -518,7 +518,6 @@ def main():
 
     # Importar collector
     sys.path.insert(0, str(Path(__file__).parent))
-    sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 
     from council_data_collector import CouncilDataCollector
 

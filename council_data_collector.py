@@ -22,7 +22,7 @@ import json
 from data_resilience import resilient_fetch, get_cache
 
 # Agregar greybark al path
-GREYBARK_PATH = Path(__file__).parent.parent / "02_greybark_library"
+GREYBARK_PATH = Path(__file__).parent
 sys.path.insert(0, str(GREYBARK_PATH))
 
 from daily_report_parser import DailyReportParser

@@ -25,7 +25,6 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 
 logger = logging.getLogger(__name__)
 

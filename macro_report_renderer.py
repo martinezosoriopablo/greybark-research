@@ -40,7 +40,6 @@ def _md_to_html_inline(text: str) -> str:
     return text
 
 sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "02_greybark_library"))
 
 from macro_content_generator import MacroContentGenerator
 from chart_generator import MacroChartsGenerator

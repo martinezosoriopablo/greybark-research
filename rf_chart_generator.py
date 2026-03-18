@@ -21,7 +21,7 @@ from datetime import date, timedelta
 import warnings
 
 # Ensure greybark library is importable
-_lib_path = str(Path(__file__).resolve().parent.parent / '02_greybark_library')
+_lib_path = str(Path(__file__).resolve().parent)
 if _lib_path not in sys.path:
     sys.path.insert(0, _lib_path)
 

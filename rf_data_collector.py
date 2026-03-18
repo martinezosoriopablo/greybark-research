@@ -43,7 +43,7 @@ if sys.stdout.encoding != 'utf-8':
 
 # Agregar paths para imports
 sys.path.insert(0, str(Path(__file__).parent))
-LIB_PATH = Path(__file__).parent.parent / "02_greybark_library"
+LIB_PATH = Path(__file__).parent
 sys.path.insert(0, str(LIB_PATH))
 
 # Output directory

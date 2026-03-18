@@ -47,7 +47,6 @@ for d in [RESEARCH_DIR, COUNCIL_DIR, REPORTS_DIR, EQUITY_DIR, RF_DATA_DIR]:
 
 # Add paths for imports
 sys.path.insert(0, str(BASE_DIR))
-sys.path.insert(0, str(BASE_DIR.parent / "02_greybark_library"))
 
 
 # =========================================================================
