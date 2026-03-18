@@ -110,6 +110,14 @@ class PreCouncilPackage:
         # Save to disk
         self._save()
 
+        # Render HTML briefing
+        self._print("\n  -> Generando HTML briefing...")
+        try:
+            html_path = self.render_html()
+            self.package['metadata']['html_path'] = html_path
+        except Exception as e:
+            logger.warning("HTML briefing generation failed: %s", e)
+
         return self.package
 
     # =====================================================================
@@ -562,3 +570,417 @@ Formato: JSON con las 6 claves. Solo el JSON, sin markdown.
             lines.append(f"  {rt.upper()}: {len(charts)} charts [{status}]")
 
         return '\n'.join(lines)
+
+    # =====================================================================
+    # HTML REPORT — Professional Pre-Council Briefing
+    # =====================================================================
+
+    def render_html(self, output_dir: str = None) -> str:
+        """Render the pre-council package as a professional HTML document.
+
+        Returns path to the generated HTML file.
+        """
+        from datetime import datetime
+
+        MONTHS_ES = {
+            1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+            5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+            9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre',
+        }
+
+        now = datetime.now()
+        fecha = f"{now.day} {MONTHS_ES[now.month]} {now.year}"
+        hora = now.strftime('%H:%M')
+
+        # Build sections
+        briefing = self.package.get('briefing', {})
+        stats = self.package.get('data_stats', {})
+        validation = self.package.get('validation', {})
+        charts = self.package.get('charts', {})
+        metadata = self.package.get('metadata', {})
+
+        # --- Market Stats Table ---
+        stats_rows = ''
+        stat_labels = {
+            'gdp_usa': ('PIB USA QoQ', '%'),
+            'unemployment_usa': ('Desempleo USA', '%'),
+            'cpi_core': ('CPI Core YoY', '%'),
+            'breakeven_5y': ('Breakeven 5Y', '%'),
+            'breakeven_10y': ('Breakeven 10Y', '%'),
+            'fed_rate': ('Fed Funds Rate', '%'),
+            'tpm': ('TPM Chile', '%'),
+            'imacec': ('IMACEC', '%'),
+            'ipc_chile': ('IPC Chile YoY', '%'),
+            'usdclp': ('USD/CLP', ''),
+            'vix': ('VIX', ''),
+            'pe_us': ('P/E S&P 500', 'x'),
+            'pe_europe': ('P/E Europa', 'x'),
+            'pe_em': ('P/E EM', 'x'),
+            'pe_chile': ('P/E Chile', 'x'),
+            'return_ytd_us': ('Return YTD USA', '%'),
+            'return_ytd_europe': ('Return YTD Europa', '%'),
+            'return_ytd_chile': ('Return YTD Chile', '%'),
+        }
+        for key, (label, unit) in stat_labels.items():
+            val = stats.get(key)
+            if val is not None:
+                if isinstance(val, float):
+                    formatted = f"{val:,.2f}{unit}"
+                else:
+                    formatted = f"{val}{unit}"
+                stats_rows += f'<tr><td>{label}</td><td style="text-align:right;font-weight:600">{formatted}</td></tr>\n'
+
+        # --- Briefing Sections ---
+        section_labels = {
+            'macro': 'Macroeconomía',
+            'rf': 'Inflación y Tasas',
+            'rv': 'Renta Variable',
+            'rf_credit': 'Renta Fija y Crédito',
+            'riesgo': 'Riesgos y Geopolítica',
+            'chile': 'Chile y LatAm',
+        }
+        briefing_html = ''
+        for key, label in section_labels.items():
+            text = briefing.get(key, '')
+            if text:
+                # Convert newlines to paragraphs
+                paragraphs = '\n'.join(f'<p>{p.strip()}</p>' for p in str(text).split('\n') if p.strip())
+                briefing_html += f'''
+                <div class="briefing-section">
+                    <h3>{label}</h3>
+                    {paragraphs}
+                </div>
+                '''
+
+        # --- Research ---
+        research_html = ''
+        research_text = briefing.get('research_summary', '')
+        if research_text:
+            paragraphs = '\n'.join(f'<p>{p.strip()}</p>' for p in str(research_text).split('\n') if p.strip())
+            research_html = f'''
+            <div class="briefing-section">
+                <h3>Research Externo (Goldman, JPM, MS)</h3>
+                {paragraphs}
+            </div>
+            '''
+
+        # --- Charts Grid per Report ---
+        charts_html = ''
+        for report_type in self.reports:
+            report_charts = charts.get(report_type, {})
+            val = validation.get(report_type, {})
+            status = 'OK' if val.get('ok') else f"INCOMPLETO ({len(val.get('missing', []))} faltantes)"
+            status_class = 'status-ok' if val.get('ok') else 'status-warn'
+
+            charts_html += f'''
+            <div class="report-section">
+                <h2>{report_type.upper()} <span class="{status_class}">[{status}]</span></h2>
+                <p>{len(report_charts)} charts generados</p>
+            '''
+
+            if val.get('missing'):
+                charts_html += '<div class="missing-list"><strong>Charts faltantes:</strong><ul>'
+                for m in val['missing']:
+                    charts_html += f'<li>{m}</li>'
+                charts_html += '</ul></div>'
+
+            # Chart grid
+            if report_charts:
+                charts_html += '<div class="chart-grid">'
+                for chart_id, chart_data in report_charts.items():
+                    if chart_data and len(chart_data) > 100:
+                        # It's a base64 image or SVG
+                        if chart_data.startswith('<'):
+                            # SVG or HTML
+                            charts_html += f'''
+                            <div class="chart-card">
+                                <div class="chart-title">{chart_id}</div>
+                                {chart_data}
+                            </div>
+                            '''
+                        elif 'base64' in chart_data or chart_data.startswith('data:'):
+                            charts_html += f'''
+                            <div class="chart-card">
+                                <div class="chart-title">{chart_id}</div>
+                                <img src="{chart_data}" alt="{chart_id}" style="max-width:100%">
+                            </div>
+                            '''
+                        else:
+                            # Try as raw base64
+                            charts_html += f'''
+                            <div class="chart-card">
+                                <div class="chart-title">{chart_id}</div>
+                                <img src="data:image/png;base64,{chart_data}" alt="{chart_id}" style="max-width:100%">
+                            </div>
+                            '''
+                charts_html += '</div>'
+
+            charts_html += '</div>'
+
+        # --- Validation Summary ---
+        validation_rows = ''
+        for rt in self.reports:
+            val = validation.get(rt, {})
+            total = val.get('total_required', 0)
+            gen = val.get('generated', 0)
+            missing = len(val.get('missing', []))
+            ok = val.get('ok', False)
+            badge = '<span class="badge-ok">OK</span>' if ok else f'<span class="badge-warn">{missing} faltantes</span>'
+            validation_rows += f'<tr><td>{rt.upper()}</td><td>{gen}</td><td>{total}</td><td>{badge}</td></tr>\n'
+
+        # --- Directives ---
+        directives_html = ''
+        directives_text = briefing.get('directives', '') or self.data.get('directives', '')
+        if directives_text:
+            directives_html = f'''
+            <div class="directives-box">
+                <h3>Directivas del Usuario</h3>
+                <p>{directives_text}</p>
+            </div>
+            '''
+
+        # --- Full HTML ---
+        html = f'''<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Pre-Council Briefing — Greybark Research</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-size: 10pt;
+            color: #1a1a1a;
+            background: #f5f5f5;
+            line-height: 1.5;
+        }}
+        .container {{ max-width: 1200px; margin: 0 auto; background: #fff; padding: 0; }}
+
+        /* Header */
+        .header {{
+            background: #1a1a1a;
+            color: #fff;
+            padding: 25px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .header h1 {{
+            font-family: 'Arial Black', 'Segoe UI', sans-serif;
+            font-size: 18pt;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }}
+        .header .subtitle {{
+            color: #dd6b20;
+            font-size: 11pt;
+            font-weight: 600;
+        }}
+        .header .date {{
+            text-align: right;
+            font-size: 9pt;
+            opacity: 0.8;
+        }}
+
+        /* Sections */
+        .section {{
+            padding: 25px 40px;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        .section h2 {{
+            font-size: 14pt;
+            font-weight: 700;
+            color: #1a1a1a;
+            border-bottom: 2px solid #dd6b20;
+            padding-bottom: 6px;
+            margin-bottom: 15px;
+        }}
+
+        /* Stats Table */
+        .stats-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9.5pt;
+        }}
+        .stats-table td {{
+            padding: 5px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }}
+        .stats-table tr:nth-child(even) {{
+            background: #f7f7f7;
+        }}
+
+        /* Briefing Sections */
+        .briefing-section {{
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background: #fafafa;
+            border-left: 3px solid #dd6b20;
+        }}
+        .briefing-section h3 {{
+            font-size: 11pt;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }}
+        .briefing-section p {{
+            font-size: 9.5pt;
+            margin-bottom: 6px;
+            color: #2d3748;
+        }}
+
+        /* Charts */
+        .report-section {{
+            padding: 20px 40px;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        .report-section h2 {{
+            font-size: 13pt;
+            margin-bottom: 10px;
+        }}
+        .chart-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }}
+        .chart-card {{
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 10px;
+            background: #fff;
+        }}
+        .chart-card img {{
+            width: 100%;
+            height: auto;
+        }}
+        .chart-title {{
+            font-size: 8.5pt;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }}
+
+        /* Badges */
+        .badge-ok {{
+            background: #276749; color: #fff;
+            padding: 2px 8px; border-radius: 3px; font-size: 8.5pt;
+        }}
+        .badge-warn {{
+            background: #c53030; color: #fff;
+            padding: 2px 8px; border-radius: 3px; font-size: 8.5pt;
+        }}
+        .status-ok {{ color: #276749; font-size: 9pt; }}
+        .status-warn {{ color: #c53030; font-size: 9pt; }}
+
+        /* Validation Table */
+        .validation-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9.5pt;
+        }}
+        .validation-table th {{
+            background: #1a1a1a; color: #fff;
+            padding: 8px 12px; text-align: left;
+        }}
+        .validation-table td {{
+            padding: 6px 12px; border-bottom: 1px solid #e2e8f0;
+        }}
+
+        /* Missing list */
+        .missing-list {{
+            background: #fff5f5; border: 1px solid #fed7d7;
+            padding: 10px 15px; margin: 10px 0; border-radius: 4px;
+            font-size: 9pt;
+        }}
+        .missing-list ul {{ margin-left: 20px; }}
+
+        /* Directives */
+        .directives-box {{
+            background: #fffff0; border: 2px solid #dd6b20;
+            padding: 15px 20px; margin: 15px 0; border-radius: 4px;
+        }}
+        .directives-box h3 {{ color: #dd6b20; margin-bottom: 8px; }}
+
+        /* Footer */
+        .footer {{
+            background: #f7f7f7;
+            border-top: 2px solid #1a1a1a;
+            padding: 15px 40px;
+            text-align: center;
+            font-size: 8pt;
+            color: #718096;
+        }}
+
+        /* Print */
+        @media print {{
+            body {{ background: #fff; }}
+            .chart-grid {{ grid-template-columns: repeat(2, 1fr); }}
+            .report-section, .section {{ page-break-inside: avoid; }}
+        }}
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>Greybark Research</h1>
+            <div class="subtitle">Pre-Council Briefing — Departamento de Estudios</div>
+        </div>
+        <div class="date">
+            {fecha}<br>{hora}<br>
+            Build: {metadata.get('build_time_seconds', '?')}s
+        </div>
+    </div>
+
+    {directives_html}
+
+    <!-- Validation Summary -->
+    <div class="section">
+        <h2>Estado de Datos por Reporte</h2>
+        <table class="validation-table">
+            <tr><th>Reporte</th><th>Charts Generados</th><th>Charts Required</th><th>Estado</th></tr>
+            {validation_rows}
+        </table>
+    </div>
+
+    <!-- Market Stats -->
+    <div class="section">
+        <h2>Datos de Mercado Verificados</h2>
+        <table class="stats-table">
+            {stats_rows}
+        </table>
+    </div>
+
+    <!-- Intelligence Briefing -->
+    <div class="section">
+        <h2>Briefing de Inteligencia</h2>
+        {briefing_html}
+        {research_html}
+    </div>
+
+    <!-- Charts by Report -->
+    {charts_html}
+
+    <!-- Footer -->
+    <div class="footer">
+        Greybark Research — Pre-Council Briefing — Generado {fecha} {hora}<br>
+        Documento interno. No distribuir sin autorización.
+    </div>
+
+</div>
+</body>
+</html>'''
+
+        # Save
+        out_dir = Path(output_dir) if output_dir else Path(__file__).parent / "output" / "reports"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ts = now.strftime('%Y%m%d')
+        path = out_dir / f"pre_council_briefing_{ts}.html"
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(html)
+
+        self._print(f"    HTML Briefing: {path}")
+        return str(path)
