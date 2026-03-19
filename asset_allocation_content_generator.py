@@ -1276,35 +1276,18 @@ class AssetAllocationContentGenerator:
         tpm_real_str = f'+{tpm_real}%' if tpm_real is not None else 'N/D'
         cobre_str = f'${cobre}/lb' if cobre is not None else 'N/D'
 
-        quant_ctx = f"TPM: {tpm_str} | IPC: {ipc_str} | Tasa Real: {tpm_real_str} | Cobre: {cobre_str}"
-
-        narrativa = generate_narrative(
-            section_name="aa_chile_review",
-            prompt=(
-                f"Escribe 2-3 parrafos sobre Chile para el reporte de asset allocation de "
-                f"{self.month_name} {self.date.year}. Cubrir: posicion relativa en LatAm, "
-                "dinamica del peso, politica monetaria BCCh, cobre, y IPSA. "
-                "Integrar datos cuantitativos. Maximo 150 palabras."
-            ),
-            council_context=f"MACRO PANEL:\n{macro[:2000]}",
-            quant_context=quant_ctx,
-            company_name=self.company_name,
-            max_tokens=600,
-        )
-        if not narrativa:
-            narrativa = f"Chile: TPM {tpm_str}, tasa real {tpm_real_str}, cobre {cobre_str}."
-
-        # Compute tendencias from data
+        # Compute tendencias from data BEFORE narrative (so we can pass them as context)
         tpm_tend = 'N/D'
         tpm_dir = self._q('tpm_expectations', 'summary', 'direction')
         if tpm_dir:
             tpm_tend = str(tpm_dir)
         elif macro:
-            if 'recorte' in macro.lower() or 'baja' in macro.lower():
-                tpm_tend = '↓ Recortes'
-            elif 'mantener' in macro.lower() or 'pausa' in macro.lower():
+            # More specific patterns first to avoid false matches
+            if any(w in macro.lower() for w in ['mantener tpm', 'tpm estable', 'pausa monetaria', 'mantener la tpm']):
                 tpm_tend = '→ Estable'
-            elif 'alza' in macro.lower() or 'subir' in macro.lower():
+            elif any(w in macro.lower() for w in ['recorte', 'bajar tpm', 'reducir tpm']):
+                tpm_tend = '↓ Recortes'
+            elif any(w in macro.lower() for w in ['alza', 'subir tpm']):
                 tpm_tend = '↑ Alzas'
 
         ipc_tend = 'N/D'
@@ -1315,6 +1298,31 @@ class AssetAllocationContentGenerator:
                 ipc_tend = '↑ Acelerando'
             elif ipc is not None:
                 ipc_tend = '→ Estable'
+
+        # Build quant context including tendencies for coherent narrative
+        tpm_dir_text = tpm_tend.replace('↓ ', '').replace('↑ ', '').replace('→ ', '')
+        quant_ctx = (
+            f"TPM: {tpm_str} (tendencia: {tpm_dir_text}) | IPC: {ipc_str} | "
+            f"Tasa Real: {tpm_real_str} | Cobre: {cobre_str}"
+        )
+
+        narrativa = generate_narrative(
+            section_name="aa_chile_review",
+            prompt=(
+                f"Escribe 2-3 parrafos sobre Chile para el reporte de asset allocation de "
+                f"{self.month_name} {self.date.year}. Cubrir: posicion relativa en LatAm, "
+                "dinamica del peso, politica monetaria BCCh, cobre, y IPSA. "
+                "IMPORTANTE: La tendencia de la TPM es {tpm_dir_text} — tu narrativa DEBE ser "
+                "coherente con esta direccion. No contradigas los datos. "
+                "Integrar datos cuantitativos. Maximo 150 palabras."
+            ),
+            council_context=f"MACRO PANEL:\n{macro[:2000]}",
+            quant_context=quant_ctx,
+            company_name=self.company_name,
+            max_tokens=600,
+        )
+        if not narrativa:
+            narrativa = f"Chile: TPM {tpm_str}, tasa real {tpm_real_str}, cobre {cobre_str}."
 
         cobre_tend = 'N/D'
         cobre_ret = self._q('equity', 'bcch_indices', 'copper', 'returns', '1m')

@@ -37,6 +37,11 @@ if sys.platform == 'win32':
     except AttributeError:
         pass
 
+# Load .env from wealth/ root (API keys)
+from dotenv import load_dotenv
+_env_path = Path(__file__).resolve().parents[2] / '.env'
+load_dotenv(_env_path)
+
 # Agregar paths
 sys.path.insert(0, str(Path(__file__).parent))
 LIB_PATH = Path(__file__).parent
@@ -703,13 +708,19 @@ class MonthlyPipeline:
 
         elif report_name == 'aa':
             from asset_allocation_renderer import AssetAllocationRenderer
-            # Combine equity + RF data for AA report
+            # Combine equity + RF + macro quant data for AA report
             aa_data = {}
             rf_data = self.data.get('rf')
             if isinstance(rf_data, dict) and 'error' not in rf_data:
                 aa_data.update(rf_data)
             if equity_data and isinstance(equity_data, dict):
                 aa_data['equity'] = equity_data
+            # Inject macro quant data (chile, inflation, rates, etc.)
+            quant_data = self.data.get('quant')
+            if isinstance(quant_data, dict):
+                for k, v in quant_data.items():
+                    if k not in aa_data:  # Don't overwrite RF/equity keys
+                        aa_data[k] = v
             renderer = AssetAllocationRenderer(
                 council_result=council_result,
                 market_data=aa_data if aa_data else None,
