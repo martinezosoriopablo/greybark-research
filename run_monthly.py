@@ -716,7 +716,7 @@ class MonthlyPipeline:
             if equity_data and isinstance(equity_data, dict):
                 aa_data['equity'] = equity_data
             # Inject macro quant data (chile, inflation, rates, etc.)
-            quant_data = self.data.get('quant')
+            quant_data = self.data.get('macro_quant')
             if isinstance(quant_data, dict):
                 for k, v in quant_data.items():
                     if k not in aa_data:  # Don't overwrite RF/equity keys
