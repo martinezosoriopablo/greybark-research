@@ -74,7 +74,7 @@ Ej:
 "IRAN-EEUU:
 Base (55%): Sanciones se mantienen, negociaciones estancadas. Brent $70-80.
 Escalación (30%): Bloqueo parcial Ormuz → crude +40-60% → CPI US +120bps →
-  Fed delay cortes → USD fortalece → Chile: cobre -10%, CLP +5%. Horizonte: 1-3m.
+  Fed delay cortes → USD fortalece → Chile: cobre -10%, USD/CLP +5% (CLP se deprecia). Horizonte: 1-3m.
 Desescalación (15%): Acuerdo nuclear parcial → crude -15%, CDS Irán -100bps.
   Señal temprana: IAEA inspectors readmitidos."
 

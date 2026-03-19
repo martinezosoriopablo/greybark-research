@@ -141,6 +141,7 @@ Alternativos: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
 Caja: {peso}%, {OW|NEUTRAL|UW vs benchmark}, {rationale}
 
 [BLOQUE: FX_VIEWS]
+CONVENCIÓN: ALCISTA = el primer activo se aprecia. Para USD/CLP: ALCISTA = USD sube, CLP se DEPRECIA (malo para Chile). BAJISTA = USD baja, CLP se APRECIA (bueno para Chile). Si eres positivo en Chile, el view USD/CLP debe ser BAJISTA (peso se fortalece).
 USD/CLP: {ALCISTA|BAJISTA|NEUTRAL}, {razón en una línea}
 EUR/USD: {ALCISTA|BAJISTA|NEUTRAL}, {razón}
 USD/CNY: {ALCISTA|BAJISTA|NEUTRAL}, {razón}

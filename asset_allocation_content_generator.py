@@ -22,6 +22,17 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 
+# Directive injected into all LLM prompts touching CLP/USD to prevent direction confusion
+CLP_USD_DIRECTIVE = (
+    "REGLA CRITICA USD/CLP: El tipo de cambio USD/CLP se expresa como pesos por dolar. "
+    "Si USD/CLP SUBE (ej: 900→950) el peso se DEPRECIA (se DEBILITA) — eso es NEGATIVO para Chile. "
+    "Si USD/CLP BAJA (ej: 900→850) el peso se APRECIA (se FORTALECE) — eso es POSITIVO para Chile. "
+    "Si eres ALCISTA en Chile, tu target USD/CLP debe ser MAS BAJO que el spot (apreciacion). "
+    "Si eres BAJISTA en Chile, tu target USD/CLP debe ser MAS ALTO que el spot (depreciacion). "
+    "NUNCA digas 'sobreponderamos CLP' con un target USD/CLP mas alto que el spot. "
+)
+
+
 class AssetAllocationContentGenerator:
     """Generador de contenido narrativo para Reporte de Asset Allocation."""
 
@@ -522,13 +533,14 @@ class AssetAllocationContentGenerator:
         if not self._has_council():
             return 'N/D'
         from narrative_engine import generate_narrative
+        clp_rule = f"\n{CLP_USD_DIRECTIVE}" if 'chile' in region.lower() else ""
         trigger = generate_narrative(
             section_name=f"aa_{region.lower().replace(' ', '_')}_trigger",
             prompt=(
                 f"En 1 oración concreta, describe el trigger principal que cambiaría la vista de "
                 f"inversión para {region}. Incluir: dato específico, umbral, y dirección del cambio. "
                 "Ejemplo: 'Revisaríamos a UW si Core CPI supera 4.0% por 2 meses consecutivos.' "
-                "Máximo 30 palabras. Sin preámbulos."
+                f"Máximo 30 palabras. Sin preámbulos.{clp_rule}"
             ),
             council_context=council_ctx,
             company_name=self.company_name,
@@ -541,6 +553,7 @@ class AssetAllocationContentGenerator:
         from narrative_engine import generate_narrative
         if not self._has_council():
             return self._fallback_region_args(region)
+        clp_rule = f"\n{CLP_USD_DIRECTIVE}" if 'chile' in region.lower() else ""
         args_raw = generate_narrative(
             section_name=f"aa_{region.lower().replace(' ', '_')}_args",
             prompt=(
@@ -548,7 +561,7 @@ class AssetAllocationContentGenerator:
                 '{"favor": [{"punto": "string", "dato": "string"}], '
                 '"contra": [{"punto": "string", "dato": "string"}]}. '
                 "Exactamente 3 en cada lista. Usa datos del council. SOLO JSON, sin texto adicional."
-                + self._canon_constraints()
+                + self._canon_constraints() + clp_rule
             ),
             council_context=council_ctx,
             quant_context=quant_ctx,
@@ -1312,8 +1325,9 @@ class AssetAllocationContentGenerator:
                 f"Escribe 2-3 parrafos sobre Chile para el reporte de asset allocation de "
                 f"{self.month_name} {self.date.year}. Cubrir: posicion relativa en LatAm, "
                 "dinamica del peso, politica monetaria BCCh, cobre, y IPSA. "
-                "IMPORTANTE: La tendencia de la TPM es {tpm_dir_text} — tu narrativa DEBE ser "
+                f"IMPORTANTE: La tendencia de la TPM es {tpm_dir_text} — tu narrativa DEBE ser "
                 "coherente con esta direccion. No contradigas los datos. "
+                f"{CLP_USD_DIRECTIVE} "
                 "Integrar datos cuantitativos. Maximo 150 palabras."
             ),
             council_context=f"MACRO PANEL:\n{macro[:2000]}",
@@ -1998,6 +2012,7 @@ class AssetAllocationContentGenerator:
                     "Escribe la tesis de inversion para Chile en 3-4 oraciones. "
                     "Cubrir: posicion relativa en LatAm, carry trade, cobre, y riesgos. "
                     "Integrar datos cuantitativos. Usa datos del council. Maximo 80 palabras."
+                    f"\n\n{CLP_USD_DIRECTIVE}"
                     "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
                 ),
                 council_context=f"MACRO:\n{macro[:1500]}\n\nRF:\n{rf[:800]}",
