@@ -130,30 +130,22 @@ def _client_context(request: Request, client_id: str, platform: Platform, **extr
 def _get_client_reports(client_id: str, platform: Platform) -> list:
     """Discover HTML reports for a client with type detection.
 
-    Searches BOTH the client output dir (daily reports) and the council
-    reports dir, merging results and deduplicating by filename.
+    Only searches the client-specific output dir so each client sees
+    only their own reports.
     """
     output_base = os.environ.get("GREYBARK_OUTPUT", str(Path(_layout_dir) / "output"))
     client_dir = Path(output_base) / client_id
-    council_reports_dir = _consejo_dir / "output" / "reports"
 
-    search_dirs = []
-    if client_dir.exists():
-        search_dirs.append(client_dir)
-    if council_reports_dir.exists() and council_reports_dir.resolve() != client_dir.resolve():
-        search_dirs.append(council_reports_dir)
-
-    if not search_dirs:
+    if not client_dir.exists():
         return []
 
     reports = []
     seen = set()
 
-    # Collect all HTML files from all dirs, then sort globally by mtime
+    # Collect all HTML files from client dir
     all_files = []
-    for search_dir in search_dirs:
-        for html_file in search_dir.rglob("*.html"):
-            all_files.append((html_file, search_dir))
+    for html_file in client_dir.rglob("*.html"):
+        all_files.append((html_file, client_dir))
 
     all_files.sort(key=lambda pair: pair[0].stat().st_mtime, reverse=True)
 
@@ -301,6 +293,26 @@ def _dir_size(path: Path) -> int:
             if f.is_file():
                 total += f.stat().st_size
     return total
+
+
+def _copy_reports_to_client(client_id: str):
+    """Copy newly generated reports from shared output/reports/ to the client folder."""
+    output_base = os.environ.get("GREYBARK_OUTPUT", str(Path(_layout_dir) / "output"))
+    client_dir = Path(output_base) / client_id
+    shared_reports = _consejo_dir / "output" / "reports"
+
+    if not shared_reports.exists():
+        return
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    dest_dir = client_dir / today
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    for html_file in shared_reports.glob("*.html"):
+        try:
+            shutil.copy2(str(html_file), str(dest_dir / html_file.name))
+        except Exception as e:
+            logger.warning(f"Could not copy {html_file.name} to client {client_id}: {e}")
 
 
 def _run_system_checks() -> List[dict]:
@@ -530,6 +542,9 @@ def _run_pipeline_task(
             _jobs[job_id]["status"] = "completed"
             _jobs[job_id]["progress"] = 100
             _jobs[job_id]["message"] = "Pipeline completado exitosamente."
+
+            # Copy generated reports to client-specific folder
+            _copy_reports_to_client(client_id)
         else:
             for k in phases:
                 if phases[k] == "running":
