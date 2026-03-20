@@ -172,7 +172,7 @@ class EquityDataCollector:
                     'pe_trailing': self._safe_float(info.get('trailingPE')),
                     'pe_forward': self._safe_float(info.get('forwardPE')),
                     'pb': self._safe_float(info.get('priceToBook')),
-                    'dividend_yield': self._safe_float(info.get('dividendYield', 0)) * 100 if info.get('dividendYield') else None,
+                    'dividend_yield': self._safe_float(info.get('dividendYield', 0)) * 100 if info.get('dividendYield') and self._safe_float(info.get('dividendYield', 0)) < 1 else (self._safe_float(info.get('dividendYield')) if info.get('dividendYield') else None),
                     'returns': {k: round(v, 2) for k, v in returns.items()},
                     'fifty_two_week_high': self._safe_float(info.get('fiftyTwoWeekHigh')),
                     'fifty_two_week_low': self._safe_float(info.get('fiftyTwoWeekLow')),

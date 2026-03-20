@@ -122,18 +122,22 @@ class CreditSpreadAnalytics:
     # DATA FETCHING
     # =========================================================================
     
-    def _fetch_spread_series(self, series_id: str, 
+    def _fetch_spread_series(self, series_id: str,
                              lookback_years: int = 5) -> Optional[pd.Series]:
-        """Fetch spread series from FRED"""
+        """Fetch spread series from FRED. Converts pct points to bps (×100)."""
         try:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=lookback_years * 365)
-            
+
             data = self.fred.get_series(
                 series_id,
                 start_date=start_date.strftime('%Y-%m-%d'),
                 end_date=end_date.strftime('%Y-%m-%d')
             )
+            # FRED OAS series return percentage points (0.77 = 77bps)
+            # Convert to basis points for consistency with thresholds
+            if data is not None and len(data) > 0:
+                data = data * 100
             return data
         except Exception as e:
             print(f"  ✗ Error fetching {series_id}: {e}")

@@ -1723,9 +1723,11 @@ class MacroContentGenerator:
         imacec_str = (self._fmt(imacec) + ' a/a') if imacec is not None else 'N/D'
         desemp_str = self._fmt(desemp)
 
+        imacec_desc = 'expansión' if imacec is not None and imacec > 0 else 'contracción' if imacec is not None and imacec < 0 else 'variación'
+        recupera_desc = 'consolida su recuperación' if imacec is not None and imacec > 0 else 'muestra debilidad' if imacec is not None and imacec < 0 else 'se mantiene'
         narrativa = (
-            f"La economía chilena consolida su recuperación. "
-            f"El IMACEC muestra expansión de {imacec_str}, "
+            f"La economía chilena {recupera_desc}. "
+            f"El IMACEC muestra {imacec_desc} de {imacec_str}, "
             f"con servicios y mineria como drivers. "
             f"El consumo privado mantiene dinamismo apoyado por salarios reales positivos. "
             f"La tasa de desempleo se ubica en {desemp_str}. "
@@ -1925,9 +1927,13 @@ class MacroContentGenerator:
                     council_text += ' ' + (self.council.get(key, '') or '')
                 for panel in self.council.get('panel_outputs', {}).values():
                     council_text += ' ' + (panel if isinstance(panel, str) else '')
-            ct = council_text.lower()
-            # Search council for commodity mentions
             import re as _re
+            # Strip markdown headers and metadata lines to avoid leaking raw council text
+            ct = _re.sub(r'#[^\n]*\n?', '', council_text)
+            ct = _re.sub(r'\*\*[^*]*\*\*', '', ct)
+            ct = _re.sub(r'---+', '', ct)
+            ct = ct.lower()
+            # Search council for commodity mentions
             sentences = _re.split(r'[.;]\s*', ct)
             relevant = [s for s in sentences if name_lower in s and len(s.strip()) > 15]
             if relevant:
@@ -2151,10 +2157,10 @@ class MacroContentGenerator:
         result = generate_narrative(
             section_name="events_calendar",
             prompt=(
-                f"Genera un calendario de 4-6 eventos macro clave para el proximo mes ({self.month_name} {self.year}). "
+                f"Genera un calendario de 4-6 eventos macro clave FUTUROS (despues del {self.date.day} de {self.month_name} {self.year}). "
                 "Formato JSON: [{\"fecha\": \"DD Mon\", \"evento\": \"...\", \"relevancia\": \"Alta/Media\", \"impacto_potencial\": \"...\"}]. "
                 "Incluye: FOMC/Fed, ECB, BCCh, datos de inflacion y PIB relevantes. "
-                "Las fechas deben ser aproximadas para el mes indicado. Devuelve SOLO el JSON."
+                "SOLO eventos que NO hayan ocurrido aun. Devuelve SOLO el JSON."
             ),
             council_context="", quant_context="",
             company_name=self.company_name, max_tokens=500,

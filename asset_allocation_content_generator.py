@@ -84,10 +84,10 @@ class AssetAllocationContentGenerator:
             return default
         # Unwrap simple dict with 'value' key (common pattern from data collectors)
         # Only unwrap if dict looks like a data point (has 'value' and few other keys like 'period', 'date')
-        if isinstance(d, dict) and 'value' in d and len(keys) >= 2:
-            non_meta_keys = [k for k in d.keys() if k not in ('value', 'period', 'date', 'unit', 'source', 'returns')]
+        if isinstance(d, dict) and ('value' in d or 'current' in d) and len(keys) >= 2:
+            non_meta_keys = [k for k in d.keys() if k not in ('value', 'current', 'period', 'date', 'unit', 'source', 'returns')]
             if len(non_meta_keys) <= 2:
-                d = d['value']
+                d = d.get('value') or d.get('current')
         # Handle numpy types
         if d is not None:
             t = type(d).__name__
@@ -599,7 +599,9 @@ class AssetAllocationContentGenerator:
                 {'punto': 'Dependencia commodities', 'dato': 'Riesgo China'},
             ]
         elif 'brasil' in region_l:
-            favor = [{'punto': 'Carry atractivo', 'dato': f"SELIC {c.get('selic', 'N/D')}%"}]
+            selic_val = c.get('selic')
+            selic_str = f"{selic_val:.1f}" if selic_val is not None else 'N/D'
+            favor = [{'punto': 'Carry atractivo', 'dato': f"SELIC {selic_str}%"}]
             contra = [{'punto': 'Riesgo fiscal', 'dato': 'Déficit primario persistente'}]
         elif 'europa' in region_l or 'europe' in region_l:
             favor = [{'punto': 'Descuento valuación', 'dato': f"STOXX P/E {self._canon_str('pe_stoxx')}x vs S&P {self._canon_str('pe_spx')}x"}]
