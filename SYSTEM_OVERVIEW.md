@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-20 (Sprint 1 completo + pipeline validado: 4/4 reportes OK)
+> Última actualización: 2026-03-20 (22 bugs resueltos, revisión visual Macro OK, pipeline 4/4 OK)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -311,6 +311,8 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | Risk card horizonte/señal mezclados en HTML | `macro_report_renderer.py:565` | Campos separados con labels | Sprint 1 |
 | EV/EBITDA columna vacía en RV | `rv_report_renderer.py:211` + template | Columna oculta si todos N/D | Sprint 1 |
 | Missing accents en 4 templates HTML (~50) | 4 templates HTML | Comité, Crédito, Región, Recomendación, glosarios, disclaimers | Sprint 1 |
+| US Fiscal section N/D (sin fuente FRED) | `chart_data_provider.py` + `macro_content_generator.py` | `get_usa_fiscal()` con 3 FRED series | `6f55067` |
+| China Trade chart 190 pts sin trim | `chart_generator.py:1764` | Trim a 120 meses consistente | `6f55067` |
 
 ### 6.4 Bugs Conocidos (Activos)
 
@@ -319,7 +321,6 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | BCU 2Y sin datos | BCCh API `F022.BUF.TIS.AN02.UF.Z.D` | Serie vacía → skip | Permanente (BCCh no publica) |
 | EMBI Chile sin datos | BCCh API `F019.EMBI.IND.CL.D` | Sin spread Chile directo | Usar BCRP client como fallback |
 | `fed_rate` inyectado en sentence de OAS | `narrative_engine.py` tagger | False positive en pattern matching (P1) | Pendiente refactor |
-| US Fiscal section vacío (triple N/D) | `macro_content_generator.py` | Sin fuente fiscal integrada (P2) | Pendiente (BEA?) |
 
 ### 6.5 Datos Hardcodeados (Sin API)
 

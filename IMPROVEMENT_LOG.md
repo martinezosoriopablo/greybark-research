@@ -51,12 +51,18 @@
 | 16 | EV/EBITDA columna vacía en RV | `rv_report_renderer.py:211` + template | Columna oculta si todos los valores son N/D |
 | 17 | Missing accents en 4 templates HTML | 4 templates | ~50 correcciones: Comité, Crédito, Región, Recomendación, etc. |
 
-### Bugs Pendientes (solo P1-P2)
+### Revisión Visual Macro (2026-03-20)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 18 | US Fiscal section triple N/D | `chart_data_provider.py` + `macro_content_generator.py` | Nuevo `get_usa_fiscal()` con 3 FRED series (deficit -5.8%, deuda 122.5%, intereses 3.2%) |
+| 19 | China Trade chart datos cortados (190 pts sin trim) | `chart_generator.py:1764` | Trim a 120 meses consistente con otros charts |
+
+### Bugs Pendientes (solo P1)
 
 | Prioridad | Bug | Archivo | Impacto |
 |-----------|-----|---------|---------|
 | P1 | `fed_rate` inyectado donde debería ir OAS threshold | `narrative_engine.py` tagger | False positive en pattern matching |
-| P2 | US Fiscal section triple N/D | `macro_content_generator.py` | Sección vacía (sin fuente BEA integrada) |
 
 ### Validación — Pipeline 2026-03-20 (post Sprint 1)
 - [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (41 min)
@@ -69,7 +75,11 @@
 - [x] AA: reporte generado con narrativas + tablas completas
 - [x] Anti-fabricación: 10 correcciones aplicadas (fed_rate, hy_spread, tpm, oil, etc.)
 - [x] Pre-council: 44 charts, 0 fallidos, 4/4 reportes validados
-- [ ] Verificar visualmente: TPM sin dict leak, IMACEC signo correcto, IPC Chile, stance RV, EM drivers, accents — **pendiente revisión manual**
+- [x] US Fiscal: datos reales FRED (deficit -5.8%, deuda 122.5%, intereses 3.2% GDP)
+- [x] China Trade: trim 120m aplicado
+- [x] PMI Global: datos reales Bloomberg (USA 52.4, Euro 50.8, China 49.0)
+- [x] CPI Contribution: datos reales confirmados
+- [ ] Revisión visual pendiente: RV, RF, AA
 
 ---
 
