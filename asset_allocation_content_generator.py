@@ -1279,7 +1279,7 @@ class AssetAllocationContentGenerator:
         if tpm is None:
             tpm = self._q('chile', 'tpm')
         if ipc is None:
-            ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
+            ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
         # Cobre fallback: quant_data (chile_rates or bcch_indices from equity data)
         if cobre is None:
             cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
@@ -1385,7 +1385,7 @@ class AssetAllocationContentGenerator:
             if tpm_val is not None:
                 tpm_str = f"{tpm_val}%"
         if ipc_str == 'N/D':
-            ipc_val = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
+            ipc_val = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
             if ipc_val is not None:
                 ipc_str = f"{ipc_val}%"
         cobre_val = self._q('equity', 'bcch_indices', 'copper', 'value')
@@ -1396,14 +1396,21 @@ class AssetAllocationContentGenerator:
         tpm_tend = str(tpm_dir) if tpm_dir else 'N/D'
         ipc_tend = 'N/D'
 
-        quant_ctx = f"TPM: {tpm_str} | IPC YoY: {ipc_str} | USD/CLP: {usdclp_str} | Cobre: {cobre_str} | Tendencia TPM: {tpm_tend}"
+        # Compute USD/CLP target range for narrative consistency
+        usdclp_spot = self._safe_float(self._q('equity', 'bcch_indices', 'usd_clp', 'value')) or self._safe_float(self._q('chile_rates', 'usdclp'))
+        usdclp_target_hint = ''
+        if usdclp_spot:
+            usdclp_target_hint = f" | Target USD/CLP (usar este exacto): {usdclp_spot * 0.97:.0f}-{usdclp_spot * 0.95:.0f} si alcista Chile, {usdclp_spot * 1.03:.0f}-{usdclp_spot * 1.05:.0f} si bajista Chile"
+
+        quant_ctx = f"TPM: {tpm_str} | IPC YoY: {ipc_str} | USD/CLP: {usdclp_str} | Cobre: {cobre_str} | Tendencia TPM: {tpm_tend}{usdclp_target_hint}"
 
         narrativa = generate_data_driven_narrative(
             section_name="aa_chile_dd",
             prompt=(
                 f"Escribe 2 párrafos sobre Chile para el reporte de asset allocation de "
                 f"{self.month_name} {self.date.year}. Analiza: TPM y tasa real, inflación, "
-                "tipo de cambio y cobre. Máximo 120 palabras."
+                "tipo de cambio y cobre. Máximo 120 palabras. "
+                "Si mencionas un target USD/CLP, usa EXACTAMENTE el rango del contexto cuantitativo."
             ),
             quant_context=quant_ctx,
             company_name=self.company_name,
@@ -1990,7 +1997,7 @@ class AssetAllocationContentGenerator:
         if tpm is None:
             tpm = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
         if ipc is None:
-            ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
+            ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
         if cobre is None:
             cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
 
@@ -2423,7 +2430,7 @@ class AssetAllocationContentGenerator:
 
         # Chile: enrich with real TPM expectations — no hardcoded rates
         tpm_val = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
-        ipc_val = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
+        ipc_val = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
         carry_str = 'N/D'
         if tpm_val is not None and ipc_val is not None:
             carry_str = f'Tasa real: {tpm_val - ipc_val:.1f}% (TPM {tpm_val}% - IPC {ipc_val}%)'
@@ -2594,7 +2601,7 @@ class AssetAllocationContentGenerator:
         ig_bps = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
         hy_bps = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
         tpm = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
-        ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc')
+        ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
 
         quant_parts = []
         if us_2y is not None:

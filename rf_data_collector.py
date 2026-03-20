@@ -474,6 +474,20 @@ class RFDataCollector:
             if tpm is not None:
                 result['tpm'] = {'current': tpm}
 
+            # Chile IPC YoY (from monthly variation series)
+            try:
+                ipc_series = bcch.get_series('F074.IPC.VAR.Z.Z.C.M', lookback_months=14)
+                if ipc_series is not None and len(ipc_series) >= 13:
+                    # Compute YoY from monthly variations: (1+m1/100)*(1+m2/100)*...*(1+m12/100)-1)*100
+                    monthly = ipc_series.tail(12).values
+                    yoy = 1.0
+                    for m in monthly:
+                        yoy *= (1 + m / 100)
+                    result['ipc_yoy'] = round((yoy - 1) * 100, 1)
+                    self._print(f"    [OK] Chile IPC YoY: {result['ipc_yoy']}%")
+            except Exception:
+                pass
+
             # DAP rates (deposit rates by tenor)
             dap_90 = _latest('F022.TDP.TIS.D090.NO.Z.D')
             dap_1y = _latest('F022.TDP.TIS.AN01.NO.Z.D')

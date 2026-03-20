@@ -325,7 +325,13 @@ class RVContentGenerator:
             elif 'risk-off' in text or 'postura defensiva' in text or 'cauteloso' in text:
                 result['view'] = 'CAUTELOSO'
                 result['conviccion'] = 'ALTA'
+            elif 'subponder' in text or _re.search(r'\buw\b', text) or 'infraponder' in text:
+                result['view'] = 'CAUTELOSO'
+                result['conviccion'] = 'MEDIA-ALTA'
             elif 'constructiv' in text and 'cauteloso' not in text:
+                result['view'] = 'CONSTRUCTIVO'
+                result['conviccion'] = 'MEDIA-ALTA'
+            elif 'sobreponder' in text or _re.search(r'\bow\b', text) or 'risk-on' in text:
                 result['view'] = 'CONSTRUCTIVO'
                 result['conviccion'] = 'MEDIA-ALTA'
             elif 'neutral' in text:
@@ -507,6 +513,26 @@ class RVContentGenerator:
             council_ctx = f"RV PANEL:\n{rv[:1500]}\n\nCIO:\n{cio[:1000]}\n\nFINAL:\n{final[:1000]}"
             quant_ctx = f"Datos Chile: {chile_quant}" if chile_quant else ""
 
+            # Build verified_data for anti-fabrication (prevents P/E swap etc.)
+            vd = {}
+            if self._has_data():
+                for rk, vd_key in [('us', 'sp500_pe'), ('europe', 'stoxx600_pe'),
+                                    ('em', 'msci_em_pe'), ('chile', 'ipsa_pe')]:
+                    rv_val = self._val(rk)
+                    pe_v = rv_val.get('pe_trailing') or rv_val.get('pe_forward')
+                    if pe_v:
+                        vd[vd_key] = pe_v
+
+            # Also add quant_ctx P/E values explicitly to the prompt
+            pe_hints = []
+            us_pe = self._val('us').get('pe_trailing') or self._val('us').get('pe_forward')
+            if us_pe:
+                pe_hints.append(f"S&P 500 P/E: {us_pe:.1f}x")
+            if pe:
+                pe_hints.append(f"IPSA P/E: {pe:.1f}x")
+            if pe_hints:
+                quant_ctx += "\n" + " | ".join(pe_hints)
+
             result = generate_narrative(
                 section_name="rv_key_calls",
                 prompt=(
@@ -522,6 +548,7 @@ class RVContentGenerator:
                 quant_context=quant_ctx,
                 company_name=self.company_name,
                 max_tokens=500,
+                verified_data=vd if vd else None,
             )
             if result:
                 lines = [l.strip() for l in result.split('\n') if l.strip()]
