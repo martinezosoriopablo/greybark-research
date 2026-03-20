@@ -1,8 +1,8 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-18 (post-auditoría completa)
+> Última actualización: 2026-03-19 (post-auditoría + 7 bug fixes)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
-> Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, 0 gaps funcionales
+> Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
 ---
 
@@ -192,11 +192,11 @@ Plataforma automatizada de research de inversiones que genera **4 reportes mensu
 
 | Agente | Modelo | Max Tokens | Ve | Prompt |
 |--------|--------|------------|-----|--------|
-| **MACRO** | claude-sonnet-4-6 | 2500 | regime, macro_usa, inflation, chile, china, rates, leading indicators | `prompts/ias_macro.txt` |
-| **RV** | claude-sonnet-4-6 | 2500 | valuations, sectors, earnings, factors, risk (VIX, breadth) | `prompts/ias_rv.txt` |
-| **RF** | claude-sonnet-4-6 | 2500 | duration, yield_curve, credit_spreads, inflation, rates, expectations | `prompts/ias_rf.txt` |
-| **RIESGO** | claude-sonnet-4-6 | 2500 | risk scorecard (VIX, VaR, drawdown), breadth, EPU, credit | `prompts/ias_riesgo.txt` |
-| **GEO** | claude-sonnet-4-6 | 2500 | chile, china, international, commodities, intelligence themes | `prompts/ias_geo.txt` |
+| **MACRO** | claude-sonnet-4-6 | 4000 | regime, macro_usa, inflation, chile, china, rates, leading indicators | `prompts/ias_macro.txt` |
+| **RV** | claude-sonnet-4-6 | 4000 | valuations, sectors, earnings, factors, risk (VIX, breadth) | `prompts/ias_rv.txt` |
+| **RF** | claude-sonnet-4-6 | 4000 | duration, yield_curve, credit_spreads, inflation, rates, expectations | `prompts/ias_rf.txt` |
+| **RIESGO** | claude-sonnet-4-6 | 4000 | risk scorecard (VIX, VaR, drawdown), breadth, EPU, credit | `prompts/ias_riesgo.txt` |
+| **GEO** | claude-sonnet-4-6 | 4000 | chile, china, international, commodities, intelligence themes | `prompts/ias_geo.txt` |
 
 ### 4.2 Síntesis (Capa 2)
 
@@ -287,15 +287,37 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 - ✅ `europe_pmi` — Euro PMI composite
 - ✅ `china_trade` — China trade balance
 
-### 6.3 Bugs Conocidos (Activos)
+### 6.3 Bugs Resueltos (2026-03-19 — Auditoría Completa)
+
+| Bug | Ubicación | Fix | Commit |
+|-----|-----------|-----|--------|
+| Credit spreads 1bp (FRED OAS sin ×100) | `credit_spreads.py:_fetch_spread_series()` | ×100 en fuente → 77bp correcto | `5210d3e` |
+| Dividend yields 106%/308% | `equity_data_collector.py:175` | Condicional: solo ×100 si valor <1 | `5210d3e` |
+| TPM `{'current': 4.5}` raw dict en HTML | `asset_allocation_content_generator.py:_q()` | Unwrap 'current' key junto con 'value' | `5210d3e` |
+| SELIC None% | `asset_allocation_content_generator.py:602` | Guard con format None → 'N/D' | `5210d3e` |
+| IMACEC "expansión de -0.5%" | `macro_content_generator.py:1728` | Dinámico: expansión/contracción según signo | `5210d3e` |
+| Council markdown leak en commodity table | `macro_content_generator.py:_commodity_outlook()` | Strip `#` headers y `**bold**` antes de text-mine | `5210d3e` |
+| Calendario con fechas pasadas | `macro_content_generator.py:2160` | Prompt filtrado: solo eventos futuros | `5210d3e` |
+| CLP/USD dirección contradictoria | `asset_allocation_content_generator.py` + prompts | `CLP_USD_DIRECTIVE` inyectado en 4 prompts Chile | `d037cd5` |
+| TPM narrativa contradice tendencia | `asset_allocation_content_generator.py` | Tendencia computada ANTES de narrativa LLM | `f4b3dc9` |
+| max_tokens truncación de textos | `ai_council_runner.py` + 4 content generators | Panel 4000, Refinador 12000, narrativas 300-500 | `472835d` |
+
+### 6.4 Bugs Conocidos (Activos)
 
 | Bug | Ubicación | Impacto | Estado |
 |-----|-----------|---------|--------|
 | BCU 2Y sin datos | BCCh API `F022.BUF.TIS.AN02.UF.Z.D` | Serie vacía → skip | Permanente (BCCh no publica) |
 | EMBI Chile sin datos | BCCh API `F019.EMBI.IND.CL.D` | Sin spread Chile directo | Usar BCRP client como fallback |
-| `fed_rate` coherence mismatch | coherence_validator | macro=1.56 vs rv=4.5 (extracción regex) | Requiere debug en extractor |
+| `fed_rate` inyectado en sentence de OAS | `rf_content_generator.py` | data-key="fed_rate" donde debería ser OAS threshold | Pendiente |
+| EM country drivers copy-paste | `rf_content_generator.py` | México/Brasil/Perú/Colombia mismo texto | Pendiente |
+| HY-by-rating commentary idéntico | `rf_content_generator.py` | BB/B/CCC mismo texto | Pendiente |
+| S&P/IPSA P/E swapped en Key Calls | `rv_content_generator.py` | data-key mapping invertido | Pendiente |
+| RV stance NEUTRAL vs conclusión UW | `rv_content_generator.py` | Widget dice NEUTRAL, texto dice UW | Pendiente |
+| US Fiscal section vacío (triple N/D) | `macro_content_generator.py` | Sin fuente fiscal en collector | Pendiente (BEA?) |
+| Chile IPC YoY falta en AA | `asset_allocation_content_generator.py` | macro_quant.chile.ipc no fluye | Pendiente debug |
+| Doble horizonte en risk cards | `macro_report_renderer.py` template | Horizonte aparece 2 veces | Pendiente |
 
-### 6.4 Datos Hardcodeados (Sin API)
+### 6.5 Datos Hardcodeados (Sin API)
 
 | Dato | Razón | Fallback Actual |
 |------|-------|-----------------|
@@ -307,7 +329,7 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | Refinancing calendar | Manual | Hardcoded en content generator |
 | Credit by sector detail | API limitada | Totales IG/HY solamente |
 
-### 6.5 Dependencias Bloomberg
+### 6.6 Dependencias Bloomberg
 
 El archivo `input/bloomberg_data.xlsx` (22 hojas, 95 series) provee datos que **no tienen alternativa pública gratuita**:
 
@@ -321,7 +343,7 @@ El archivo `input/bloomberg_data.xlsx` (22 hojas, 95 series) provee datos que **
 | Positioning | Net speculative positions | OPTIONAL |
 | CPI_Componentes | Shelter, Services ex-Housing | REPLACED (ahora FRED) |
 
-### 6.6 Test Coverage
+### 6.7 Test Coverage
 
 **Estado actual: Mínimo**
 - `test_charts.py` — test manual de chart generation
