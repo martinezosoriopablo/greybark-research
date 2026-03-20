@@ -1133,13 +1133,25 @@ class MacroContentGenerator:
         debt_str = f"{debt:.1f}% GDP" if debt is not None else 'N/D'
         interest_str = f"{interest:.1f}% GDP" if interest is not None else 'N/D'
 
+        # Dynamic narrative based on data
+        if deficit is not None and debt is not None and interest is not None:
+            deficit_dir = "se amplió" if (fiscal.get('deficit_gdp_prev') and deficit < fiscal['deficit_gdp_prev']) else "se redujo"
+            narrativa = (
+                f"El déficit fiscal federal se ubica en {deficit_str} ({deficit_dir} vs {self._fmt(fiscal.get('deficit_gdp_prev'))} previo). "
+                f"La deuda pública total alcanza {debt_str}, "
+                f"mientras los costos de servicio de deuda representan {interest_str} del producto, "
+                f"reflejando el impacto acumulado de tasas más altas sobre el stock de deuda."
+            )
+        else:
+            narrativa = (
+                f"El déficit fiscal se ubica en {deficit_str}. "
+                f"La deuda pública se sitúa en {debt_str}. "
+                f"Los costos de servicio de deuda representan {interest_str}."
+            )
+
         return {
             'titulo': 'Política Fiscal',
-            'narrativa': (
-                f"El déficit fiscal se ubica en {deficit_str}. "
-                f"La deuda publica se situa en {debt_str}. "
-                f"Los costos de servicio de deuda representan {interest_str}."
-            ),
+            'narrativa': narrativa,
             'datos': [
                 {'indicador': 'Déficit Fiscal', 'valor': deficit_str, 'anterior': self._fmt(fiscal.get('deficit_gdp_prev'))},
                 {'indicador': 'Deuda Publica', 'valor': debt_str, 'anterior': self._fmt(fiscal.get('debt_gdp_prev'))},

@@ -1764,6 +1764,13 @@ class MacroChartsGenerator:
         exp_s = self.bloomberg.get_series('china_exp_yoy')
         imp_s = self.bloomberg.get_series('china_imp_yoy')
         tbal_s = self.bloomberg.get_series('china_trade_bal')
+        # Trim to last 120 months for consistency with other charts
+        if exp_s is not None and len(exp_s) > 120:
+            exp_s = exp_s.iloc[-120:]
+        if imp_s is not None and len(imp_s) > 120:
+            imp_s = imp_s.iloc[-120:]
+        if tbal_s is not None and len(tbal_s) > 120:
+            tbal_s = tbal_s.iloc[-120:]
         exp_r = self._real_series(exp_s)
         imp_r = self._real_series(imp_s)
         if not (exp_r and imp_r):

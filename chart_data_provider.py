@@ -996,3 +996,36 @@ class ChartDataProvider:
             except Exception:
                 pass
         return result
+
+    # =========================================================================
+    # USA FISCAL DATA (FRED)
+    # =========================================================================
+
+    def get_usa_fiscal(self) -> Dict[str, Optional[float]]:
+        """US fiscal indicators from FRED as % of GDP.
+
+        Returns dict with keys:
+            deficit_gdp, deficit_gdp_prev, debt_gdp, debt_gdp_prev,
+            interest_gdp, interest_gdp_prev
+        """
+        result = {}
+
+        # Federal Deficit as % of GDP (annual, negative = deficit)
+        deficit_s = self.get_fred_series('FYFSGDA188S', resample=None)
+        if deficit_s is not None and len(deficit_s) >= 2:
+            result['deficit_gdp'] = round(float(deficit_s.iloc[-1]), 1)
+            result['deficit_gdp_prev'] = round(float(deficit_s.iloc[-2]), 1)
+
+        # Federal Debt: Total Public Debt as % of GDP (quarterly)
+        debt_s = self.get_fred_series('GFDEGDQ188S', resample=None)
+        if debt_s is not None and len(debt_s) >= 2:
+            result['debt_gdp'] = round(float(debt_s.iloc[-1]), 1)
+            result['debt_gdp_prev'] = round(float(debt_s.iloc[-2]), 1)
+
+        # Interest payments as % of GDP (quarterly)
+        interest_s = self.get_fred_series('FYOIGDA188S', resample=None)
+        if interest_s is not None and len(interest_s) >= 2:
+            result['interest_gdp'] = round(float(interest_s.iloc[-1]), 1)
+            result['interest_gdp_prev'] = round(float(interest_s.iloc[-2]), 1)
+
+        return result
