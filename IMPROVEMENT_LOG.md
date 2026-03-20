@@ -31,20 +31,25 @@
 | 6 | Council markdown header leakeado en commodity table | `macro_content_generator.py:_commodity_outlook()` | Strip `#` headers y `**bold**` antes de text-mining |
 | 7 | Calendario incluye fechas pasadas | `macro_content_generator.py:2160` | Prompt pide solo eventos futuros |
 
-### Bugs Pendientes (priorizados)
+### Fixes Adicionales (commit `72a3fa0`)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 8 | RV stance NEUTRAL cuando council dice UW | `rv_content_generator.py` | Agregado 'subponder'/'UW'/'OW' al extractor de stance |
+| 9 | S&P/IPSA P/E swap en Key Calls | `rv_content_generator.py` | Pass verified_data a key_calls → anti-fabricación corrige |
+| 10 | Chile IPC YoY "---" (macro chile module falla) | `rf_data_collector.py` + `aa_content_gen` | IPC YoY calculado en chile_rates + fallback path |
+| 11 | EM country drivers copy-paste | `rf_content_generator.py` | Per-country drivers con yields reales + contexto local |
+| 12 | USD/CLP dual targets (820 vs 880) | `asset_allocation_content_generator.py` | Target programático pasado como contexto binding a LLM |
+
+### Bugs Pendientes (solo P1-P2)
 
 | Prioridad | Bug | Archivo | Impacto |
 |-----------|-----|---------|---------|
-| P0 | Chile IPC YoY "---" en AA | `asset_allocation_content_generator.py` | Sección Chile incompleta |
-| P0 | S&P/IPSA P/E swapped en Key Calls | `rv_content_generator.py` | Dato crítico invertido |
-| P0 | RV stance NEUTRAL vs conclusión UW | `rv_content_generator.py` | Contradicción visible |
-| P1 | `fed_rate` inyectado donde debería ir OAS | `rf_content_generator.py` | Sentence sin sentido |
-| P1 | EM drivers copy-paste (4 países mismo texto) | `rf_content_generator.py` | Apariencia poco profesional |
-| P1 | USD/CLP targets inconsistentes (820-840 vs 880) | AA content gen | Dos targets en un reporte |
-| P2 | US Fiscal section triple N/D | `macro_content_generator.py` | Sección vacía |
-| P2 | EV/EBITDA columna vacía en RV | `rv_content_generator.py` | Columna sin datos |
-| P2 | Doble horizonte en risk cards (Macro) | Template macro | Dato duplicado |
-| P2 | Missing accents en headings | Templates / renderers | Estético |
+| P1 | `fed_rate` inyectado donde debería ir OAS threshold | `narrative_engine.py` tagger | False positive en pattern matching |
+| P2 | US Fiscal section triple N/D | `macro_content_generator.py` | Sección vacía (sin fuente BEA integrada) |
+| P2 | EV/EBITDA columna vacía en RV | `rv_content_generator.py` | yfinance no provee EV/EBITDA para ETFs |
+| P2 | Doble horizonte en risk cards (Macro) | Template macro | Horizonte aparece 2 veces |
+| P2 | Missing accents en headings | Templates / renderers | Estético menor |
 
 ### Validación Pendiente
 - [ ] Re-run pipeline completo con datos frescos
@@ -52,6 +57,9 @@
 - [ ] Verificar dividend yields < 10% para todas las regiones
 - [ ] Verificar TPM en AA sin dict leak
 - [ ] Verificar IMACEC texto correcto según signo
+- [ ] Verificar Chile IPC YoY aparece en AA (nuevo fallback)
+- [ ] Verificar stance RV refleja council (no default NEUTRAL)
+- [ ] Verificar EM drivers diferenciados por país
 
 ---
 
