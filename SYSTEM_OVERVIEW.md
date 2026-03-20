@@ -301,6 +301,11 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | CLP/USD dirección contradictoria | `asset_allocation_content_generator.py` + prompts | `CLP_USD_DIRECTIVE` inyectado en 4 prompts Chile | `d037cd5` |
 | TPM narrativa contradice tendencia | `asset_allocation_content_generator.py` | Tendencia computada ANTES de narrativa LLM | `f4b3dc9` |
 | max_tokens truncación de textos | `ai_council_runner.py` + 4 content generators | Panel 4000, Refinador 12000, narrativas 300-500 | `472835d` |
+| RV stance NEUTRAL cuando council dice UW | `rv_content_generator.py:316-337` | Agregado 'subponder'/'UW'/'OW' al extractor | `72a3fa0` |
+| S&P/IPSA P/E swap en Key Calls | `rv_content_generator.py:_generate_key_calls()` | Pass verified_data → anti-fabricación corrige | `72a3fa0` |
+| Chile IPC YoY "---" en AA | `rf_data_collector.py` + `aa_content_gen` | IPC YoY calculado desde BCCh + fallback `chile_rates.ipc_yoy` | `72a3fa0` |
+| EM country drivers copy-paste | `rf_content_generator.py:_generate_em_by_country()` | Per-country drivers con yields reales + contexto local | `72a3fa0` |
+| USD/CLP targets inconsistentes (820 vs 880) | `asset_allocation_content_generator.py` | Target programático pasado como binding context a LLM | `72a3fa0` |
 
 ### 6.4 Bugs Conocidos (Activos)
 
@@ -308,14 +313,12 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 |-----|-----------|---------|--------|
 | BCU 2Y sin datos | BCCh API `F022.BUF.TIS.AN02.UF.Z.D` | Serie vacía → skip | Permanente (BCCh no publica) |
 | EMBI Chile sin datos | BCCh API `F019.EMBI.IND.CL.D` | Sin spread Chile directo | Usar BCRP client como fallback |
-| `fed_rate` inyectado en sentence de OAS | `rf_content_generator.py` | data-key="fed_rate" donde debería ser OAS threshold | Pendiente |
-| EM country drivers copy-paste | `rf_content_generator.py` | México/Brasil/Perú/Colombia mismo texto | Pendiente |
-| HY-by-rating commentary idéntico | `rf_content_generator.py` | BB/B/CCC mismo texto | Pendiente |
-| S&P/IPSA P/E swapped en Key Calls | `rv_content_generator.py` | data-key mapping invertido | Pendiente |
-| RV stance NEUTRAL vs conclusión UW | `rv_content_generator.py` | Widget dice NEUTRAL, texto dice UW | Pendiente |
-| US Fiscal section vacío (triple N/D) | `macro_content_generator.py` | Sin fuente fiscal en collector | Pendiente (BEA?) |
-| Chile IPC YoY falta en AA | `asset_allocation_content_generator.py` | macro_quant.chile.ipc no fluye | Pendiente debug |
-| Doble horizonte en risk cards | `macro_report_renderer.py` template | Horizonte aparece 2 veces | Pendiente |
+| `fed_rate` inyectado en sentence de OAS | `narrative_engine.py` tagger | False positive en pattern matching (P1) | Pendiente refactor |
+| HY-by-rating commentary idéntico | `rf_content_generator.py` | BB/B/CCC mismo texto (P2) | Pendiente |
+| US Fiscal section vacío (triple N/D) | `macro_content_generator.py` | Sin fuente fiscal integrada (P2) | Pendiente (BEA?) |
+| EV/EBITDA columna vacía en RV | `rv_content_generator.py` | yfinance no provee para ETFs (P2) | Pendiente |
+| Doble horizonte en risk cards | Template macro HTML | Horizonte aparece 2 veces (P2) | Pendiente |
+| Missing accents en headings | Templates / renderers | Estético menor (P2) | Pendiente |
 
 ### 6.5 Datos Hardcodeados (Sin API)
 
