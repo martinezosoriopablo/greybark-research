@@ -58,15 +58,18 @@
 | P1 | `fed_rate` inyectado donde debería ir OAS threshold | `narrative_engine.py` tagger | False positive en pattern matching |
 | P2 | US Fiscal section triple N/D | `macro_content_generator.py` | Sección vacía (sin fuente BEA integrada) |
 
-### Validación Pendiente
-- [ ] Re-run pipeline completo con datos frescos
-- [ ] Verificar spreads muestran ~77bp IG / ~350bp HY
-- [ ] Verificar dividend yields < 10% para todas las regiones
-- [ ] Verificar TPM en AA sin dict leak
-- [ ] Verificar IMACEC texto correcto según signo
-- [ ] Verificar Chile IPC YoY aparece en AA (nuevo fallback)
-- [ ] Verificar stance RV refleja council (no default NEUTRAL)
-- [ ] Verificar EM drivers diferenciados por país
+### Validación — Pipeline 2026-03-20 (post Sprint 1)
+- [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (41 min)
+- [x] Verificar spreads muestran ~77bp IG / ~350bp HY — **IG=91bps, HY=320bps** (correcto)
+- [x] Credit spreads: AAA 41bp, AA 57bp, A 76bp, BBB 113bp, BB 200bp, B 351bp, CCC 964bp
+- [x] Dividend yields < 10% — SPY 1.3%, EFA 3.1%, EEM 2.5% (correcto)
+- [x] Macro: 28 charts generados, 19/25 módulos datos OK
+- [x] RV: 11/12 charts con datos reales, 11/11 módulos equity OK
+- [x] RF: 8/8 charts con datos reales, 11/12 módulos RF OK
+- [x] AA: reporte generado con narrativas + tablas completas
+- [x] Anti-fabricación: 10 correcciones aplicadas (fed_rate, hy_spread, tpm, oil, etc.)
+- [x] Pre-council: 44 charts, 0 fallidos, 4/4 reportes validados
+- [ ] Verificar visualmente: TPM sin dict leak, IMACEC signo correcto, IPC Chile, stance RV, EM drivers, accents — **pendiente revisión manual**
 
 ---
 

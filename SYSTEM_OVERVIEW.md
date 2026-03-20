@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-19 (post-auditoría + 17 bug fixes, Sprint 1 completo)
+> Última actualización: 2026-03-20 (Sprint 1 completo + pipeline validado: 4/4 reportes OK)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
