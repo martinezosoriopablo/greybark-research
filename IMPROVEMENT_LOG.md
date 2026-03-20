@@ -41,15 +41,22 @@
 | 11 | EM country drivers copy-paste | `rf_content_generator.py` | Per-country drivers con yields reales + contexto local |
 | 12 | USD/CLP dual targets (820 vs 880) | `asset_allocation_content_generator.py` | Target programático pasado como contexto binding a LLM |
 
+### Sprint 1 Fixes (5 P2 cerrados)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 13 | HY B rating commentary igual a BB | `rf_content_generator.py:1645` | Fallback diferenciado: "selectividad por emisor" |
+| 14 | Señal temprana duplica horizonte en risk cards | `macro_content_generator.py:2236` | Lee `early_signal`/`monitoring` en vez de `horizon` |
+| 15 | Risk card horizonte y señal temprana mezclados | `macro_report_renderer.py:565` | Campos separados con labels |
+| 16 | EV/EBITDA columna vacía en RV | `rv_report_renderer.py:211` + template | Columna oculta si todos los valores son N/D |
+| 17 | Missing accents en 4 templates HTML | 4 templates | ~50 correcciones: Comité, Crédito, Región, Recomendación, etc. |
+
 ### Bugs Pendientes (solo P1-P2)
 
 | Prioridad | Bug | Archivo | Impacto |
 |-----------|-----|---------|---------|
 | P1 | `fed_rate` inyectado donde debería ir OAS threshold | `narrative_engine.py` tagger | False positive en pattern matching |
 | P2 | US Fiscal section triple N/D | `macro_content_generator.py` | Sección vacía (sin fuente BEA integrada) |
-| P2 | EV/EBITDA columna vacía en RV | `rv_content_generator.py` | yfinance no provee EV/EBITDA para ETFs |
-| P2 | Doble horizonte en risk cards (Macro) | Template macro | Horizonte aparece 2 veces |
-| P2 | Missing accents en headings | Templates / renderers | Estético menor |
 
 ### Validación Pendiente
 - [ ] Re-run pipeline completo con datos frescos

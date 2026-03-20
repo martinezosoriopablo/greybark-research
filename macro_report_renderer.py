@@ -562,8 +562,9 @@ class MacroReportRenderer:
                         <span>Impacto: <strong>{r.get("impacto", "N/D")}</strong></span>
                     </span>
                 </div>
-                <p style="margin: 10px 0; color: #4a5568;">{r.get("descripcion", r.get("horizonte", ""))}</p>
-                {'<p style="font-size: 9pt; color: #718096;"><strong>Horizonte:</strong> ' + monitoreo_val + '</p>' if (monitoreo_val := r.get("senal_temprana", r.get("monitoreo", ""))) and monitoreo_val != r.get("nombre", "") else ''}
+                <p style="margin: 10px 0; color: #4a5568;">{r.get("descripcion", "")}</p>
+                {'<p style="font-size: 9pt; color: #718096;"><strong>Horizonte:</strong> ' + r.get("horizonte", "") + '</p>' if r.get("horizonte") else ''}
+                {'<p style="font-size: 9pt; color: #718096;"><strong>Señal temprana:</strong> ' + monitoreo_val + '</p>' if (monitoreo_val := r.get("senal_temprana", r.get("monitoreo", ""))) and monitoreo_val != r.get("nombre", "") else ''}
             </div>'''
         if narrativa and not risk_list:
             risks_html = f'<p style="color:#4a5568;">{narrativa}</p>'

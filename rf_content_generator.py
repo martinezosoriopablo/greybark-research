@@ -1642,7 +1642,7 @@ class RFContentGenerator:
                 'rating': 'B',
                 'spread': self._fmt_bp(hy_b) if hy_b else 'N/D',
                 'view': hy_rating_views.get('B', {}).get('view', hy_overall_view),
-                'comentario': hy_rating_views.get('B', {}).get('rationale', hy_overall_rationale),
+                'comentario': hy_rating_views.get('B', {}).get('rationale', 'Spread intermedio; selectividad por emisor' if hy_overall_view == 'UW' else hy_overall_rationale),
             },
             {
                 'rating': 'CCC',

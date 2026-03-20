@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-19 (post-auditoría + 7 bug fixes)
+> Última actualización: 2026-03-19 (post-auditoría + 17 bug fixes, Sprint 1 completo)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -306,6 +306,11 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | Chile IPC YoY "---" en AA | `rf_data_collector.py` + `aa_content_gen` | IPC YoY calculado desde BCCh + fallback `chile_rates.ipc_yoy` | `72a3fa0` |
 | EM country drivers copy-paste | `rf_content_generator.py:_generate_em_by_country()` | Per-country drivers con yields reales + contexto local | `72a3fa0` |
 | USD/CLP targets inconsistentes (820 vs 880) | `asset_allocation_content_generator.py` | Target programático pasado como binding context a LLM | `72a3fa0` |
+| HY B rating commentary idéntico a BB | `rf_content_generator.py:1645` | Fallback diferenciado por rating | Sprint 1 |
+| Señal temprana duplica horizonte en risk cards | `macro_content_generator.py:2236` | Lee `early_signal`/`monitoring` | Sprint 1 |
+| Risk card horizonte/señal mezclados en HTML | `macro_report_renderer.py:565` | Campos separados con labels | Sprint 1 |
+| EV/EBITDA columna vacía en RV | `rv_report_renderer.py:211` + template | Columna oculta si todos N/D | Sprint 1 |
+| Missing accents en 4 templates HTML (~50) | 4 templates HTML | Comité, Crédito, Región, Recomendación, glosarios, disclaimers | Sprint 1 |
 
 ### 6.4 Bugs Conocidos (Activos)
 
@@ -314,11 +319,7 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | BCU 2Y sin datos | BCCh API `F022.BUF.TIS.AN02.UF.Z.D` | Serie vacía → skip | Permanente (BCCh no publica) |
 | EMBI Chile sin datos | BCCh API `F019.EMBI.IND.CL.D` | Sin spread Chile directo | Usar BCRP client como fallback |
 | `fed_rate` inyectado en sentence de OAS | `narrative_engine.py` tagger | False positive en pattern matching (P1) | Pendiente refactor |
-| HY-by-rating commentary idéntico | `rf_content_generator.py` | BB/B/CCC mismo texto (P2) | Pendiente |
 | US Fiscal section vacío (triple N/D) | `macro_content_generator.py` | Sin fuente fiscal integrada (P2) | Pendiente (BEA?) |
-| EV/EBITDA columna vacía en RV | `rv_content_generator.py` | yfinance no provee para ETFs (P2) | Pendiente |
-| Doble horizonte en risk cards | Template macro HTML | Horizonte aparece 2 veces (P2) | Pendiente |
-| Missing accents en headings | Templates / renderers | Estético menor (P2) | Pendiente |
 
 ### 6.5 Datos Hardcodeados (Sin API)
 

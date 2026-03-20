@@ -566,7 +566,7 @@
                 </div>
 
                 <div class="stance-spectrum">
-                    <div class="stance-spectrum-title">Espectro de Posturas del Comite</div>
+                    <div class="stance-spectrum-title">Espectro de Posturas del Comité</div>
                     <div class="stance-spectrum-bar">
                         <div class="stance-spectrum-segment spectrum-cauteloso {{spectrum_active_cauteloso}}">CAUTELOSO</div>
                         <div class="stance-spectrum-segment spectrum-neutral {{spectrum_active_neutral}}">NEUTRAL</div>
@@ -581,7 +581,7 @@
                     </div>
                 </div>
 
-                <h3 class="subsection-title">Views por Region</h3>
+                <h3 class="subsection-title">Views por Región</h3>
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -619,14 +619,14 @@
                 <p>{{valuation_narrative}}</p>
             </div>
 
-            <h3 class="subsection-title">Multiples por Region</h3>
+            <h3 class="subsection-title">Múltiplos por Región</h3>
             <table class="data-table">
                 <thead>
                     <tr>
                         <th>Mercado</th>
                         <th class="center">P/E Fwd</th>
                         <th class="center">vs 10y Avg</th>
-                        <th class="center">EV/EBITDA</th>
+                        {{ev_ebitda_header}}
                         <th class="center">P/B</th>
                         <th class="center">Div Yield</th>
                         <th>Comentario</th>
@@ -694,7 +694,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Region</th>
+                        <th>Región</th>
                         <th class="center">EPS 2025</th>
                         <th class="center">EPS 2026F</th>
                         <th class="center">Growth</th>
@@ -714,7 +714,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Region</th>
+                        <th>Región</th>
                         <th class="center">Upgrades</th>
                         <th class="center">Downgrades</th>
                         <th class="center">Net</th>
@@ -778,7 +778,7 @@
                         <p>{{growth_value_narrative}}</p>
                     </div>
                     <div class="metric-box" style="margin-top: 10px;">
-                        <div class="metric-label">Recomendacion Style</div>
+                        <div class="metric-label">Recomendación Style</div>
                         <div class="metric-value" style="font-size: 12pt;">{{style_recommendation}}</div>
                     </div>
                 </div>
@@ -867,11 +867,11 @@
 
             <div class="two-column">
                 <div>
-                    <h3 class="subsection-title">Flujos por Region</h3>
+                    <h3 class="subsection-title">Flujos por Región</h3>
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Region</th>
+                                <th>Región</th>
                                 <th class="center">YTD</th>
                                 <th class="center">1M</th>
                             </tr>
@@ -1010,7 +1010,7 @@
             <div class="glossary-grid">
                 <div class="glossary-item"><strong>OW / UW:</strong> Overweight (sobreponderacion) / Underweight (subponderacion) — indica si un activo tiene mayor o menor peso que su benchmark.</div>
                 <div class="glossary-item"><strong>P/E (Price-to-Earnings):</strong> Relacion precio/ganancias. P/E alto puede indicar sobrevaluacion relativa.</div>
-                <div class="glossary-item"><strong>EV/EBITDA:</strong> Enterprise Value / EBITDA — multiplo de valoracion que compara el valor de la empresa con su generacion de caja operativa.</div>
+                <div class="glossary-item"><strong>EV/EBITDA:</strong> Enterprise Value / EBITDA — múltiplo de valoración que compara el valor de la empresa con su generación de caja operativa.</div>
                 <div class="glossary-item"><strong>P/B (Price-to-Book):</strong> Relacion precio/valor libro. P/B &lt; 1 puede indicar subvaluacion.</div>
                 <div class="glossary-item"><strong>Div Yield:</strong> Dividend Yield — rendimiento por dividendos como porcentaje del precio de la accion.</div>
                 <div class="glossary-item"><strong>Earnings Yield:</strong> Inverso del P/E (Ganancias/Precio). Permite comparar rendimiento de acciones vs bonos.</div>
@@ -1020,7 +1020,7 @@
                 <div class="glossary-item"><strong>Breadth (Amplitud de Mercado):</strong> Porcentaje de acciones que participan en una tendencia. Breadth 15/100 = solo 15% de acciones sobre su media movil 50 dias.</div>
                 <div class="glossary-item"><strong>Risk-On / Risk-Off:</strong> Postura favorable (Risk-On) o defensiva (Risk-Off) respecto a activos de riesgo.</div>
                 <div class="glossary-item"><strong>Factor Tilt:</strong> Inclinacion hacia factores de inversion (Quality, Value, Momentum) que historicamente generan alfa.</div>
-                <div class="glossary-item"><strong>Percentil:</strong> Posicion relativa de un dato vs su historia. Percentil 80 = el 80% de observaciones historicas fue menor.</div>
+                <div class="glossary-item"><strong>Percentil:</strong> Posición relativa de un dato vs su historia. Percentil 80 = el 80% de observaciones históricas fue menor.</div>
                 <div class="glossary-item"><strong>PMI:</strong> Purchasing Managers' Index — indicador de actividad economica. &gt; 50 = expansion, &lt; 50 = contraccion.</div>
                 <div class="glossary-item"><strong>IPSA:</strong> Indice de Precio Selectivo de Acciones — principal indice bursatil de Chile (30 acciones mas liquidas).</div>
                 <div class="glossary-item"><strong>MSCI EM:</strong> Morgan Stanley Capital International Emerging Markets — indice de acciones de mercados emergentes.</div>
@@ -1033,7 +1033,7 @@
         <footer class="footer">
             <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Renta Variable | {{fecha_reporte}}</div>
             <div class="disclaimer">
-                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion personalizada. Las opiniones expresadas pueden cambiar sin previo aviso. El desempeno pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
+                {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendación de inversión personalizada. Las opiniones expresadas pueden cambiar sin previo aviso. El desempeño pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversión.') }}
             </div>
         </footer>
     </div>

@@ -822,7 +822,7 @@
             </div>
             <div class="report-info">
                 <div class="date">{{fecha_reporte}}</div>
-                <div>Comite de Inversion</div>
+                <div>Comité de Inversión</div>
             </div>
         </header>
 
@@ -835,7 +835,7 @@
         <div style="margin: 20px 0;">
             <span class="postura-badge postura-{{postura_class}}">{{postura_view}} con sesgo {{postura_sesgo}}</span>
             <div class="conviction-meter">
-                <span class="conviction-label">Conviccion:</span>
+                <span class="conviction-label">Convicción:</span>
                 <div class="conviction-bar">
                     <div class="conviction-fill" style="width: {{conviccion_pct}}%;"></div>
                 </div>
@@ -844,7 +844,7 @@
         </div>
 
         <div class="stance-spectrum">
-            <div class="stance-spectrum-title">Espectro de Posturas del Comite</div>
+            <div class="stance-spectrum-title">Espectro de Posturas del Comité</div>
             <div class="stance-spectrum-bar">
                 <div class="stance-spectrum-segment spectrum-cauteloso {{spectrum_active_cauteloso}}">CAUTELOSO</div>
                 <div class="stance-spectrum-segment spectrum-neutral {{spectrum_active_neutral}}">NEUTRAL</div>
@@ -852,10 +852,10 @@
                 <div class="stance-spectrum-segment spectrum-agresivo {{spectrum_active_agresivo}}">AGRESIVO</div>
             </div>
             <div class="stance-spectrum-labels">
-                <span title="Postura defensiva: reduce exposicion a activos de riesgo">Defensivo / Risk-Off <small style="display:block;font-size:7px;color:#c0c0c0;">(postura defensiva)</small></span>
+                <span title="Postura defensiva: reduce exposición a activos de riesgo">Defensivo / Risk-Off <small style="display:block;font-size:7px;color:#c0c0c0;">(postura defensiva)</small></span>
                 <span>Selectivo / Sin sesgo</span>
                 <span title="Postura favorable selectiva hacia activos de riesgo">Risk-On selectivo <small style="display:block;font-size:7px;color:#c0c0c0;">(favorable selectivo)</small></span>
-                <span title="Postura plenamente favorable a activos de riesgo">Full Risk-On <small style="display:block;font-size:7px;color:#c0c0c0;">(plena exposicion)</small></span>
+                <span title="Postura plenamente favorable a activos de riesgo">Full Risk-On <small style="display:block;font-size:7px;color:#c0c0c0;">(plena exposición)</small></span>
             </div>
         </div>
 
@@ -892,7 +892,7 @@
                 <div class="dashboard-postura-label">Postura General</div>
                 <span class="postura-badge postura-{{postura_class}}">{{postura_view}}</span>
                 <div class="dashboard-postura-sesgo">{{postura_sesgo}}</div>
-                <div class="dashboard-postura-conv">Conviccion: {{conviccion_text}}</div>
+                <div class="dashboard-postura-conv">Convicción: {{conviccion_text}}</div>
             </div>
         </div>
     </section>
@@ -996,7 +996,7 @@
 
     <!-- 5. VIEWS POR REGION -->
     <section class="section">
-        <h2 class="section-title"><span class="section-number">5.</span> Views por Region</h2>
+        <h2 class="section-title"><span class="section-number">5.</span> Views por Región</h2>
 
         {{regional_views_html}}
     </section>
@@ -1011,7 +1011,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Region</th>
+                    <th>Región</th>
                     <th>View</th>
                     <th>Rationale</th>
                 </tr>
@@ -1026,7 +1026,7 @@
         <strong>Factor tilt:</strong> {{factor_tilt}}</p>
 
         <h3>6.2 Renta Fija</h3>
-        <p><strong>View Tasas:</strong> {{rf_view_tasas}} | <strong>Duration <span style="font-weight:400;font-size:9pt;color:var(--text-light);">(sensibilidad a tasas)</span>:</strong> {{rf_view_duration}} | <strong>Credito:</strong> {{rf_view_credito}}</p>
+        <p><strong>View Tasas:</strong> {{rf_view_tasas}} | <strong>Duration <span style="font-weight:400;font-size:9pt;color:var(--text-light);">(sensibilidad a tasas)</span>:</strong> {{rf_view_duration}} | <strong>Crédito:</strong> {{rf_view_credito}}</p>
 
         <table>
             <thead>
@@ -1042,11 +1042,11 @@
         </table>
 
         <div class="key-points">
-            <h4>Chile Especifico</h4>
+            <h4>Chile Específico</h4>
             <ul>
                 <li><strong>TPM Path:</strong> {{chile_tpm_path}}</li>
                 <li><strong>Carry Trade:</strong> {{chile_carry_trade}}</li>
-                <li><strong>Recomendacion:</strong> {{chile_rf_recomendacion}}</li>
+                <li><strong>Recomendación:</strong> {{chile_rf_recomendacion}}</li>
             </ul>
         </div>
 
@@ -1106,7 +1106,7 @@
         </table>
 
         <div class="triggers-list">
-            <h4>Triggers para Reconvocar Comite</h4>
+            <h4>Triggers para Reconvocar Comité</h4>
             <ul>
                 {{triggers_html}}
             </ul>
@@ -1143,7 +1143,7 @@
         {{focus_list_html}}
 
         <p style="font-size: 9pt; color: var(--text-light); margin-top: 15px;">
-            <strong>Nota:</strong> Los instrumentos listados son recomendaciones del Comite de Inversion y no constituyen asesoría personalizada.
+            <strong>Nota:</strong> Los instrumentos listados son recomendaciones del Comité de Inversión y no constituyen asesoría personalizada.
             <span title="Overweight — sobreponderacion">OW</span> = Overweight, N = Neutral, <span title="Underweight — subponderacion">UW</span> = Underweight. Consulte con su asesor antes de operar.
         </p>
     </section>
@@ -1158,15 +1158,15 @@
             <div class="glossary-grid">
                 <div class="glossary-item">
                     <span class="glossary-term">OW / UW</span><br>
-                    <span class="glossary-def">Overweight (sobreponderacion) / Underweight (subponderacion) — indica si un activo tiene mayor o menor peso que su benchmark.</span>
+                    <span class="glossary-def">Overweight (sobreponderación) / Underweight (subponderación) — indica si un activo tiene mayor o menor peso que su benchmark.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Duration</span><br>
-                    <span class="glossary-def">Sensibilidad del precio de un bono a cambios en tasas de interes. Mayor duracion = mayor sensibilidad.</span>
+                    <span class="glossary-def">Sensibilidad del precio de un bono a cambios en tasas de interés. Mayor duración = mayor sensibilidad.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Carry / Carry Trade</span><br>
-                    <span class="glossary-def">Rendimiento que se obtiene por mantener una posicion. En renta fija, diferencia entre la tasa del activo y el costo de financiamiento.</span>
+                    <span class="glossary-def">Rendimiento que se obtiene por mantener una posición. En renta fija, diferencia entre la tasa del activo y el costo de financiamiento.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Spread</span><br>
@@ -1174,27 +1174,27 @@
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">bps (puntos base)</span><br>
-                    <span class="glossary-def">Centesimas de punto porcentual. 100 bps = 1%.</span>
+                    <span class="glossary-def">Centésimas de punto porcentual. 100 bps = 1%.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">VIX</span><br>
-                    <span class="glossary-def">Indice de volatilidad implicita del S&amp;P 500. Mide la expectativa de volatilidad del mercado a 30 dias. VIX &gt; 30 indica estres.</span>
+                    <span class="glossary-def">Índice de volatilidad implícita del S&amp;P 500. Mide la expectativa de volatilidad del mercado a 30 días. VIX &gt; 30 indica estrés.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">DXY</span><br>
-                    <span class="glossary-def">Dollar Index — indice que mide el valor del dolar estadounidense frente a una canasta de 6 monedas principales.</span>
+                    <span class="glossary-def">Dollar Index — índice que mide el valor del dólar estadounidense frente a una canasta de 6 monedas principales.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Factor Tilt</span><br>
-                    <span class="glossary-def">Inclinacion del portafolio hacia factores de inversion especificos (Quality, Value, Momentum) que historicamente generan retorno adicional.</span>
+                    <span class="glossary-def">Inclinación del portafolio hacia factores de inversión específicos (Quality, Value, Momentum) que historicamente generan retorno adicional.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Risk-On / Risk-Off</span><br>
-                    <span class="glossary-def">Postura favorable (Risk-On) o defensiva (Risk-Off) respecto a activos de riesgo como acciones, credito y commodities.</span>
+                    <span class="glossary-def">Postura favorable (Risk-On) o defensiva (Risk-Off) respecto a activos de riesgo como acciones, crédito y commodities.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">TPM</span><br>
-                    <span class="glossary-def">Tasa de Politica Monetaria — tasa de referencia fijada por el Banco Central de Chile (BCCh).</span>
+                    <span class="glossary-def">Tasa de Política Monetaria — tasa de referencia fijada por el Banco Central de Chile (BCCh).</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">BCCh</span><br>
@@ -1206,19 +1206,19 @@
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">P/E</span><br>
-                    <span class="glossary-def">Price-to-Earnings — relacion entre el precio de una accion y sus ganancias por accion. P/E alto puede indicar sobrevaluacion.</span>
+                    <span class="glossary-def">Price-to-Earnings — relación entre el precio de una acción y sus ganancias por acción. P/E alto puede indicar sobrevaluación.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Percentil</span><br>
-                    <span class="glossary-def">Posicion de un dato respecto a su historia. Percentil 80 significa que el 80% de las observaciones historicas fueron menores.</span>
+                    <span class="glossary-def">Posición de un dato respecto a su historia. Percentil 80 significa que el 80% de las observaciones históricas fueron menores.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Drawdown</span><br>
-                    <span class="glossary-def">Caida maxima desde un maximo anterior. Mide la perdida maxima que habria sufrido un inversionista.</span>
+                    <span class="glossary-def">Caída máxima desde un máximo anterior. Mide la pérdida máxima que habría sufrido un inversionista.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">Breakeven de Inflacion</span><br>
-                    <span class="glossary-def">Expectativa de inflacion implicita en el diferencial entre bonos nominales e indexados a inflacion.</span>
+                    <span class="glossary-def">Expectativa de inflación implícita en el diferencial entre bonos nominales e indexados a inflación.</span>
                 </div>
                 <div class="glossary-item">
                     <span class="glossary-term">BCP / BCU</span><br>
@@ -1264,7 +1264,7 @@
     <footer class="footer">
         <div>{{ company_name|default('GREYBARK RESEARCH') }} | Reporte Asset Allocation | {{fecha_reporte}}</div>
         <div class="disclaimer">
-            {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendacion de inversion. Las opiniones expresadas son las del Comite de Inversion a la fecha indicada y estan sujetas a cambios sin previo aviso. El rendimiento pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversion.') }}
+            {{ disclaimer_text|default('Este documento es solo para fines informativos y no constituye una recomendación de inversión. Las opiniones expresadas son las del Comité de Inversión a la fecha indicada y están sujetas a cambios sin previo aviso. El rendimiento pasado no garantiza resultados futuros. Consulte a su asesor financiero antes de tomar decisiones de inversión.') }}
         </div>
     </footer>
     </div>

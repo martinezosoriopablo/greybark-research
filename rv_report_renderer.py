@@ -207,20 +207,27 @@ class RVReportRenderer:
         val = content['valorizaciones']
         replacements['{{valuation_narrative}}'] = val['narrativa']
 
-        # Multiples table
+        # Multiples table — hide EV/EBITDA column if all N/D
+        has_ev = any(m.get('ev_ebitda') not in (None, 'N/D', '') for m in val['multiples_region'])
         mult_rows = ''
         for m in val['multiples_region']:
             val_class = self._get_valuation_class(m['vs_10y_avg'])
+            ev_col = f'<td class="center">{m["ev_ebitda"]}</td>' if has_ev else ''
             mult_rows += f'''<tr>
                 <td><strong>{m['mercado']}</strong></td>
                 <td class="center">{m['pe_fwd']}</td>
                 <td class="center {val_class}">{m['vs_10y_avg']}</td>
-                <td class="center">{m['ev_ebitda']}</td>
+                {ev_col}
                 <td class="center">{m['pb']}</td>
                 <td class="center">{m['div_yield']}</td>
                 <td>{m['comentario']}</td>
             </tr>'''
         replacements['{{multiples_table_rows}}'] = mult_rows
+        # Hide EV/EBITDA header if column hidden
+        if not has_ev:
+            replacements['{{ev_ebitda_header}}'] = ''
+        else:
+            replacements['{{ev_ebitda_header}}'] = '<th class="center">EV/EBITDA</th>'
 
         # PE Targets (fair value model)
         pe_targets = val.get('pe_targets', [])
