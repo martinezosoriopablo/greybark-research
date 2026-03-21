@@ -94,6 +94,8 @@ class AssetAllocationRenderer:
         css_map = {
             'sin recomendación': 'neutral', 'sin recomendacion': 'neutral',
             'n/d': 'nd', 'n/a': 'na', 'neutral': 'n',
+            'sobreponderar': 'ow', 'sobreponder': 'ow', 'ow': 'ow', 'overweight': 'ow',
+            'subponderar': 'uw', 'subponder': 'uw', 'uw': 'uw', 'underweight': 'uw',
         }
         if s in css_map:
             return css_map[s]

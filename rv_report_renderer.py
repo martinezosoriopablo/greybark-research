@@ -530,10 +530,10 @@ class RVReportRenderer:
 
     def _get_view_class(self, view: str) -> str:
         """Retorna clase CSS segun view."""
-        view_upper = view.upper()
-        if view_upper in ['OW', 'OVERWEIGHT']:
+        view_upper = view.upper().strip()
+        if any(kw in view_upper for kw in ['OW', 'OVERWEIGHT', 'SOBREPONDERAR', 'SOBREPONDER']):
             return 'badge-ow'
-        elif view_upper in ['UW', 'UNDERWEIGHT']:
+        elif any(kw in view_upper for kw in ['UW', 'UNDERWEIGHT', 'SUBPONDERAR', 'SUBPONDER']):
             return 'badge-uw'
         return 'badge-neutral'
 

@@ -51,7 +51,7 @@ from narrative_engine import validate_narrative
 
 DEFAULT_MODEL = "claude-sonnet-4-6"          # Panel (5 agentes)
 SYNTHESIS_MODEL = "claude-opus-4-6"          # CIO + Contrarian + Refinador
-MAX_TOKENS = 4000           # Panel agents (5 analysts)
+MAX_TOKENS = 6000           # Panel agents (5 analysts)
 REFINADOR_MAX_TOKENS = 12000  # Refinador final document (~8K words)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 

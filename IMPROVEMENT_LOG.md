@@ -58,11 +58,24 @@
 | 18 | US Fiscal section triple N/D | `chart_data_provider.py` + `macro_content_generator.py` | Nuevo `get_usa_fiscal()` con 3 FRED series (deficit -5.8%, deuda 122.5%, intereses 3.2%) |
 | 19 | China Trade chart datos cortados (190 pts sin trim) | `chart_generator.py:1764` | Trim a 120 meses consistente con otros charts |
 
-### Bugs Pendientes (solo P1)
+### Sprint 2 — Fixes Sistémicos (2026-03-21)
 
-| Prioridad | Bug | Archivo | Impacto |
-|-----------|-----|---------|---------|
-| P1 | `fed_rate` inyectado donde debería ir OAS threshold | `narrative_engine.py` tagger | False positive en pattern matching |
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 20 | `fed_rate` regex matchea "Fed" solo → false positive en OAS/inflación | `narrative_engine.py:170` | Regex requiere "Funds"/"rate"/"tasa fed" explícito |
+| 21 | Panel agents truncados (max_tokens=4000 insuficiente) | `ai_council_runner.py:54` | MAX_TOKENS 4000→6000 para panelistas |
+| 22 | Oil $100 fabricado sin corrección (sin pattern WTI/Brent) | `narrative_engine.py` _LABEL_PATTERNS | Agregado oil/WTI/Brent/petróleo + KEY_SOURCE_MAP + verified builders |
+| 23 | Badge CSS: OW/UW solo inglés, council output en español | `rf_report_renderer.py`, `rv_report_renderer.py`, `asset_allocation_renderer.py` | `_get_view_class()` acepta Sobreponderar/Subponderar + `_sanitize_css_class` mapea español |
+
+### Bugs Pendientes
+
+| Prioridad | Bug | Impacto |
+|-----------|-----|---------|
+| P1 | CPI subcomponents vacío (sin fuente FRED simple) | Macro chart vacío |
+| P1 | `[Seccion incompleta]` markers visibles en RV HTML | Texto visible al cliente |
+| P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
+| P1 | Tabla de escenarios vacía en AA | Sección crítica sin contenido |
+| P2 | Acentos faltantes en contenido dinámico (no template) | Cosmético |
 
 ### Validación — Pipeline 2026-03-20 (post Sprint 1)
 - [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (41 min)

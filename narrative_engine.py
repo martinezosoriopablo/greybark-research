@@ -167,7 +167,7 @@ _LABEL_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r'BCU\s*5', re.IGNORECASE), 'bcu_5y'),
     (re.compile(r'TIPS\s*10', re.IGNORECASE), 'tips_10y'),
     # Policy rates
-    (re.compile(r'(?:Fed\s*(?:Funds?)?|tasa\s*fed)', re.IGNORECASE), 'fed_rate'),
+    (re.compile(r'(?:Fed\s+Funds?\s*(?:Rate|rate)?|tasa\s+(?:de\s+)?(?:la\s+)?fed|Fed\s+rate|FFR)\b', re.IGNORECASE), 'fed_rate'),
     (re.compile(r'(?:TPM|tasa\s*pol[ií]tica)', re.IGNORECASE), 'tpm'),
     (re.compile(r'BCE|ECB', re.IGNORECASE), 'ecb_rate'),
     # Inflation
@@ -205,6 +205,7 @@ _LABEL_PATTERNS: List[Tuple[re.Pattern, str]] = [
     # Index levels
     (re.compile(r'S&P(?:\s*500)?\b(?!.{0,30}?P/?E)', re.IGNORECASE), 'sp500_level'),
     (re.compile(r'IPSA\b(?!.{0,30}?P/?E)', re.IGNORECASE), 'ipsa_level'),
+    (re.compile(r'(?:WTI|Brent|petr[oó]leo|oil\b|crudo)', re.IGNORECASE), 'oil'),
     (re.compile(r'(?:cobre|copper)', re.IGNORECASE), 'copper'),
     (re.compile(r'(?:oro|gold)\b', re.IGNORECASE), 'gold'),
     (re.compile(r'(?:USD/?CLP|d[oó]lar.{0,10}?CLP)', re.IGNORECASE), 'usdclp'),
@@ -637,7 +638,7 @@ _KEY_SOURCE_MAP = {
     # Other
     'vix': 'yfinance:^VIX', 'move_index': 'FRED:MOVE',
     'sp500_level': 'yfinance:SPY', 'ipsa_level': 'BCCh:IPSA',
-    'copper': 'BCCh:commodities', 'gold': 'BCCh:commodities',
+    'oil': 'BCCh:commodities', 'copper': 'BCCh:commodities', 'gold': 'BCCh:commodities',
     'usdclp': 'BCCh:FX', 'dxy': 'yfinance:DX-Y.NYB',
     'us_gdp': 'FRED:GDPC1', 'chile_gdp': 'BCCh:PIB',
     'us_unemployment': 'FRED:UNRATE',
@@ -739,7 +740,7 @@ def build_verified_data_rv(market_data: dict) -> Dict[str, float]:
     bcch = market_data.get('bcch_indices', {})
     for idx_key, vd_key in [
         ('ipsa', 'ipsa_level'), ('copper', 'copper'),
-        ('gold', 'gold'), ('usdclp', 'usdclp'),
+        ('gold', 'gold'), ('usdclp', 'usdclp'), ('oil', 'oil'),
     ]:
         val = _safe(bcch.get(idx_key))
         if val is not None:
@@ -913,7 +914,8 @@ def build_verified_data_macro(quant_data: dict, data_provider=None) -> Dict[str,
             cl = data_provider.get_chile_latest()
             if cl:
                 for k, vd_k in [('tpm', 'tpm'), ('ipc_yoy', 'chile_ipc'),
-                                  ('copper', 'copper'), ('usdclp', 'usdclp')]:
+                                  ('copper', 'copper'), ('usdclp', 'usdclp'),
+                                  ('oil', 'oil')]:
                     val = _safe(cl.get(k))
                     if val is not None:
                         vd[vd_k] = val
