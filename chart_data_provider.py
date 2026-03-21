@@ -370,28 +370,66 @@ class ChartDataProvider:
     # COMMODITIES
     # =========================================================================
 
+    def _get_yfinance_spot(self, ticker: str) -> Optional[float]:
+        """Fetch latest spot price from yfinance (daily, no lag)."""
+        try:
+            import yfinance as yf
+            t = yf.Ticker(ticker)
+            hist = t.history(period='5d')
+            if hist is not None and len(hist) > 0:
+                return float(hist['Close'].iloc[-1])
+        except Exception as e:
+            logger.warning("yfinance spot %s failed: %s", ticker, e)
+        return None
+
+    def _append_spot_if_stale(self, series: Optional[pd.Series],
+                               yf_ticker: str, max_age_days: int = 35) -> Optional[pd.Series]:
+        """If BCCh series is >max_age_days old, append yfinance spot as current data point."""
+        if series is None or len(series) == 0:
+            return series
+        last_date = pd.Timestamp(series.index[-1])
+        age = (pd.Timestamp.now() - last_date).days
+        if age <= max_age_days:
+            return series  # Fresh enough
+        spot = self._get_yfinance_spot(yf_ticker)
+        if spot is None:
+            return series
+        today = pd.Timestamp(date.today())
+        new_point = pd.Series([spot], index=[today], name=series.name)
+        updated = pd.concat([series, new_point])
+        logger.info("ChartDataProvider: %s stale (%dd), appended yfinance spot %.2f", yf_ticker, age, spot)
+        return updated
+
     def get_commodities(self) -> Dict[str, Optional[pd.Series]]:
-        """Cobre, Oro, Brent para commodity_prices chart."""
+        """Cobre, Oro, Brent para commodity_prices chart. yfinance spot if BCCh stale."""
+        brent = self.get_series(BCChSeries.BRENT, resample='M')
+        cobre = self.get_series(BCChSeries.COBRE, resample='M')
+        oro = self.get_series(BCChSeries.ORO, resample='M')
         return {
-            'brent': self.get_series(BCChSeries.BRENT, resample='M'),
-            'cobre': self.get_series(BCChSeries.COBRE, resample='M'),
-            'oro': self.get_series(BCChSeries.ORO, resample='M'),
+            'brent': self._append_spot_if_stale(brent, 'BZ=F'),
+            'petroleo': self._append_spot_if_stale(brent, 'BZ=F'),
+            'cobre': self._append_spot_if_stale(cobre, 'HG=F'),
+            'oro': self._append_spot_if_stale(oro, 'GC=F'),
         }
 
     def get_commodities_table(self) -> List[Dict]:
-        """Datos para tabla de commodities: valor actual, cambio 1m, 3m, 1y."""
+        """Datos para tabla de commodities: valor actual, cambio 1m, 3m, 1y.
+        Uses yfinance spot if BCCh data is stale (>35 days old)."""
+        # (name, BCCh series, unit, yfinance ticker for spot)
         commodities = [
-            ('Cobre', BCChSeries.COBRE, 'USD/lb'),
-            ('Oro', BCChSeries.ORO, 'USD/oz'),
-            ('Brent', BCChSeries.BRENT, 'USD/bbl'),
-            ('WTI', BCChSeries.WTI, 'USD/bbl'),
-            ('Gas Natural', BCChSeries.GAS_NATURAL, 'USD/MMBtu'),
-            ('Plata', BCChSeries.PLATA, 'USD/oz'),
-            ('Litio', BCChSeries.LITIO, 'USD/ton'),
+            ('Cobre', BCChSeries.COBRE, 'USD/lb', 'HG=F'),
+            ('Oro', BCChSeries.ORO, 'USD/oz', 'GC=F'),
+            ('Brent', BCChSeries.BRENT, 'USD/bbl', 'BZ=F'),
+            ('WTI', BCChSeries.WTI, 'USD/bbl', 'CL=F'),
+            ('Gas Natural', BCChSeries.GAS_NATURAL, 'USD/MMBtu', 'NG=F'),
+            ('Plata', BCChSeries.PLATA, 'USD/oz', 'SI=F'),
+            ('Litio', BCChSeries.LITIO, 'USD/ton', None),
         ]
         result = []
-        for name, sid, unit in commodities:
+        for name, sid, unit, yf_ticker in commodities:
             s = self.get_series(sid, resample='M')
+            if yf_ticker:
+                s = self._append_spot_if_stale(s, yf_ticker)
             if s is None or len(s) < 2:
                 continue
             current = float(s.iloc[-1])
@@ -412,11 +450,14 @@ class ChartDataProvider:
         return result
 
     def get_energy(self) -> Dict[str, Optional[pd.Series]]:
-        """WTI, Gas Natural para energy_food chart."""
+        """WTI, Gas Natural para energy_food chart. yfinance spot if stale."""
+        wti = self.get_series(BCChSeries.WTI, resample='M')
+        gas = self.get_series(BCChSeries.GAS_NATURAL, resample='M')
+        brent = self.get_series(BCChSeries.BRENT, resample='M')
         return {
-            'wti': self.get_series(BCChSeries.WTI, resample='M'),
-            'gas': self.get_series(BCChSeries.GAS_NATURAL, resample='M'),
-            'brent': self.get_series(BCChSeries.BRENT, resample='M'),
+            'wti': self._append_spot_if_stale(wti, 'CL=F'),
+            'gas': self._append_spot_if_stale(gas, 'NG=F'),
+            'brent': self._append_spot_if_stale(brent, 'BZ=F'),
         }
 
     # =========================================================================
