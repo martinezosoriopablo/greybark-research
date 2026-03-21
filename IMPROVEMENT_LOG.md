@@ -77,6 +77,19 @@
 | P1 | Tabla de escenarios vacía en AA | Sección crítica sin contenido |
 | P2 | Acentos faltantes en contenido dinámico (no template) | Cosmético |
 
+### Validación — Pipeline 2026-03-21 (post Sprint 2 sistémicos)
+- [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (43.6 min)
+- [x] Anti-fabricación: S&P P/E 500→25.73, UST 10Y 4.00→4.25, IG spread 110→90bp, TPM 4.0→4.5%
+- [x] Consistency fixes: VIX→26.8, Focus GLD NEUTRAL→N, RF curva OW→N
+- [x] Panel agents: 4435-8636 chars (antes ~3500-4000) — **max_tokens=6000 OK**
+- [x] Coherence check: 1 conflicto (TPM macro=2.2 vs rf=4.5)
+- [x] Macro: 28 charts, 19/25 módulos OK
+- [x] RV: 11/12 charts, 11/11 módulos OK
+- [x] RF: 8/8 charts, 11/12 módulos OK
+- [x] AA: reporte completo con narrativas
+- [x] Pre-council: 44 charts, 0 fallidos, 4/4 reportes validados
+- [ ] Revisión visual pendiente: 4 reportes
+
 ### Validación — Pipeline 2026-03-20 (post Sprint 1)
 - [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (41 min)
 - [x] Verificar spreads muestran ~77bp IG / ~350bp HY — **IG=91bps, HY=320bps** (correcto)
