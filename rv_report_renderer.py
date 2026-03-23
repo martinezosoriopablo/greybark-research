@@ -355,7 +355,7 @@ class RVReportRenderer:
                 </div>
                 <div class="sector-card-body">
                     <p>{s['razon']}</p>
-                    <p style="font-size:9pt; color: var(--text-light);"><strong>Que cambiaria:</strong> {s['que_cambiaria']}</p>
+                    <p style="font-size:9pt; color: var(--text-light);"><strong>¿Qué cambiaría?</strong> {s['que_cambiaria']}</p>
                 </div>
             </div>'''
         replacements['{{avoid_sectors_html}}'] = avoid_html

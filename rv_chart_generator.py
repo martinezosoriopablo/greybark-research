@@ -887,6 +887,45 @@ class RVChartsGenerator:
     # 11. FACTOR RADAR — Factor scores por region
     # =========================================================================
 
+    def _compute_yf_factor_scores(self) -> Dict[str, Dict[str, float]]:
+        """Compute factor scores for ETFs using yfinance (fallback when AV fails)."""
+        try:
+            import yfinance as yf
+        except ImportError:
+            return {}
+
+        tickers = ['SPY', 'EFA', 'EEM', 'EWJ', 'ECH']
+        results = {}
+        for ticker in tickers:
+            try:
+                etf = yf.Ticker(ticker)
+                hist = etf.history(period='1y')
+                if hist.empty or len(hist) < 60:
+                    continue
+                info = etf.info or {}
+                close = hist['Close']
+                # Momentum: 6M return scaled to 0-100
+                ret_6m = (float(close.iloc[-1]) / float(close.iloc[-126]) - 1) * 100 if len(close) >= 126 else 0
+                momentum = max(0, min(100, 50 + ret_6m * 2.5))
+                # Value proxy: inverse PE percentile (low PE = high value)
+                pe = info.get('trailingPE')
+                value = max(0, min(100, 100 - (pe - 10) * 3)) if pe and pe > 0 else 50
+                # Quality proxy: profit margin
+                margin = info.get('profitMargins')
+                quality = max(0, min(100, (margin or 0.15) * 400)) if margin else 50
+                # Growth proxy: earnings growth
+                eg = info.get('earningsQuarterlyGrowth') or info.get('revenueGrowth')
+                growth = max(0, min(100, 50 + (eg or 0) * 200)) if eg is not None else 50
+                results[ticker] = {
+                    'momentum': round(momentum, 1),
+                    'value': round(value, 1),
+                    'growth': round(growth, 1),
+                    'quality': round(quality, 1),
+                }
+            except Exception:
+                continue
+        return results
+
     def _generate_factor_radar(self) -> str:
         """Factor scores (momentum, value, quality, growth) por ETF regional."""
         if not MATPLOTLIB_AVAILABLE:
@@ -894,7 +933,7 @@ class RVChartsGenerator:
 
         factors = self.data.get('factors', {})
         if not factors or 'error' in factors:
-            return self._create_placeholder('Factor Performance — sin datos')
+            factors = {}
 
         # Collect data for each ticker that has factor scores
         ticker_order = ['SPY', 'EFA', 'EEM', 'EWJ', 'ECH']
@@ -907,15 +946,26 @@ class RVChartsGenerator:
         for ticker in ticker_order:
             f = factors.get(ticker, {})
             if 'error' in f or not isinstance(f, dict):
-                continue
+                f = {}
             scores = [f.get(fn) for fn in factor_names]
-            if any(s is not None for s in scores):
+            if any(s is not None and s != 0 for s in scores):
                 tickers_with_data.append(self.REGION_LABELS.get(
                     {'SPY': 'us', 'EFA': 'europe', 'EEM': 'em', 'EWJ': 'japan', 'ECH': 'chile'}.get(ticker, ''), ticker))
                 data_rows.append([s if s is not None else 0 for s in scores])
 
+        # Fallback: compute from yfinance if no data from FactorAnalytics
         if not tickers_with_data:
-            return self._create_placeholder('Factor Performance — sin scores')
+            yf_scores = self._compute_yf_factor_scores()
+            for ticker in ticker_order:
+                f = yf_scores.get(ticker, {})
+                if f:
+                    scores = [f.get(fn, 0) for fn in factor_names]
+                    tickers_with_data.append(self.REGION_LABELS.get(
+                        {'SPY': 'us', 'EFA': 'europe', 'EEM': 'em', 'EWJ': 'japan', 'ECH': 'chile'}.get(ticker, ''), ticker))
+                    data_rows.append(scores)
+
+        if not tickers_with_data:
+            return self._create_placeholder('Factor Performance — sin datos')
 
         fig, ax = plt.subplots(figsize=(8, max(3, 0.6 * len(tickers_with_data) + 1.5)))
 
