@@ -154,15 +154,25 @@
 | 64 | AA tabla macro indicadores vacía | `asset_allocation_content_generator.py` | Keys corregidos: gdp_qoq, cpi_core_yoy, retail_sales.yoy |
 | 65 | AA dashboard flechas todas → | `asset_allocation_content_generator.py` | `_arrow_from_view()`: OW→↑, UW→↓, N→→ |
 
+### Sprint 9 — Capa 3: Acentos, Traducciones, Unidades (2026-03-23)
+
+| # | Bug | Archivo(s) | Fix |
+|---|-----|------------|-----|
+| 66 | ~22 acentos faltantes en RF | `rf_content_generator.py`, `templates/rf_report_professional.html` | México, Perú, crédito, días, política, Posición, distribución, últimos, años, Cámara, Inflación |
+| 67 | ~25 acentos faltantes en AA | `asset_allocation_content_generator.py`, `asset_allocation_renderer.py`, `templates/asset_allocation_professional.html` | opinión, señal, inversión, política, Revisión, Economía, Escalación, Depósito, reducción, históricamente, protección |
+| 68 | ~18 acentos faltantes en RV | `rv_content_generator.py`, `templates/rv_report_professional.html` | Japón, Débil, correlación, depreciación, suscripción, Región, política, análisis, Índice, Valuación, caída máxima |
+| 69 | ~5 acentos faltantes en Macro | `macro_content_generator.py`, `templates/macro_report_professional.html` | último, dinámicas, inflación, análisis, región, PRONÓSTICO PONDERADO |
+| 70 | ~20 labels en inglés en 4 reportes | Todos los templates + renderers + content generators | Driver→Factor, Key Calls→Decisiones Clave, Rationale→Fundamento, Target→Objetivo, Entry→Entrada, Stop→Stop-loss, Hedge→Cobertura, Asset Class→Clase de Activo, Key Points→Puntos Clave, GDP Growth→Crecimiento PIB, Inflation (Core)→Inflación (Subyacente), Policy Rates→Tasas de Política, Euro Area→Eurozona |
+| 71 | Litio unidad incorrecta USD/ton | `chart_data_provider.py`, `equity_data_collector.py`, `rv_content_generator.py`, `macro_content_generator.py` | → USD/kg (litio se cotiza en kg, no en toneladas) |
+
+**Resultado:** ~95 correcciones cosméticas en 12 archivos. 4 reportes ahora 100% español con acentos correctos.
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
 |-----------|-----|---------|
 | P1 | CPI subcomponents vacío (sin fuente FRED simple) | Macro chart vacío |
 | P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
-| P2 | ~48 acentos faltantes (RF 12, AA 20+, RV 13, Macro 3) | Cosmético |
-| P2 | ~58 labels en inglés que deberían ser español | Idioma mixto |
-| P2 | Macro Litio $18.25/ton (unidad incorrecta, es USD/kg) | Dato confuso |
 
 ### Validación — Pipeline 2026-03-22 (post Sprint 4 RV visual)
 - [x] Forecast engine: 5/5 modelos S&P 500 OK (+2.4%, era +21.8%)
