@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-23 (48 bugs resueltos, 5 sprints + 5 sub-sprints, pipeline 4/4 OK)
+> Última actualización: 2026-03-23 (51 bugs resueltos, 6 sprints + 5 sub-sprints, pipeline 4/4 OK)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -334,6 +334,9 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | AA SELIC N/D (wrong key) | `asset_allocation_content_generator.py` | `chile_rates.policy_rates.bcb` | Sprint 5 |
 | AA breakeven N/D (wrong path) | `asset_allocation_content_generator.py` | `inflation.breakeven_inflation.current.breakeven_5y` | Sprint 5 |
 | Calendar table 4 cols vs 3 header cols | `table_builder.py` | Removed orphan `impacto` column | Sprint 5 |
+| TPM expectations start at 5.0% (actual 4.5%) | `rf_data_collector.py` | Auto-fetch from BCCh API at init | Sprint 6 |
+| Fed Funds default 4.50% (actual EFFR 3.64%) | `rf_data_collector.py` | Auto-fetch from FRED DFF at init | Sprint 6 |
+| 6 standalone rate defaults stale | `rate_expectations/*.py` | TPM 5.00→4.50, Fed 4.50→3.75 | Sprint 6 |
 
 ### 6.4 Bugs Conocidos (Activos)
 

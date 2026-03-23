@@ -118,6 +118,16 @@
 - Copper $5.57/lb, Gold $4607/oz, Oil $94.65/bbl
 - Spreads: IG 90bp, HY 327bp
 
+### Sprint 6 — Tasas Stale (2026-03-23)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 49 | TPM expectations parten de 5.0% (real 4.5%) | `rf_data_collector.py` | Auto-fetch TPM desde BCCh API (`_fetch_current_tpm()`) |
+| 50 | Fed Funds default 4.50% (real EFFR 3.64%) | `rf_data_collector.py` | Auto-fetch Fed Funds desde FRED DFF (`_fetch_current_fed_funds()`) |
+| 51 | 6 standalone defaults stale en rate_expectations/ | `clp_expectations.py`, `usd_expectations.py`, `fed_dots_comparison.py`, `bcch_encuesta_comparison.py`, `__init__.py` | TPM 5.00→4.50, Fed 4.50→3.75 |
+
+**Resultado:** RFDataCollector ahora obtiene tasas actuales de APIs al inicializar. Fallback a 4.50% si API falla.
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |

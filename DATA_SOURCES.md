@@ -308,8 +308,8 @@ Motor de pronosticos cuantitativos con arquitectura de 2 capas.
 | **GDP Chile** | BCCh EEE PIB (F089.PIB.VAR.Z.M) + IMACEC tendencia | 70/30 |
 | **GDP China** | BCCh GDP QoQ (F019.PIB.VAR.CHN.T) + Credit impulse + Commodities | 50/30/20 |
 | **GDP Eurozona** | BCCh GDP QoQ (F019.PIB.VAR.20.T) + Desempleo (F019.DES.TAS.20.M) | 60/40 |
-| **Tasas Fed** | SOFR forwards (usd_expectations.py) | Mercado |
-| **Tasas TPM** | SPC forwards (clp_expectations.py) | Mercado |
+| **Tasas Fed** | SOFR forwards (usd_expectations.py) — current auto-fetched from FRED DFF | Mercado |
+| **Tasas TPM** | SPC forwards (clp_expectations.py) — current auto-fetched from BCCh API | Mercado |
 | **Tasas ECB** | Modelo inflation gap vs target 2% | Modelo |
 | **Equity Targets** | 5-modelo ensemble (ver detalle abajo) | Ponderado |
 
