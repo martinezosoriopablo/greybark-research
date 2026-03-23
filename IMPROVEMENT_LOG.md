@@ -128,13 +128,35 @@
 
 **Resultado:** RFDataCollector ahora obtiene tasas actuales de APIs al inicializar. Fallback a 4.50% si API falla.
 
+### Sprint 7 — P0 Data Bugs (2026-03-23)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 52 | BCCh dates DD-MM swapped when day<=12 → WTI +50% 1M | `greybark/data_sources/bcch_client.py:98` | `dayfirst=True` en `pd.to_datetime()` |
+| 53 | RV earnings tabla: columnas EPS muestran beat rate y P/E | `templates/rv_report_professional.html` | Headers → "Beat Rate" / "P/E Fwd" |
+| 54 | AA escenarios suman 90% (falta 10%) | `asset_allocation_content_generator.py` | Residual "Cola / Riesgo Extremo" auto-añadido |
+| 55 | AA 3 precios cobre diferentes ($5.30/$5.46/$5.57) | `asset_allocation_content_generator.py` | Canon value first en 3 métodos Chile |
+| 56 | AA `MODERATE_GROWTH` raw code visible en texto | `asset_allocation_content_generator.py` | `_REGIME_LABELS` dict → "Crecimiento Moderado" |
+| 57 | AA Focus List 18 rationales en inglés | `asset_allocation_content_generator.py` | Traducidos a español |
+| 58 | RV `[Sección incompleta — revisar]` visible | `narrative_engine.py:1089` | Marker removido (warning en log se mantiene) |
+
+**Resultado:** Datos BCCh con fechas correctas, tablas con headers correctos, escenarios suman 100%, cobre coherente, código interno no visible.
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
 |-----------|-----|---------|
 | P1 | CPI subcomponents vacío (sin fuente FRED simple) | Macro chart vacío |
 | P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
-| P2 | Acentos faltantes en contenido dinámico LLM (no template) | Cosmético |
+| P1 | RV 6+ narrativas truncadas mid-sentence (max_tokens bajo) | Contenido cortado |
+| P1 | RF trades duplicados entre Sección 3 y 7 | Contenido repetido |
+| P1 | RF `FAIR_VALUE`/`EXPENSIVE` enum raw en columna signal | Código visible |
+| P1 | RF badge UW styled como neutral (line 846) | Badge color incorrecto |
+| P1 | AA tabla macro indicadores 4 filas vacías (em-dash) | Sección vacía |
+| P1 | AA dashboard flechas todas → (sin cambios) | Info faltante |
+| P2 | ~48 acentos faltantes (RF 12, AA 20+, RV 13, Macro 3) | Cosmético |
+| P2 | ~58 labels en inglés que deberían ser español | Idioma mixto |
+| P2 | Macro Litio $18.25/ton (unidad incorrecta, es USD/kg) | Dato confuso |
 
 ### Validación — Pipeline 2026-03-22 (post Sprint 4 RV visual)
 - [x] Forecast engine: 5/5 modelos S&P 500 OK (+2.4%, era +21.8%)

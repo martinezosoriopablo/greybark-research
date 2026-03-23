@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-23 (51 bugs resueltos, 6 sprints + 5 sub-sprints, pipeline 4/4 OK)
+> Última actualización: 2026-03-23 (58 bugs resueltos, 7 sprints + 5 sub-sprints, pipeline 4/4 OK)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -337,6 +337,13 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | TPM expectations start at 5.0% (actual 4.5%) | `rf_data_collector.py` | Auto-fetch from BCCh API at init | Sprint 6 |
 | Fed Funds default 4.50% (actual EFFR 3.64%) | `rf_data_collector.py` | Auto-fetch from FRED DFF at init | Sprint 6 |
 | 6 standalone rate defaults stale | `rate_expectations/*.py` | TPM 5.00→4.50, Fed 4.50→3.75 | Sprint 6 |
+| BCCh dates DD-MM swapped (day<=12) | `bcch_client.py:98` | `dayfirst=True` — fixes WTI +50%, commodity returns | Sprint 7 |
+| RV earnings headers EPS→Beat Rate/P/E | `rv_report_professional.html` | Headers match actual data | Sprint 7 |
+| AA scenarios sum 90% | `asset_allocation_content_generator.py` | Auto-add residual scenario | Sprint 7 |
+| AA 3 copper prices incoherent | `asset_allocation_content_generator.py` | Canon value first in all 3 methods | Sprint 7 |
+| AA MODERATE_GROWTH raw code visible | `asset_allocation_content_generator.py` | `_REGIME_LABELS` dict mapping | Sprint 7 |
+| AA Focus List 18 rationales in English | `asset_allocation_content_generator.py` | All translated to Spanish | Sprint 7 |
+| RV truncation marker visible | `narrative_engine.py:1089` | Marker removed from output | Sprint 7 |
 
 ### 6.4 Bugs Conocidos (Activos)
 
