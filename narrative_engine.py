@@ -1086,7 +1086,7 @@ def generate_narrative(
                 f"narrative_engine: {section_name} TRUNCATED at {max_tokens} tokens "
                 f"({len(text)} chars). Consider increasing max_tokens for this section."
             )
-            text += "\n<p><em>[Sección incompleta — revisar]</em></p>"
+            # Do NOT append visible marker — truncated text is still usable
 
         logger.info(f"narrative_engine: {section_name} — {len(text)} chars generated")
 

@@ -95,7 +95,7 @@ class BCChClient:
                 value_str = observation.get('value', '').strip()
                 if date_str and value_str:
                     try:
-                        dates.append(pd.to_datetime(date_str))
+                        dates.append(pd.to_datetime(date_str, dayfirst=True))
                         values.append(float(value_str))
                     except (ValueError, TypeError):
                         continue

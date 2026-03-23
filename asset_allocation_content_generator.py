@@ -36,6 +36,15 @@ CLP_USD_DIRECTIVE = (
 class AssetAllocationContentGenerator:
     """Generador de contenido narrativo para Reporte de Asset Allocation."""
 
+    _REGIME_LABELS = {
+        'MODERATE_GROWTH': 'Crecimiento Moderado',
+        'EXPANSION': 'Expansión',
+        'RECESSION': 'Recesión',
+        'SLOWDOWN': 'Desaceleración',
+        'LATE_CYCLE_BOOM': 'Expansión Tardía',
+        'STAGFLATION': 'Estanflación',
+    }
+
     def __init__(self, council_result: Dict, quant_data: Dict = None,
                  forecast_data: Dict = None, company_name: str = ""):
         self.council = council_result or {}
@@ -101,6 +110,12 @@ class AssetAllocationContentGenerator:
     def _has_q(self, *keys) -> bool:
         """Verifica si quant_data tiene datos en la ruta."""
         return self._q(*keys) is not None
+
+    def _regime_label(self, raw: str) -> str:
+        """Translate raw regime code (e.g. MODERATE_GROWTH) to human-readable Spanish."""
+        if not raw:
+            return 'N/D'
+        return self._REGIME_LABELS.get(raw, self._REGIME_LABELS.get(raw.upper(), raw))
 
     # =========================================================================
     # CANONICAL DATA — Single source of truth for cross-section consistency
@@ -465,7 +480,7 @@ class AssetAllocationContentGenerator:
         # Regime
         regime = self._q('regime', 'current')
         if regime:
-            parts.append(f"Régimen: {regime}")
+            parts.append(f"Régimen: {self._regime_label(regime)}")
         # Chile
         for key, label in [('tpm', 'TPM'), ('ipc_yoy', 'IPC Chile')]:
             val = self._q('chile', key)
@@ -1024,7 +1039,7 @@ class AssetAllocationContentGenerator:
         if fed_str == 'N/D':
             fed_str = self._fmt_pct(self._q('macro_usa', 'fed_rate'))
 
-        regime = self._q('regime', 'current') or 'N/D'
+        regime = self._regime_label(self._q('regime', 'current'))
         recession_prob = self._fmt_pct(self._q('macro_usa', 'recession_prob'))
 
         quant_ctx = (
@@ -1287,7 +1302,14 @@ class AssetAllocationContentGenerator:
         # Extract from council text (no hardcoded defaults)
         tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', None)
         ipc = self._extract_number(macro, r'(?:IPC|inflaci[oó]n)\s+(\d+\.?\d*)%', None)
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
+        # Cobre: canonical value first (single source of truth), then quant, then council text
+        cobre = self.canon.get('copper')
+        if cobre is None:
+            cobre = self._safe_float(
+                self._q('chile_rates', 'copper')
+                or self._q('equity', 'bcch_indices', 'copper', 'value'))
+        if cobre is None:
+            cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
 
         # Enrich with real BCCh data if available
         if self.data:
@@ -1309,13 +1331,6 @@ class AssetAllocationContentGenerator:
             tpm = self.canon.get('tpm')
         if ipc is None:
             ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
-        # Cobre fallback: quant_data → canonical cache
-        if cobre is None:
-            cobre = self._safe_float(
-                self._q('chile_rates', 'copper')
-                or self._q('equity', 'bcch_indices', 'copper', 'value'))
-        if cobre is None:
-            cobre = self.canon.get('copper')
 
         tpm_real = round(tpm - ipc, 1) if tpm is not None and ipc is not None else None
 
@@ -1488,6 +1503,17 @@ class AssetAllocationContentGenerator:
                     'implicancias': details.get('implicancias', {}),
                     'que_comprar': details.get('que_comprar', 'Ver recomendación final'),
                 })
+            # Ensure probabilities sum to 100% — add residual tail scenario if needed
+            total_prob = sum(s.get('probabilidad', 0) for s in escenarios if isinstance(s.get('probabilidad'), (int, float)))
+            if total_prob < 100:
+                residual = 100 - total_prob
+                escenarios.append({
+                    'nombre': 'Cola / Riesgo Extremo',
+                    'probabilidad': int(residual),
+                    'descripcion': 'Eventos de baja probabilidad no contemplados en los escenarios principales.',
+                    'que_comprar': 'Coberturas: puts, oro, cash',
+                })
+
             # Determine base scenario (highest probability)
             base = max(scenarios_parsed.values(), key=lambda x: x['prob'])
             return {
@@ -1525,11 +1551,11 @@ class AssetAllocationContentGenerator:
         bull_str = f'{int(bull_prob)}%' if bull_prob is not None else 'N/D'
         tariff_str = f'{int(tariff_prob)}%' if tariff_prob is not None else 'N/D'
         china_str = f'{int(china_prob)}%' if china_prob is not None else 'N/D'
-        regime_str = str(regime) if regime else 'N/D'
+        regime_str = self._regime_label(regime) if regime else 'N/D'
 
         # Determine base scenario from regime or recession probability
         if regime and isinstance(regime, str):
-            escenario_base = regime.upper()
+            escenario_base = self._regime_label(regime).upper()
         elif recession is not None and recession > 50:
             escenario_base = 'RECESIÓN'
         elif recession is not None and recession < 20:
@@ -2015,7 +2041,15 @@ class AssetAllocationContentGenerator:
 
         tpm = self._extract_number(macro, r'TPM\s+(\d+\.?\d*)%', None)
         ipc = self._extract_number(macro, r'(?:IPC|inflaci[oó]n)\s+(\d+\.?\d*)%', None)
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
+
+        # Cobre: canonical value first (single source of truth), then quant, then council text
+        cobre = self.canon.get('copper')
+        if cobre is None:
+            cobre = self._safe_float(
+                self._q('chile_rates', 'copper')
+                or self._q('equity', 'bcch_indices', 'copper', 'value'))
+        if cobre is None:
+            cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
 
         # Data fallbacks (same as chile_review)
         if self.data:
@@ -2035,12 +2069,6 @@ class AssetAllocationContentGenerator:
             tpm = self.canon.get('tpm')
         if ipc is None:
             ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
-        if cobre is None:
-            cobre = self._safe_float(
-                self._q('chile_rates', 'copper')
-                or self._q('equity', 'bcch_indices', 'copper', 'value'))
-        if cobre is None:
-            cobre = self.canon.get('copper')
 
         tpm_real = round(tpm - ipc, 1) if tpm and ipc else None
 
@@ -2812,9 +2840,10 @@ class AssetAllocationContentGenerator:
     def _generate_commodities_view(self) -> Dict[str, Any]:
         macro = self._panel('macro')
 
-        cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
-
-        # Enrich with real data
+        # Cobre: canonical value first (single source of truth), then quant, then data provider, then council text
+        cobre = self.canon.get('copper')
+        if cobre is None:
+            cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
         if cobre is None and self.data:
             try:
                 comm_table = self.data.get_commodities_table()
@@ -2825,7 +2854,7 @@ class AssetAllocationContentGenerator:
             except Exception:
                 pass
         if cobre is None:
-            cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
+            cobre = self._extract_number(macro, r'[Cc]obre\s+\$?(\d+\.?\d*)', None)
 
         cobre_str = f'${cobre:.2f}/lb' if cobre is not None else 'N/D'
         cobre_range = (
@@ -3495,28 +3524,28 @@ class AssetAllocationContentGenerator:
 
         return {
             'renta_variable': [
-                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': us_view, 'rationale': 'Core US exposure, broad market'},
-                {'ticker': 'IWB', 'nombre': 'iShares Russell 1000 Value', 'view': us_view, 'rationale': 'Value factor US'},
-                {'ticker': 'SOXX', 'nombre': 'iShares Semiconductor', 'view': _sector_view(['technology', 'semiconductors', 'tech']), 'rationale': 'AI capex / semiconductors'},
-                {'ticker': 'XLI', 'nombre': 'Industrial Select SPDR', 'view': _sector_view(['industrials', 'industrial']), 'rationale': 'US industrials exposure'},
-                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': chile_view, 'rationale': 'Chile equity exposure'},
-                {'ticker': 'EWG', 'nombre': 'iShares MSCI Germany', 'view': europe_view, 'rationale': 'Europe / Germany equity exposure'},
-                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': em_view, 'rationale': 'Emerging markets equity exposure'},
+                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': us_view, 'rationale': 'Exposición core EE.UU., mercado amplio'},
+                {'ticker': 'IWB', 'nombre': 'iShares Russell 1000 Value', 'view': us_view, 'rationale': 'Factor valor EE.UU.'},
+                {'ticker': 'SOXX', 'nombre': 'iShares Semiconductor', 'view': _sector_view(['technology', 'semiconductors', 'tech']), 'rationale': 'Capex IA / semiconductores'},
+                {'ticker': 'XLI', 'nombre': 'Industrial Select SPDR', 'view': _sector_view(['industrials', 'industrial']), 'rationale': 'Exposición industriales EE.UU.'},
+                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': chile_view, 'rationale': 'Exposición renta variable Chile'},
+                {'ticker': 'EWG', 'nombre': 'iShares MSCI Germany', 'view': europe_view, 'rationale': 'Exposición Europa / Alemania'},
+                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': em_view, 'rationale': 'Exposición mercados emergentes'},
             ],
             'renta_fija': [
-                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': _fi_view(['0-2y', 'short', 'corto', 'treasury bills', 't-bills'], '0-2Y'), 'rationale': 'Cash-like, T-Bill exposure'},
-                {'ticker': 'SHY', 'nombre': 'iShares 1-3 Year Treasury', 'view': _fi_view(['0-2y', 'short', 'corto'], '0-2Y'), 'rationale': 'Short duration treasury'},
-                {'ticker': 'VMBS', 'nombre': 'Vanguard MBS ETF', 'view': _fi_view(['mbs', 'agency', 'mortgage'], '2-5Y'), 'rationale': 'MBS spread exposure'},
-                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': _fi_view(['ig', 'investment grade', 'ig credit'], '2-5Y'), 'rationale': 'Investment grade corporate'},
-                {'ticker': 'TLT', 'nombre': 'iShares 20+ Year Treasury', 'view': _fi_view(['10y+', '10+', 'ultra long', 'long'], '10Y+'), 'rationale': 'Long duration treasury'},
-                {'ticker': 'HYG', 'nombre': 'iShares High Yield Corp', 'view': _fi_view(['hy', 'high yield', 'hy credit']), 'rationale': 'High yield corporate'},
+                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': _fi_view(['0-2y', 'short', 'corto', 'treasury bills', 't-bills'], '0-2Y'), 'rationale': 'Cuasi-efectivo, letras del Tesoro'},
+                {'ticker': 'SHY', 'nombre': 'iShares 1-3 Year Treasury', 'view': _fi_view(['0-2y', 'short', 'corto'], '0-2Y'), 'rationale': 'Tesoro corta duración'},
+                {'ticker': 'VMBS', 'nombre': 'Vanguard MBS ETF', 'view': _fi_view(['mbs', 'agency', 'mortgage'], '2-5Y'), 'rationale': 'Exposición spread MBS'},
+                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': _fi_view(['ig', 'investment grade', 'ig credit'], '2-5Y'), 'rationale': 'Bonos corporativos grado inversión'},
+                {'ticker': 'TLT', 'nombre': 'iShares 20+ Year Treasury', 'view': _fi_view(['10y+', '10+', 'ultra long', 'long'], '10Y+'), 'rationale': 'Tesoro larga duración'},
+                {'ticker': 'HYG', 'nombre': 'iShares High Yield Corp', 'view': _fi_view(['hy', 'high yield', 'hy credit']), 'rationale': 'Bonos corporativos high yield'},
             ],
             'commodities': [
-                {'ticker': 'CPER', 'nombre': 'US Copper Index Fund', 'view': comm_views.get('Cobre', 'N/D'), 'rationale': 'Copper exposure'},
-                {'ticker': 'COPX', 'nombre': 'Global X Copper Miners', 'view': comm_views.get('Cobre', 'N/D'), 'rationale': 'Copper miners'},
-                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': comm_views.get('Oro', 'N/D'), 'rationale': 'Gold hedge'},
-                {'ticker': 'USO', 'nombre': 'US Oil Fund', 'view': comm_views.get('Petróleo', 'N/D'), 'rationale': 'Oil exposure'},
-                {'ticker': 'UUP', 'nombre': 'Invesco DB US Dollar', 'view': _fx_view(['USD/CLP', 'DXY']), 'rationale': 'USD exposure'},
+                {'ticker': 'CPER', 'nombre': 'US Copper Index Fund', 'view': comm_views.get('Cobre', 'N/D'), 'rationale': 'Exposición cobre'},
+                {'ticker': 'COPX', 'nombre': 'Global X Copper Miners', 'view': comm_views.get('Cobre', 'N/D'), 'rationale': 'Mineras de cobre'},
+                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': comm_views.get('Oro', 'N/D'), 'rationale': 'Cobertura oro'},
+                {'ticker': 'USO', 'nombre': 'US Oil Fund', 'view': comm_views.get('Petróleo', 'N/D'), 'rationale': 'Exposición petróleo'},
+                {'ticker': 'UUP', 'nombre': 'Invesco DB US Dollar', 'view': _fx_view(['USD/CLP', 'DXY']), 'rationale': 'Exposición dólar'},
             ]
         }
 
@@ -3560,16 +3589,16 @@ class AssetAllocationContentGenerator:
         # Minimal fallback with N (neutral) instead of N/D
         return {
             'renta_variable': [
-                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': 'N', 'rationale': 'Core US — análisis basado en datos cuantitativos'},
-                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': 'N', 'rationale': 'Chile equity — análisis basado en datos cuantitativos'},
-                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': 'N', 'rationale': 'EM exposure — análisis basado en datos cuantitativos'},
+                {'ticker': 'SPY', 'nombre': 'SPDR S&P 500 ETF', 'view': 'N', 'rationale': 'Core EE.UU. — análisis basado en datos cuantitativos'},
+                {'ticker': 'ECH', 'nombre': 'iShares MSCI Chile', 'view': 'N', 'rationale': 'Renta variable Chile — análisis basado en datos cuantitativos'},
+                {'ticker': 'EEM', 'nombre': 'iShares MSCI EM', 'view': 'N', 'rationale': 'Mercados emergentes — análisis basado en datos cuantitativos'},
             ],
             'renta_fija': [
-                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': 'N', 'rationale': 'Cash-like — análisis basado en datos cuantitativos'},
-                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': 'N', 'rationale': 'IG credit — análisis basado en datos cuantitativos'},
+                {'ticker': 'BIL', 'nombre': 'SPDR Bloomberg T-Bill', 'view': 'N', 'rationale': 'Cuasi-efectivo — análisis basado en datos cuantitativos'},
+                {'ticker': 'LQD', 'nombre': 'iShares IG Corporate', 'view': 'N', 'rationale': 'Crédito grado inversión — análisis basado en datos cuantitativos'},
             ],
             'commodities': [
-                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'N', 'rationale': 'Gold hedge — análisis basado en datos cuantitativos'},
+                {'ticker': 'GLD', 'nombre': 'SPDR Gold Shares', 'view': 'N', 'rationale': 'Cobertura oro — análisis basado en datos cuantitativos'},
             ]
         }
 
