@@ -142,18 +142,24 @@
 
 **Resultado:** Datos BCCh con fechas correctas, tablas con headers correctos, escenarios suman 100%, cobre coherente, código interno no visible.
 
+### Sprint 8 — P1 Content Fixes (2026-03-23)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 59 | RF trades duplicados entre Sección 3 y 7 | `templates/rf_report_professional.html` | Removido duplicado S3; S7 es canónico |
+| 60 | RF `FAIR_VALUE`/`EXPENSIVE` enum raw | `rf_content_generator.py` | `_translate_signal()` → "Valor Justo"/"Caro"/"Barato" |
+| 61 | RF badge UW styled como neutral | `rf_report_renderer.py` + template | `{{hy_badge_class}}` dinámico vía `_get_view_class()` |
+| 62 | RV narrativas garbled (sector Preferidos/Evitar) | `rv_content_generator.py` | Sentence-aware extraction + `_truncate_at_sentence()` helper |
+| 63 | RV catalysts truncado (max_tokens 300) | `rv_content_generator.py` | max_tokens 300→500 |
+| 64 | AA tabla macro indicadores vacía | `asset_allocation_content_generator.py` | Keys corregidos: gdp_qoq, cpi_core_yoy, retail_sales.yoy |
+| 65 | AA dashboard flechas todas → | `asset_allocation_content_generator.py` | `_arrow_from_view()`: OW→↑, UW→↓, N→→ |
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
 |-----------|-----|---------|
 | P1 | CPI subcomponents vacío (sin fuente FRED simple) | Macro chart vacío |
 | P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
-| P1 | RV 6+ narrativas truncadas mid-sentence (max_tokens bajo) | Contenido cortado |
-| P1 | RF trades duplicados entre Sección 3 y 7 | Contenido repetido |
-| P1 | RF `FAIR_VALUE`/`EXPENSIVE` enum raw en columna signal | Código visible |
-| P1 | RF badge UW styled como neutral (line 846) | Badge color incorrecto |
-| P1 | AA tabla macro indicadores 4 filas vacías (em-dash) | Sección vacía |
-| P1 | AA dashboard flechas todas → (sin cambios) | Info faltante |
 | P2 | ~48 acentos faltantes (RF 12, AA 20+, RV 13, Macro 3) | Cosmético |
 | P2 | ~58 labels en inglés que deberían ser español | Idioma mixto |
 | P2 | Macro Litio $18.25/ton (unidad incorrecta, es USD/kg) | Dato confuso |
