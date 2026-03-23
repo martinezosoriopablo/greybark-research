@@ -153,7 +153,7 @@ def compare_market_vs_encuesta(current_tpm: float = 5.00) -> Dict:
 # =============================================================================
 
 if __name__ == "__main__":
-    report = compare_market_vs_encuesta(current_tpm=5.00)
+    report = compare_market_vs_encuesta(current_tpm=4.50)
     
     import json
     print("\n\nJSON Output:")

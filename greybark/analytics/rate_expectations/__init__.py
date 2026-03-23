@@ -19,10 +19,10 @@ Usage:
     )
     
     # Fed Funds expectations
-    fed_report = generate_fed_expectations(current_fed_funds=4.50)
+    fed_report = generate_fed_expectations(current_fed_funds=3.75)
     
     # TPM expectations
-    tpm_report = generate_tpm_expectations(current_tpm=5.00)
+    tpm_report = generate_tpm_expectations(current_tpm=4.50)
     
     # Comparisons
     dots_comparison = compare_market_vs_fed_dots()

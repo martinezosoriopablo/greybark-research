@@ -20,7 +20,7 @@ from ...utils.quantlib_helpers import (
 from ...config import SOFR_FED_SPREAD
 
 
-def generate_fed_expectations(current_fed_funds: float = 4.50,
+def generate_fed_expectations(current_fed_funds: float = 3.75,
                                num_meetings: int = 12) -> Dict:
     """
     Generate Fed Funds rate expectations report
@@ -180,7 +180,7 @@ def get_market_rate_for_year_end(sofr_rates: Dict[str, float], year: int) -> Opt
 # =============================================================================
 
 if __name__ == "__main__":
-    report = generate_fed_expectations(current_fed_funds=4.50)
+    report = generate_fed_expectations(current_fed_funds=3.75)
     
     import json
     print("\n\nJSON Output:")

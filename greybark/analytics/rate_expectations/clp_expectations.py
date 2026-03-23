@@ -18,7 +18,7 @@ from ...utils.quantlib_helpers import (
 )
 
 
-def generate_tpm_expectations(current_tpm: float = 5.00,
+def generate_tpm_expectations(current_tpm: float = 4.50,
                                num_meetings: int = 12) -> Dict:
     """
     Generate TPM (Chile) rate expectations report
@@ -175,7 +175,7 @@ def get_market_rate_by_months(spc_rates: Dict[str, float], months: int) -> Optio
 # =============================================================================
 
 if __name__ == "__main__":
-    report = generate_tpm_expectations(current_tpm=5.00)
+    report = generate_tpm_expectations(current_tpm=4.50)
     
     import json
     print("\n\nJSON Output:")

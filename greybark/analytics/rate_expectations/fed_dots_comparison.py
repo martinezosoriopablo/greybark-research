@@ -14,7 +14,7 @@ from ...utils.quantlib_helpers import (
 from ...config import SOFR_FED_SPREAD
 
 
-def compare_market_vs_fed_dots(current_fed_funds: float = 4.50) -> Dict:
+def compare_market_vs_fed_dots(current_fed_funds: float = 3.75) -> Dict:
     """
     Compare market rate expectations vs FOMC Dot Plot
     
@@ -174,7 +174,7 @@ def compare_market_vs_fed_dots(current_fed_funds: float = 4.50) -> Dict:
 # =============================================================================
 
 if __name__ == "__main__":
-    report = compare_market_vs_fed_dots(current_fed_funds=4.50)
+    report = compare_market_vs_fed_dots(current_fed_funds=3.75)
     
     import json
     print("\n\nJSON Output:")

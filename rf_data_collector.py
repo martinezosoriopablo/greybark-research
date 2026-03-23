@@ -54,11 +54,47 @@ class RFDataCollector:
     """Recopila datos cuantitativos de renta fija desde múltiples fuentes."""
 
     def __init__(self, verbose: bool = True,
-                 current_fed_funds: float = 4.50,
-                 current_tpm: float = 5.00):
+                 current_fed_funds: float = None,
+                 current_tpm: float = None):
         self.verbose = verbose
-        self.current_fed_funds = current_fed_funds
-        self.current_tpm = current_tpm
+        # Auto-fetch current rates from APIs if not provided
+        self.current_fed_funds = current_fed_funds or self._fetch_current_fed_funds()
+        self.current_tpm = current_tpm or self._fetch_current_tpm()
+
+    def _fetch_current_tpm(self) -> float:
+        """Fetch current TPM from BCCh API. Fallback 4.50%."""
+        try:
+            from greybark.data_sources.bcch_client import BCChClient
+            client = BCChClient()
+            df = client.get_series('F022.TPM.TIN.D001.NO.Z.D', days_back=60)
+            if df is not None and not df.empty:
+                val = float(df.iloc[-1])
+                if 0 < val < 20:
+                    self._print(f"  [BCCh] TPM actual: {val}%")
+                    return val
+        except Exception:
+            pass
+        self._print("  [WARN] TPM: usando fallback 4.50%")
+        return 4.50
+
+    def _fetch_current_fed_funds(self) -> float:
+        """Fetch current Fed Funds from FRED. Fallback 4.50%."""
+        try:
+            from datetime import timedelta
+            from greybark.data_sources.fred_client import FREDClient
+            from datetime import date as dt_date
+            client = FREDClient()
+            start = dt_date.today() - timedelta(days=60)
+            df = client.get_series('DFF', start_date=start)
+            if df is not None and not df.empty:
+                val = float(df.iloc[-1])
+                if 0 <= val < 20:
+                    self._print(f"  [FRED] Fed Funds actual: {val}%")
+                    return val
+        except Exception:
+            pass
+        self._print("  [WARN] Fed Funds: usando fallback 4.50%")
+        return 4.50
 
     def _print(self, msg: str):
         if self.verbose:
