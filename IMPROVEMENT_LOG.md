@@ -67,6 +67,18 @@
 | 22 | Oil $100 fabricado sin corrección (sin pattern WTI/Brent) | `narrative_engine.py` _LABEL_PATTERNS | Agregado oil/WTI/Brent/petróleo + KEY_SOURCE_MAP + verified builders |
 | 23 | Badge CSS: OW/UW solo inglés, council output en español | `rf_report_renderer.py`, `rv_report_renderer.py`, `asset_allocation_renderer.py` | `_get_view_class()` acepta Sobreponderar/Subponderar + `_sanitize_css_class` mapea español |
 
+### Sprint 3 — Forecast Engine + Commodity Data (2026-03-21)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 24 | BCCh commodity data 3-7 semanas stale (oil $70 vs real $106) | `chart_data_provider.py` | `_append_spot_if_stale()` agrega yfinance spot si BCCh >35 días |
+| 25 | S&P 500 retorno esperado +21.8% (solo 2/5 modelos) | `forecast_engine.py` | PE keys forward_pe→pe_forward fallback + derive from trailing |
+| 26 | Consensus model usa 50DMA en vez de precio actual → +79.5% | `forecast_engine.py` | `_get_etf_price()` via yfinance + sanity cap ±30% |
+| 27 | Regime siempre "UNKNOWN" (key mismatch collector→classifier) | `council_data_collector.py:78` | `regime.get('regime')` → `regime.get('classification')` |
+| 28 | EuroStoxx ticker FEZ no matchea equity_data EFA | `forecast_engine.py:65` | EQUITY_UNIVERSE eurostoxx ticker FEZ→EFA |
+
+**Resultado:** S&P 500 ahora +5.1% con 5/5 modelos (era +21.8% con 2/5)
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
@@ -76,6 +88,17 @@
 | P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
 | P1 | Tabla de escenarios vacía en AA | Sección crítica sin contenido |
 | P2 | Acentos faltantes en contenido dinámico (no template) | Cosmético |
+
+### Validación — Pipeline 2026-03-22 (post Sprint 3 forecast)
+- [x] Forecast engine: 5/5 modelos S&P 500 OK (+2.4%, era +21.8%)
+- [x] Regime: MODERATE_GROWTH (era UNKNOWN)
+- [x] Europa ticker EFA match equity_data (era FEZ mismatch)
+- [x] Consensus model: yfinance price + ±30% cap (era 50DMA → +79.5%)
+- [x] Commodity data: yfinance spot enrichment para BCCh stale >35d
+- [x] RV report: retornos S&P +2.4%, Europa +6.9%, Nikkei +8.5%, Chile +9.8%
+- [x] AA report regenerado con forecasts corregidos
+- [x] Macro: 24 charts (2.8MB)
+- [ ] Revisión visual pendiente: 4 reportes
 
 ### Validación — Pipeline 2026-03-21 (post Sprint 2 sistémicos)
 - [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (43.6 min)

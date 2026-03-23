@@ -75,11 +75,11 @@ class CouncilDataCollector:
             from greybark.analytics.regime_classification import classify_regime
             regime = classify_regime()
             return {
-                'current_regime': regime.get('regime', 'UNKNOWN'),
+                'current_regime': regime.get('classification', 'UNKNOWN'),
                 'score': regime.get('score', 0),
                 'description': regime.get('description', ''),
                 'probabilities': regime.get('probabilities', {}),
-                'indicators': regime.get('indicator_scores', {})
+                'indicators': regime.get('scores', {})
             }
         try:
             self._print("  -> Regime classification...")

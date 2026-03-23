@@ -62,7 +62,7 @@ ERP = {
 # ETF universe for equity targets
 EQUITY_UNIVERSE = {
     'sp500':     {'ticker': 'SPY', 'name': 'S&P 500',      'region': 'us',     'erp': 4.0},
-    'eurostoxx': {'ticker': 'FEZ', 'name': 'EuroStoxx 50',  'region': 'europe', 'erp': 4.5},
+    'eurostoxx': {'ticker': 'EFA', 'name': 'EAFE/Europa',    'region': 'europe', 'erp': 4.5},
     'nikkei':    {'ticker': 'EWJ', 'name': 'Nikkei 225',    'region': 'japan',  'erp': 4.5},
     'csi300':    {'ticker': 'MCHI', 'name': 'CSI 300/China', 'region': 'china',  'erp': 6.0},
     'ipsa':      {'ticker': 'ECH', 'name': 'IPSA/Chile',    'region': 'chile',  'erp': 6.0},
@@ -72,7 +72,7 @@ EQUITY_UNIVERSE = {
 # Top holdings for analyst target consensus (per ETF)
 TOP_HOLDINGS = {
     'SPY': ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META'],
-    'FEZ': ['ASML', 'SAP', 'TTE', 'SIE', 'SAN', 'AI.PA'],
+    'EFA': ['ASML', 'SAP', 'TTE', 'SIE', 'SAN', 'AI.PA'],
     'EWJ': ['TM', 'SONY', 'MUFG', 'HMC', 'SMFG', 'NTT'],
     'MCHI': ['BABA', 'TCEHY', 'PDD', 'JD', 'BIDU', 'NIO'],
     'ECH': [],   # No liquid US-listed Chilean stocks for AV
@@ -1244,8 +1244,14 @@ class ForecastEngine:
                         valuations = reg_val
                         break
 
-        forward_pe = self._safe_float(valuations.get('forward_pe'))
-        trailing_pe = self._safe_float(valuations.get('trailing_pe'))
+        forward_pe = self._safe_float(
+            valuations.get('forward_pe') or valuations.get('pe_forward'))
+        trailing_pe = self._safe_float(
+            valuations.get('trailing_pe') or valuations.get('pe_trailing'))
+
+        # ETFs often lack forward PE — estimate from trailing with growth discount
+        if forward_pe is None and trailing_pe is not None and trailing_pe > 0:
+            forward_pe = round(trailing_pe * 0.92, 2)  # ~8% earnings growth assumption
 
         models = {}
         model_returns = {}
@@ -1443,9 +1449,14 @@ class ForecastEngine:
                     resp = requests.get(url, timeout=10)
                     data = resp.json()
                     target = self._safe_float(data.get('AnalystTargetPrice'))
-                    price = self._safe_float(data.get('50DayMovingAverage'))
+                    # Use current price from yfinance, not stale 50DMA from AV
+                    price = self._get_etf_price(stock)
+                    if price is None:
+                        price = self._safe_float(data.get('50DayMovingAverage'))
                     if target and price and price > 0:
                         ret = ((target / price) - 1) * 100
+                        # Sanity cap: analyst targets rarely imply >30% or <-30% 12M
+                        ret = max(-30, min(30, ret))
                         returns.append(ret)
                 except Exception:
                     continue
