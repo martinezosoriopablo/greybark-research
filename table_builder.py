@@ -830,7 +830,7 @@ def build_forecast_rows(data: List[Dict], vs_class_fn=None) -> str:
 
 def build_calendar_rows(events: List[Dict]) -> str:
     """
-    Build calendar rows: Fecha | Evento | Relevancia | Impacto
+    Build calendar rows: Fecha | Evento | Relevancia
     Used in all 4 reports.
     """
     rows = ""
@@ -838,11 +838,9 @@ def build_calendar_rows(events: List[Dict]) -> str:
         rel = e.get("relevancia", "")
         rel_class = "relevancia-alta" if rel == "Alta" else "relevancia-media" if rel == "Media" else ""
         css = f' class="{rel_class}"' if rel_class else ""
-        impacto = e.get("impacto_potencial", e.get("impacto", ""))
         rows += (f"<tr><td>{fmt_bold(e.get('fecha', ''))}</td>"
                  f"<td>{e.get('evento', '')}</td>"
-                 f"<td{css} style='text-align:center'>{rel}</td>"
-                 f"<td>{impacto}</td></tr>\n")
+                 f"<td{css} style='text-align:center'>{rel}</td></tr>\n")
     return rows
 
 

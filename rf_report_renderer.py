@@ -344,11 +344,13 @@ class RFReportRenderer:
 
         hc = em['hard_currency']
         replacements['{{em_hc_view}}'] = hc['view']
+        replacements['{{em_hc_class}}'] = self._get_view_class(hc['view'])
         replacements['{{em_hc_spread}}'] = hc['spread']
         replacements['{{em_hc_yield}}'] = hc['yield']
 
         lc = em['local_currency']
         replacements['{{em_lc_view}}'] = lc['view']
+        replacements['{{em_lc_class}}'] = self._get_view_class(lc['view'])
 
         country_rows = ''
         for c in em['por_pais']:

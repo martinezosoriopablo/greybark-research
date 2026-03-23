@@ -377,8 +377,8 @@ class RFContentGenerator:
 
         return [
             dur_call,
-            f"Credito IG: {ig_v} - carry de {ig_yield_str}",
-            f"Credito HY: {hy_v} - spreads en {hy_spread_str}",
+            f"Crédito IG: {ig_v} - carry de {ig_yield_str}",
+            f"Crédito HY: {hy_v} - spreads en {hy_spread_str}",
         ]
 
     # =========================================================================
@@ -2807,7 +2807,7 @@ class RFContentGenerator:
                 {'dimension': 'HY Credit', 'recomendacion': hy_v},
                 {'dimension': 'EM Hard Currency', 'recomendacion': em_v},
                 {'dimension': 'EM Local Currency', 'recomendacion': em_v},
-                {'dimension': 'Inflacion/TIPS', 'recomendacion': 'NEUTRAL'},
+                {'dimension': 'Inflación/TIPS', 'recomendacion': 'NEUTRAL'},
                 {'dimension': 'Chile Soberanos', 'recomendacion': chile_rec},
             ],
             'mensaje_clave': self._generate_rf_positioning_message()

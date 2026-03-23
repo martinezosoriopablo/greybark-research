@@ -118,53 +118,76 @@ class AssetAllocationContentGenerator:
         c = {}
 
         # --- Equity PEs (authoritative) ---
-        pe_spx = self._q('equity', 'valuations', 'us', 'pe')
+        # equity_data stores pe_forward / pe_trailing, not 'pe'
+        pe_spx = (self._q('equity', 'valuations', 'us', 'pe_forward')
+                  or self._q('equity', 'valuations', 'us', 'pe_trailing')
+                  or self._q('equity', 'valuations', 'us', 'pe'))
         if pe_spx is None:
             pe_spx = self._bbg_val('pe_spx')
-        pe_stoxx = self._q('equity', 'valuations', 'europe', 'pe')
+        pe_stoxx = (self._q('equity', 'valuations', 'europe', 'pe_forward')
+                    or self._q('equity', 'valuations', 'europe', 'pe_trailing')
+                    or self._q('equity', 'valuations', 'europe', 'pe'))
         if pe_stoxx is None:
             pe_stoxx = self._bbg_val('pe_stoxx600')
-        pe_em = self._q('equity', 'valuations', 'em', 'pe')
+        pe_em = (self._q('equity', 'valuations', 'em', 'pe_forward')
+                 or self._q('equity', 'valuations', 'em', 'pe_trailing')
+                 or self._q('equity', 'valuations', 'em', 'pe'))
         if pe_em is None:
             pe_em = self._bbg_val('pe_msci_em')
-        pe_ipsa = self._q('equity', 'valuations', 'chile', 'pe')
+        pe_ipsa = (self._q('equity', 'valuations', 'chile', 'pe_forward')
+                   or self._q('equity', 'valuations', 'chile', 'pe_trailing')
+                   or self._q('equity', 'valuations', 'chile', 'pe'))
         if pe_ipsa is None:
             pe_ipsa = self._bbg_val('pe_ipsa')
-        pe_japan = self._q('equity', 'valuations', 'japan', 'pe')
-        c['pe_spx'] = pe_spx
-        c['pe_stoxx'] = pe_stoxx
-        c['pe_em'] = pe_em
-        c['pe_ipsa'] = pe_ipsa
-        c['pe_japan'] = pe_japan
+        pe_japan = (self._q('equity', 'valuations', 'japan', 'pe_forward')
+                    or self._q('equity', 'valuations', 'japan', 'pe_trailing')
+                    or self._q('equity', 'valuations', 'japan', 'pe'))
+        c['pe_spx'] = self._safe_float(pe_spx)
+        c['pe_stoxx'] = self._safe_float(pe_stoxx)
+        c['pe_em'] = self._safe_float(pe_em)
+        c['pe_ipsa'] = self._safe_float(pe_ipsa)
+        c['pe_japan'] = self._safe_float(pe_japan)
 
         # --- Rates (authoritative) ---
-        c['ust_2y'] = self._q('yield_curve', 'us_2y') or self._q('chile_rates', 'ust_2y')
-        c['ust_10y'] = self._q('yield_curve', 'us_10y') or self._q('chile_rates', 'ust_10y')
-        c['tpm'] = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
+        # yield_curve stores current_curve.2Y / .10Y, not us_2y/us_10y
+        c['ust_2y'] = self._safe_float(
+            self._q('yield_curve', 'current_curve', '2Y')
+            or self._q('yield_curve', 'us_2y')
+            or self._q('chile_rates', 'ust_2y'))
+        c['ust_10y'] = self._safe_float(
+            self._q('yield_curve', 'current_curve', '10Y')
+            or self._q('yield_curve', 'us_10y')
+            or self._q('chile_rates', 'ust_10y'))
+        # TPM: chile_rates.tpm is {'current': 4.5}, unwrap
+        tpm_raw = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
+        c['tpm'] = self._safe_float(
+            tpm_raw.get('current') if isinstance(tpm_raw, dict) else tpm_raw)
 
         # --- Spreads ---
         c['ig_spread'] = self._q('credit_spreads', 'ig_breakdown', 'total', 'current_bps')
         c['hy_spread'] = self._q('credit_spreads', 'hy_breakdown', 'total', 'current_bps')
 
         # --- VIX (single authoritative value) ---
+        # VIX is stored as {'current': 26.78, ...} in risk and chile_rates — unwrap
         vix = self._q('risk', 'vix')
         if vix is None:
             vix = self._q('chile_rates', 'vix')
         if vix is None:
             vix = self._q('equity', 'risk', 'vix')
+        if isinstance(vix, dict):
+            vix = vix.get('current')
         c['vix'] = self._safe_float(vix)
 
         # --- Commodities (authoritative prices) ---
-        c['copper'] = self._q('equity', 'bcch_indices', 'copper', 'value')
-        gold = self._q('equity', 'bcch_indices', 'gold', 'value')
-        c['gold'] = self._safe_float(gold)
-        oil = self._q('equity', 'bcch_indices', 'oil_wti', 'value')
-        c['oil_wti'] = self._safe_float(oil)
+        c['copper'] = self._safe_float(self._q('equity', 'bcch_indices', 'copper', 'value'))
+        c['gold'] = self._safe_float(self._q('equity', 'bcch_indices', 'gold', 'value'))
+        c['oil_wti'] = self._safe_float(self._q('equity', 'bcch_indices', 'oil_wti', 'value'))
 
         # --- Breakevens (authoritative, single value) ---
-        be5 = self._q('inflation', 'breakevens', '5y') or self._q('chile_rates', 'breakeven_5y')
-        if be5 is None:
-            be5 = self._q('rf_data', 'inflation', 'breakeven_5y')
+        # RF data: inflation.breakeven_inflation.current.breakeven_5y
+        be5 = (self._q('inflation', 'breakeven_inflation', 'current', 'breakeven_5y')
+               or self._q('inflation', 'breakevens', '5y')
+               or self._q('chile_rates', 'breakeven_5y'))
         c['breakeven_5y'] = self._safe_float(be5)
 
         # --- FX ---
@@ -240,8 +263,10 @@ class AssetAllocationContentGenerator:
         else:
             c['stagflation_high'] = False
 
-        # Brazil SELIC trigger check
-        selic = self._q('chile_rates', 'selic') or self._q('rf_data', 'chile_rates', 'selic')
+        # Brazil SELIC trigger check — stored under policy_rates.bcb
+        selic = (self._q('chile_rates', 'policy_rates', 'bcb')
+                 or self._q('chile_rates', 'selic')
+                 or self._q('rf_data', 'chile_rates', 'selic'))
         c['selic'] = self._safe_float(selic)
 
         return c
@@ -1275,14 +1300,22 @@ class AssetAllocationContentGenerator:
             except Exception:
                 pass
 
-        # Also try quant_data
+        # Also try quant_data, then canonical cache
         if tpm is None:
-            tpm = self._q('chile', 'tpm')
+            tpm_raw = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
+            tpm = self._safe_float(
+                tpm_raw.get('current') if isinstance(tpm_raw, dict) else tpm_raw)
+        if tpm is None:
+            tpm = self.canon.get('tpm')
         if ipc is None:
             ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
-        # Cobre fallback: quant_data (chile_rates or bcch_indices from equity data)
+        # Cobre fallback: quant_data → canonical cache
         if cobre is None:
-            cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
+            cobre = self._safe_float(
+                self._q('chile_rates', 'copper')
+                or self._q('equity', 'bcch_indices', 'copper', 'value'))
+        if cobre is None:
+            cobre = self.canon.get('copper')
 
         tpm_real = round(tpm - ipc, 1) if tpm is not None and ipc is not None else None
 
@@ -1995,11 +2028,19 @@ class AssetAllocationContentGenerator:
             except Exception:
                 pass
         if tpm is None:
-            tpm = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
+            tpm_raw = self._q('chile', 'tpm') or self._q('chile_rates', 'tpm')
+            tpm = self._safe_float(
+                tpm_raw.get('current') if isinstance(tpm_raw, dict) else tpm_raw)
+        if tpm is None:
+            tpm = self.canon.get('tpm')
         if ipc is None:
             ipc = self._q('chile', 'ipc_yoy') or self._q('chile', 'ipc') or self._q('chile_rates', 'ipc_yoy')
         if cobre is None:
-            cobre = self._q('chile_rates', 'copper') or self._q('equity', 'bcch_indices', 'copper', 'value')
+            cobre = self._safe_float(
+                self._q('chile_rates', 'copper')
+                or self._q('equity', 'bcch_indices', 'copper', 'value'))
+        if cobre is None:
+            cobre = self.canon.get('copper')
 
         tpm_real = round(tpm - ipc, 1) if tpm and ipc else None
 
