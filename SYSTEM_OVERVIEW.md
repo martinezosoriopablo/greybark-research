@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-20 (22 bugs resueltos, revisión visual Macro OK, pipeline 4/4 OK)
+> Última actualización: 2026-03-22 (32 bugs resueltos, 5 sprints, pipeline 4/4 OK)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -192,11 +192,11 @@ Plataforma automatizada de research de inversiones que genera **4 reportes mensu
 
 | Agente | Modelo | Max Tokens | Ve | Prompt |
 |--------|--------|------------|-----|--------|
-| **MACRO** | claude-sonnet-4-6 | 4000 | regime, macro_usa, inflation, chile, china, rates, leading indicators | `prompts/ias_macro.txt` |
-| **RV** | claude-sonnet-4-6 | 4000 | valuations, sectors, earnings, factors, risk (VIX, breadth) | `prompts/ias_rv.txt` |
-| **RF** | claude-sonnet-4-6 | 4000 | duration, yield_curve, credit_spreads, inflation, rates, expectations | `prompts/ias_rf.txt` |
-| **RIESGO** | claude-sonnet-4-6 | 4000 | risk scorecard (VIX, VaR, drawdown), breadth, EPU, credit | `prompts/ias_riesgo.txt` |
-| **GEO** | claude-sonnet-4-6 | 4000 | chile, china, international, commodities, intelligence themes | `prompts/ias_geo.txt` |
+| **MACRO** | claude-sonnet-4-6 | 6000 | regime, macro_usa, inflation, chile, china, rates, leading indicators | `prompts/ias_macro.txt` |
+| **RV** | claude-sonnet-4-6 | 6000 | valuations, sectors, earnings, factors, risk (VIX, breadth) | `prompts/ias_rv.txt` |
+| **RF** | claude-sonnet-4-6 | 6000 | duration, yield_curve, credit_spreads, inflation, rates, expectations | `prompts/ias_rf.txt` |
+| **RIESGO** | claude-sonnet-4-6 | 6000 | risk scorecard (VIX, VaR, drawdown), breadth, EPU, credit | `prompts/ias_riesgo.txt` |
+| **GEO** | claude-sonnet-4-6 | 6000 | chile, china, international, commodities, intelligence themes | `prompts/ias_geo.txt` |
 
 ### 4.2 Síntesis (Capa 2)
 
@@ -261,7 +261,7 @@ council_result + market_data + charts
 - Bloomberg Excel (3, OK): pmi_global, europe_pmi, china_trade
 - Otros: risk_matrix
 
-**RV (12 charts)**: regional_performance, pe_valuations, sector_heatmap, earnings_beat, style_box, correlation, vix_range, chile_ipsa_copper, credit_risk, drawdown, factor_radar, earnings_revisions
+**RV (12 charts)**: regional_performance, pe_valuations, sector_heatmap, earnings_beat, style_box, correlation, vix_range, chile_ipsa_copper, credit_risk, drawdown, factor_radar (yfinance fallback), earnings_revisions
 
 **RF (8 charts)**: yield_curve, credit_spreads, breakevens, chile_curves, policy_rates, fed_expectations, tpm_expectations, intl_yields
 
@@ -313,6 +313,17 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | Missing accents en 4 templates HTML (~50) | 4 templates HTML | Comité, Crédito, Región, Recomendación, glosarios, disclaimers | Sprint 1 |
 | US Fiscal section N/D (sin fuente FRED) | `chart_data_provider.py` + `macro_content_generator.py` | `get_usa_fiscal()` con 3 FRED series | `6f55067` |
 | China Trade chart 190 pts sin trim | `chart_generator.py:1764` | Trim a 120 meses consistente | `6f55067` |
+| `fed_rate` regex false positive | `narrative_engine.py:170` | Regex requiere "Funds"/"rate"/"tasa fed" | Sprint 2 |
+| Panel agents truncados (4000 tokens) | `ai_council_runner.py:54` | MAX_TOKENS 4000→6000 | Sprint 2 |
+| Oil fabricado sin corrección | `narrative_engine.py` | oil/WTI/Brent pattern + KEY_SOURCE_MAP | Sprint 2 |
+| Badge CSS solo inglés | `rf/rv/aa_report_renderer.py` | Sobreponderar/Subponderar acepta | Sprint 2 |
+| BCCh commodity data stale (3-7 semanas) | `chart_data_provider.py` | `_append_spot_if_stale()` yfinance | Sprint 3 |
+| S&P 500 +21.8% (2/5 modelos) | `forecast_engine.py` | PE key fallback + derive from trailing | Sprint 3 |
+| Consensus 79.5% (50DMA) | `forecast_engine.py` | yfinance current price + ±30% cap | Sprint 3 |
+| Regime "UNKNOWN" | `council_data_collector.py:78` | `classification` key fix | Sprint 3 |
+| EuroStoxx FEZ≠EFA | `forecast_engine.py:65` | FEZ→EFA en EQUITY_UNIVERSE | Sprint 3 |
+| Factor Performance "sin scores" | `rv_chart_generator.py` | yfinance factor fallback | Sprint 4 |
+| 24 acentos glosario RV | `templates/rv_report_professional.html` | Todos corregidos | Sprint 4 |
 
 ### 6.4 Bugs Conocidos (Activos)
 
@@ -320,7 +331,7 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 |-----|-----------|---------|--------|
 | BCU 2Y sin datos | BCCh API `F022.BUF.TIS.AN02.UF.Z.D` | Serie vacía → skip | Permanente (BCCh no publica) |
 | EMBI Chile sin datos | BCCh API `F019.EMBI.IND.CL.D` | Sin spread Chile directo | Usar BCRP client como fallback |
-| `fed_rate` inyectado en sentence de OAS | `narrative_engine.py` tagger | False positive en pattern matching (P1) | Pendiente refactor |
+| `fed_rate` false positive en OAS | `narrative_engine.py` tagger | Resuelto: regex requiere "Funds"/"rate"/"tasa fed" | ✅ Sprint 2 |
 
 ### 6.5 Datos Hardcodeados (Sin API)
 

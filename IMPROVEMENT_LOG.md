@@ -67,7 +67,7 @@
 | 22 | Oil $100 fabricado sin corrección (sin pattern WTI/Brent) | `narrative_engine.py` _LABEL_PATTERNS | Agregado oil/WTI/Brent/petróleo + KEY_SOURCE_MAP + verified builders |
 | 23 | Badge CSS: OW/UW solo inglés, council output en español | `rf_report_renderer.py`, `rv_report_renderer.py`, `asset_allocation_renderer.py` | `_get_view_class()` acepta Sobreponderar/Subponderar + `_sanitize_css_class` mapea español |
 
-### Sprint 3 — Forecast Engine + Commodity Data (2026-03-21)
+### Sprint 3 — Forecast Engine + Commodity Data (2026-03-22)
 
 | # | Bug | Archivo | Fix |
 |---|-----|---------|-----|
@@ -77,28 +77,40 @@
 | 27 | Regime siempre "UNKNOWN" (key mismatch collector→classifier) | `council_data_collector.py:78` | `regime.get('regime')` → `regime.get('classification')` |
 | 28 | EuroStoxx ticker FEZ no matchea equity_data EFA | `forecast_engine.py:65` | EQUITY_UNIVERSE eurostoxx ticker FEZ→EFA |
 
-**Resultado:** S&P 500 ahora +5.1% con 5/5 modelos (era +21.8% con 2/5)
+**Resultado:** S&P 500 ahora +2.4% con 5/5 modelos (era +21.8% con 2/5)
+
+### Sprint 4 — Revisión Visual RV (2026-03-22)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 29 | Factor Performance "sin scores" (AV falla para ETFs) | `rv_chart_generator.py` | `_compute_yf_factor_scores()` fallback via yfinance (momentum, value, quality, growth) |
+| 30 | 24 acentos faltantes en glosario RV | `templates/rv_report_professional.html` | sobreponderación, índice, relación, acción, etc. |
+| 31 | Título "Analisis Sectorial" sin acento | `templates/rv_report_professional.html` | → "Análisis Sectorial" |
+| 32 | "Que cambiaria:" sin acentos ni signos | `rv_report_renderer.py:358` | → "¿Qué cambiaría?" |
+
+**Resultado:** RV ahora 12/12 charts, 0 placeholders, glosario correcto
 
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
 |-----------|-----|---------|
 | P1 | CPI subcomponents vacío (sin fuente FRED simple) | Macro chart vacío |
-| P1 | `[Seccion incompleta]` markers visibles en RV HTML | Texto visible al cliente |
 | P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
 | P1 | Tabla de escenarios vacía en AA | Sección crítica sin contenido |
-| P2 | Acentos faltantes en contenido dinámico (no template) | Cosmético |
+| P2 | Acentos faltantes en contenido dinámico LLM (no template) | Cosmético |
 
-### Validación — Pipeline 2026-03-22 (post Sprint 3 forecast)
+### Validación — Pipeline 2026-03-22 (post Sprint 4 RV visual)
 - [x] Forecast engine: 5/5 modelos S&P 500 OK (+2.4%, era +21.8%)
 - [x] Regime: MODERATE_GROWTH (era UNKNOWN)
 - [x] Europa ticker EFA match equity_data (era FEZ mismatch)
 - [x] Consensus model: yfinance price + ±30% cap (era 50DMA → +79.5%)
 - [x] Commodity data: yfinance spot enrichment para BCCh stale >35d
-- [x] RV report: retornos S&P +2.4%, Europa +6.9%, Nikkei +8.5%, Chile +9.8%
+- [x] RV: **12/12 charts**, 0 placeholders, retornos S&P +2.4%, Europa +6.9%, Chile +9.8%
+- [x] RV glosario: 24 acentos corregidos + título sección + "¿Qué cambiaría?"
 - [x] AA report regenerado con forecasts corregidos
 - [x] Macro: 24 charts (2.8MB)
-- [ ] Revisión visual pendiente: 4 reportes
+- [x] Pipeline: 4/4 reportes OK (34.9 min)
+- [ ] Revisión visual pendiente: RF, AA
 
 ### Validación — Pipeline 2026-03-21 (post Sprint 2 sistémicos)
 - [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (43.6 min)

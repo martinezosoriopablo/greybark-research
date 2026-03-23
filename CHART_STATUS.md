@@ -1,17 +1,22 @@
 # Chart Data Sources — Greybark Research
 
-Last updated: 2026-03-19
+Last updated: 2026-03-22
 
 ## Summary
 
 | Report | Total Charts | 100% Real | Partial Real | Fallback/Estimated |
 |--------|-------------|-----------|-------------|-------------------|
-| Macro  | 22          | 14        | 3           | 5                 |
+| Macro  | 24          | 16        | 3           | 5                 |
 | RV     | 12          | 12        | 0           | 0                 |
 | RF     | 8           | 8         | 0           | 0                 |
-| **Total** | **42**   | **34**    | **3**       | **5**             |
+| **Total** | **44**   | **36**    | **3**       | **5**             |
 
-Real data percentage: **81%** (34/42)
+Real data percentage: **82%** (36/44)
+
+### Recent Changes (Sprint 3-4)
+- Commodity charts enriched with yfinance spot when BCCh data >35 days stale
+- Factor Performance chart: yfinance fallback (was placeholder "sin scores")
+- RV now 12/12 charts (was 11/12)
 
 ## Macro Report Charts (22)
 

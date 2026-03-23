@@ -272,7 +272,7 @@ ENIC omitido (PE distorsionado ~106x).
 | 11 | `rv_factor_radar` | Grouped horizontal bar | factors scores | S5 |
 | 12 | `rv_earnings_revisions` | Grouped bar | earnings upgrades/downgrades | S3 |
 
-**Nota:** `rv_factor_radar` muestra placeholder porque FactorAnalytics falla para ETFs (solo momentum funciona).
+**Nota:** `rv_factor_radar` usa yfinance fallback (`_compute_yf_factor_scores()`) cuando FactorAnalytics falla para ETFs. Scores: momentum (6M returns), value (inverse PE), quality (margins), growth (EPS growth).
 
 ---
 
@@ -347,7 +347,7 @@ Si un modelo no esta disponible, su peso se redistribuye proporcionalmente.
 | 4 | Consenso Analistas | 15% | AV (AnalystTargetPrice top 4 holdings) | Promedio ponderado targets |
 | 5 | Regimen Historico | 10% | RegimeClassifier + retornos historicos | Retorno 12M promedio en regimen actual |
 
-**Indices cubiertos:** SPY (S&P 500), FEZ (EuroStoxx), EWJ (Nikkei), MCHI (China), ECH (Chile), EWZ (Brasil)
+**Indices cubiertos:** SPY (S&P 500), EFA (EAFE/Europa), EWJ (Nikkei), MCHI (China), ECH (Chile), EWZ (Brasil)
 **ERP por region:** US 4%, Europa/Japon 4.5%, EM 6%
 **Senales:** OW >8%, N 3-8%, UW <3%
 **Confianza:** HIGH (spread <5%), MEDIUM (5-15%), LOW (>15%)
