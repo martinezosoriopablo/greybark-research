@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-22 (32 bugs resueltos, 5 sprints, pipeline 4/4 OK)
+> Última actualización: 2026-03-23 (48 bugs resueltos, 5 sprints + 5 sub-sprints, pipeline 4/4 OK)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -324,6 +324,16 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | EuroStoxx FEZ≠EFA | `forecast_engine.py:65` | FEZ→EFA en EQUITY_UNIVERSE | Sprint 3 |
 | Factor Performance "sin scores" | `rv_chart_generator.py` | yfinance factor fallback | Sprint 4 |
 | 24 acentos glosario RV | `templates/rv_report_professional.html` | Todos corregidos | Sprint 4 |
+| RF acentos: Crédito, Inflación, País, Centésimas | `rf_content_generator.py` + template | 6 correcciones | Sprint 5 |
+| EM badge hardcoded `badge-ow` para NEUTRAL | `rf_report_renderer.py` + template | Dynamic `{{em_hc_class}}`/`{{em_lc_class}}` | Sprint 5 |
+| AA acentos: Política, Geopolítica, Términos, etc. | `templates/asset_allocation_professional.html` | 7 correcciones | Sprint 5 |
+| AA PE siempre N/D (key `pe` → `pe_forward`) | `asset_allocation_content_generator.py` | Lookup chain: pe_forward→pe_trailing→pe | Sprint 5 |
+| AA VIX N/D (dict not unwrapped) | `asset_allocation_content_generator.py` | `.get('current')` unwrap | Sprint 5 |
+| AA TPM N/D (dict not unwrapped) | `asset_allocation_content_generator.py` | `.get('current')` unwrap + canon fallback | Sprint 5 |
+| AA UST yields N/D (wrong path) | `asset_allocation_content_generator.py` | `yield_curve.current_curve.2Y/10Y` | Sprint 5 |
+| AA SELIC N/D (wrong key) | `asset_allocation_content_generator.py` | `chile_rates.policy_rates.bcb` | Sprint 5 |
+| AA breakeven N/D (wrong path) | `asset_allocation_content_generator.py` | `inflation.breakeven_inflation.current.breakeven_5y` | Sprint 5 |
+| Calendar table 4 cols vs 3 header cols | `table_builder.py` | Removed orphan `impacto` column | Sprint 5 |
 
 ### 6.4 Bugs Conocidos (Activos)
 
@@ -331,7 +341,8 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 |-----|-----------|---------|--------|
 | BCU 2Y sin datos | BCCh API `F022.BUF.TIS.AN02.UF.Z.D` | Serie vacía → skip | Permanente (BCCh no publica) |
 | EMBI Chile sin datos | BCCh API `F019.EMBI.IND.CL.D` | Sin spread Chile directo | Usar BCRP client como fallback |
-| `fed_rate` false positive en OAS | `narrative_engine.py` tagger | Resuelto: regex requiere "Funds"/"rate"/"tasa fed" | ✅ Sprint 2 |
+| CPI subcomponents chart vacío | Macro chart | Sin fuente FRED simple | P1 |
+| Raw markdown leak en RF HTML | `rf_content_generator.py` | `**bold**`, `## headers` en HTML | P1 |
 
 ### 6.5 Datos Hardcodeados (Sin API)
 

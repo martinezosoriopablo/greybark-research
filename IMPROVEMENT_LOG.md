@@ -90,13 +90,40 @@
 
 **Resultado:** RV ahora 12/12 charts, 0 placeholders, glosario correcto
 
+### Sprint 5 — Revisión Visual RF + AA (2026-03-23)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 33 | "Credito IG/HY" sin acento en RF | `rf_content_generator.py` | → "Crédito IG" / "Crédito HY" |
+| 34 | "Inflacion/TIPS" sin acento | `rf_content_generator.py` | → "Inflación/TIPS" |
+| 35 | "Inflacion Implicita" sin acentos en RF template | `templates/rf_report_professional.html` | → "Inflación Implícita" |
+| 36 | "Riesgo Pais", "Views por Pais" sin acentos | `templates/rf_report_professional.html` | → "Riesgo País", "Views por País" |
+| 37 | "Centesimas" sin acento | `templates/rf_report_professional.html` | → "Centésimas" |
+| 38 | EM HC/LC badge hardcoded `badge-ow` para views NEUTRAL | `rf_report_renderer.py` + template | Dynamic `{{em_hc_class}}`/`{{em_lc_class}}` via `_get_view_class()` |
+| 39 | "Politica y Geopolitica" sin acentos en AA template | `templates/asset_allocation_professional.html` | → "Política y Geopolítica" |
+| 40 | "inflacion" sin acento en glosario AA | `templates/asset_allocation_professional.html` | → "inflación" |
+| 41 | 5 acentos faltantes en glosario AA | `templates/asset_allocation_professional.html` | Términos, sobreponderación, índice, expansión, contracción |
+| 42 | PE siempre N/D — key `pe` no existe, es `pe_forward`/`pe_trailing` | `asset_allocation_content_generator.py` | Lookup chain: pe_forward → pe_trailing → pe → bloomberg |
+| 43 | VIX siempre N/D — dict `{'current': 23.48}` pasado a `_safe_float` | `asset_allocation_content_generator.py` | Unwrap `.get('current')` antes de `_safe_float()` |
+| 44 | TPM siempre N/D — dict `{'current': 4.5}` no unwrapped | `asset_allocation_content_generator.py` | Unwrap `.get('current')` + canon fallback |
+| 45 | UST 2Y/10Y siempre N/D — path `yield_curve.us_2y` no existe | `asset_allocation_content_generator.py` | Path: `yield_curve.current_curve.2Y` / `.10Y` |
+| 46 | SELIC siempre N/D — key `chile_rates.selic` no existe | `asset_allocation_content_generator.py` | Path: `chile_rates.policy_rates.bcb` = 15.0% |
+| 47 | Breakeven 5Y siempre N/D — path incorrecto | `asset_allocation_content_generator.py` | Path: `inflation.breakeven_inflation.current.breakeven_5y` |
+| 48 | Calendar table 4 columnas vs 3 en template header | `table_builder.py` | Removed orphan `impacto` column (3-col: Fecha/Evento/Relevancia) |
+
+**Resultado:** 16/16 canonical data points ahora resuelven desde API real (era 0/16):
+- PE: SPX 25.7x, STOXX 17.4x, EM 14.7x, IPSA 13.0x, Japan 17.1x
+- Rates: UST 2Y 3.79%, 10Y 4.25%, TPM 4.5%
+- VIX 23.5, SELIC 15.0%, Breakeven 5Y 2.63%
+- Copper $5.57/lb, Gold $4607/oz, Oil $94.65/bbl
+- Spreads: IG 90bp, HY 327bp
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
 |-----------|-----|---------|
 | P1 | CPI subcomponents vacío (sin fuente FRED simple) | Macro chart vacío |
 | P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
-| P1 | Tabla de escenarios vacía en AA | Sección crítica sin contenido |
 | P2 | Acentos faltantes en contenido dinámico LLM (no template) | Cosmético |
 
 ### Validación — Pipeline 2026-03-22 (post Sprint 4 RV visual)
@@ -110,7 +137,9 @@
 - [x] AA report regenerado con forecasts corregidos
 - [x] Macro: 24 charts (2.8MB)
 - [x] Pipeline: 4/4 reportes OK (34.9 min)
-- [ ] Revisión visual pendiente: RF, AA
+- [x] RF: acentos + badge dinámico EM HC/LC (Sprint 5)
+- [x] AA: 16 data key fixes + acentos + calendar column (Sprint 5)
+- [ ] Regenerar RF + AA para verificar visualmente
 
 ### Validación — Pipeline 2026-03-21 (post Sprint 2 sistémicos)
 - [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (43.6 min)

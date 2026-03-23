@@ -446,3 +446,31 @@ Todos los charts y tablas siguen el patron:
 | China contenido (2/5 metodos) | **REAL** | BCCh API |
 | China contenido (property, credit, trade) | Hardcoded | Sin series BCCh |
 | PMI global chart | Hardcoded | PMI propietario |
+
+---
+
+## AA Report — Canonical Data Flow (asset_allocation_content_generator.py)
+
+El reporte AA combina datos de 3 fuentes en `aa_data` (construido en `run_monthly.py`):
+- `rf_data` (top-level keys: yield_curve, credit_spreads, inflation, chile_rates, ...)
+- `equity_data` (nested under `aa_data['equity']`: valuations, risk, bcch_indices, ...)
+- `macro_quant` (merged if not overlapping: chile, inflation, rates, ...)
+
+### Canonical Data Paths (Sprint 5 — 2026-03-23)
+
+| Dato | Path en quant_data | Notas |
+|------|-------------------|-------|
+| PE SPX | `equity.valuations.us.pe_forward` (fallback: `pe_trailing`) | NOT `pe` |
+| PE STOXX | `equity.valuations.europe.pe_forward` | idem |
+| PE EM/IPSA/Japan | `equity.valuations.{region}.pe_forward` | idem |
+| UST 2Y | `yield_curve.current_curve.2Y` | NOT `yield_curve.us_2y` |
+| UST 10Y | `yield_curve.current_curve.10Y` | idem |
+| TPM | `chile_rates.tpm.current` | Dict `{'current': 4.5}`, unwrap |
+| VIX | `chile_rates.vix.current` o `equity.risk.vix.current` | Dict, unwrap |
+| Copper | `equity.bcch_indices.copper.value` | Direct float |
+| Gold | `equity.bcch_indices.gold.value` | Direct float |
+| Oil WTI | `equity.bcch_indices.oil_wti.value` | Direct float |
+| Breakeven 5Y | `inflation.breakeven_inflation.current.breakeven_5y` | Nested 3 levels |
+| SELIC | `chile_rates.policy_rates.bcb` | NOT `chile_rates.selic` |
+| IG Spread | `credit_spreads.ig_breakdown.total.current_bps` | Already in bps |
+| HY Spread | `credit_spreads.hy_breakdown.total.current_bps` | Already in bps |
