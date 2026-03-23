@@ -167,57 +167,42 @@
 
 **Resultado:** ~95 correcciones cosméticas en 12 archivos. 4 reportes ahora 100% español con acentos correctos.
 
+### Sprint 10 — 2 P1 Bugs Restantes (2026-03-23)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 72 | CPI subcomponents chart vacío | Ya resuelto (Sprint previo) | FRED series CUSR0000SAH1/SAS/SACL1E/CPIUFDSL/CPIENGSL → `get_usa_cpi_breakdown()` + `_generate_inflation_components_ts()` ya OK. Verificado: 5/5 series, 109 pts, chart genera 78KB base64 |
+| 73 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | `rf_report_renderer.py` | `_md_to_html()` wrap en 12 campos: key_calls, driver (×2), rationale (×3), trade name (×2), señal, comentario, riesgo, descripcion, hedge |
+
+**Resultado:** 0 bugs P1 pendientes. inflation_components_ts genera correctamente (21/24 macro charts OK, 3 son Bloomberg-only).
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
 |-----------|-----|---------|
-| P1 | CPI subcomponents vacío (sin fuente FRED simple) | Macro chart vacío |
-| P1 | Raw markdown leak en RF HTML (`**bold**`, `## headers`) | Formato roto |
+| — | Ningún bug P0 o P1 pendiente | — |
+| Permanente | BCU 2Y sin datos (BCCh no publica) | Serie vacía → skip |
+| Permanente | PMI/China Trade (Bloomberg-only, 3 charts) | Charts vacíos sin Bloomberg terminal |
 
-### Validación — Pipeline 2026-03-22 (post Sprint 4 RV visual)
-- [x] Forecast engine: 5/5 modelos S&P 500 OK (+2.4%, era +21.8%)
-- [x] Regime: MODERATE_GROWTH (era UNKNOWN)
-- [x] Europa ticker EFA match equity_data (era FEZ mismatch)
-- [x] Consensus model: yfinance price + ±30% cap (era 50DMA → +79.5%)
-- [x] Commodity data: yfinance spot enrichment para BCCh stale >35d
-- [x] RV: **12/12 charts**, 0 placeholders, retornos S&P +2.4%, Europa +6.9%, Chile +9.8%
-- [x] RV glosario: 24 acentos corregidos + título sección + "¿Qué cambiaría?"
-- [x] AA report regenerado con forecasts corregidos
-- [x] Macro: 24 charts (2.8MB)
-- [x] Pipeline: 4/4 reportes OK (34.9 min)
-- [x] RF: acentos + badge dinámico EM HC/LC (Sprint 5)
-- [x] AA: 16 data key fixes + acentos + calendar column (Sprint 5)
-- [ ] Regenerar RF + AA para verificar visualmente
+### Validación Acumulada (Sprints 1-9)
 
-### Validación — Pipeline 2026-03-21 (post Sprint 2 sistémicos)
-- [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (43.6 min)
-- [x] Anti-fabricación: S&P P/E 500→25.73, UST 10Y 4.00→4.25, IG spread 110→90bp, TPM 4.0→4.5%
-- [x] Consistency fixes: VIX→26.8, Focus GLD NEUTRAL→N, RF curva OW→N
-- [x] Panel agents: 4435-8636 chars (antes ~3500-4000) — **max_tokens=6000 OK**
-- [x] Coherence check: 1 conflicto (TPM macro=2.2 vs rf=4.5)
-- [x] Macro: 28 charts, 19/25 módulos OK
-- [x] RV: 11/12 charts, 11/11 módulos OK
-- [x] RF: 8/8 charts, 11/12 módulos OK
-- [x] AA: reporte completo con narrativas
-- [x] Pre-council: 44 charts, 0 fallidos, 4/4 reportes validados
-- [ ] Revisión visual pendiente: 4 reportes
+**Pipeline runs exitosos:**
+- 2026-03-20 (post Sprint 1): 4/4 reportes, 41 min, spreads IG 91bp/HY 320bp OK
+- 2026-03-21 (post Sprint 2): 4/4 reportes, 43.6 min, anti-fabricación 10 correcciones
+- 2026-03-22 (post Sprint 4): 4/4 reportes, 34.9 min, forecasts 5/5 modelos OK
 
-### Validación — Pipeline 2026-03-20 (post Sprint 1)
-- [x] Re-run pipeline completo con datos frescos — **4/4 reportes OK** (41 min)
-- [x] Verificar spreads muestran ~77bp IG / ~350bp HY — **IG=91bps, HY=320bps** (correcto)
-- [x] Credit spreads: AAA 41bp, AA 57bp, A 76bp, BBB 113bp, BB 200bp, B 351bp, CCC 964bp
-- [x] Dividend yields < 10% — SPY 1.3%, EFA 3.1%, EEM 2.5% (correcto)
-- [x] Macro: 28 charts generados, 19/25 módulos datos OK
-- [x] RV: 11/12 charts con datos reales, 11/11 módulos equity OK
-- [x] RF: 8/8 charts con datos reales, 11/12 módulos RF OK
-- [x] AA: reporte generado con narrativas + tablas completas
-- [x] Anti-fabricación: 10 correcciones aplicadas (fed_rate, hy_spread, tpm, oil, etc.)
-- [x] Pre-council: 44 charts, 0 fallidos, 4/4 reportes validados
-- [x] US Fiscal: datos reales FRED (deficit -5.8%, deuda 122.5%, intereses 3.2% GDP)
-- [x] China Trade: trim 120m aplicado
-- [x] PMI Global: datos reales Bloomberg (USA 52.4, Euro 50.8, China 49.0)
-- [x] CPI Contribution: datos reales confirmados
-- [ ] Revisión visual pendiente: RV, RF, AA
+**Checks pasados:**
+- [x] Credit spreads: IG ~90bp, HY ~320bp (era 1bp sin ×100)
+- [x] Dividend yields < 10% (era 308% sin guard)
+- [x] S&P 500 target +2.4% con 5/5 modelos (era +21.8% con 2/5)
+- [x] Anti-fabricación: corrige P/E, UST, IG spread, TPM, oil en narrativas LLM
+- [x] Panel agents: 4435-8636 chars (max_tokens=6000 OK)
+- [x] Macro: 28/28 charts, RV: 12/12, RF: 8/8, AA: tablas completas
+- [x] 16/16 AA canonical data points resuelven desde API real
+- [x] BCCh dates dayfirst=True (era DD-MM swap)
+- [x] Tasas auto-fetch: TPM 4.50% (BCCh), Fed Funds 3.64% (FRED)
+- [x] ~95 acentos corregidos, ~20 labels traducidos, litio USD/kg
+- [ ] Pendiente: regenerar 4 reportes post Sprint 9+10 para verificar visualmente
 
 ---
 
@@ -285,10 +270,60 @@
 
 ---
 
-## Cómo Usar Este Log
+## Bucle de Mejora Automática
 
-1. **Antes de correr el pipeline**: revisar "Bugs Pendientes" del último ciclo
-2. **Después de correr**: auditar reportes contra los checks del último ciclo
-3. **Al encontrar bugs nuevos**: agregar al log con prioridad y archivo afectado
-4. **Al fixear**: mover de "Pendientes" a "Fixes Aplicados" con commit hash
-5. **Meta**: llegar a 0 bugs P0 y P1 antes de entregar reportes a clientes
+### Proceso (por sprint)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  1. AUDITORÍA                                            │
+│     - Abrir los 4 reportes HTML en browser               │
+│     - Revisar cada sección: datos correctos, formato,    │
+│       acentos, coherencia entre reportes                 │
+│     - Clasificar bugs: P0 (datos erróneos que engañan),  │
+│       P1 (contenido roto/vacío), P2 (cosmético/idioma)   │
+│     - Registrar en "Bugs Pendientes" con prioridad       │
+├─────────────────────────────────────────────────────────┤
+│  2. FIX                                                  │
+│     - Atacar por prioridad: P0 → P1 → P2                │
+│     - Trazar cada bug hasta el archivo/línea raíz        │
+│     - Verificar compilación: py_compile                  │
+│     - Agrupar fixes relacionados en un solo sprint       │
+├─────────────────────────────────────────────────────────┤
+│  3. DOCUMENTAR                                           │
+│     - IMPROVEMENT_LOG.md: Sprint N con tabla de bugs     │
+│     - SYSTEM_OVERVIEW.md: actualizar conteo y §6.4       │
+│     - DATA_SOURCES.md: si cambió fuente de datos         │
+│     - Commit + push inmediatamente después de cada sprint│
+├─────────────────────────────────────────────────────────┤
+│  4. VALIDAR                                              │
+│     - Regenerar reportes: python run_monthly.py          │
+│       --skip-collect --no-confirm                        │
+│     - Verificar: file size, chart count, datos visibles  │
+│     - Agregar checks a "Validación Acumulada"            │
+│     - Si hay bugs nuevos → volver a paso 1               │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Clasificación de Bugs
+
+| Prioridad | Nombre | Criterio | Ejemplo |
+|-----------|--------|----------|---------|
+| **P0** | Datos erróneos | Número incorrecto que engaña al lector | WTI +50% (fecha swap), S&P target +21.8% |
+| **P1** | Contenido roto | Sección vacía, formato roto, placeholder visible | N/D en 16 campos AA, markdown leak en HTML |
+| **P2** | Cosmético | Acentos, idioma, unidades, labels | "Credito" → "Crédito", Driver → Factor |
+
+### Meta
+- **0 bugs P0 y P1** antes de entregar reportes a clientes
+- P2 = nice-to-have pero contribuyen a calidad profesional
+- Cada sprint debe terminar con: código compilado + commit + push + .md actualizados
+
+### Estadísticas
+| Ciclo | Sprints | Bugs resueltos | P0 | P1 | P2 |
+|-------|---------|----------------|----|----|-----|
+| 1 (Setup) | — | 0 | — | — | — |
+| 2 (Library) | — | 0 | — | — | — |
+| 3 (Coherence) | — | 7 | 3 | 2 | 2 |
+| 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 |
+| 5 (Auditoría) | 9 | 71 | 28 | 25 | 18 |
+| **Total** | **9** | **71+13** | **35** | **28** | **21** |

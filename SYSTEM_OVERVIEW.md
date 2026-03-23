@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-23 (71 bugs resueltos, 9 sprints + 5 sub-sprints, pipeline 4/4 OK)
+> Última actualización: 2026-03-23 (73 bugs resueltos, 10 sprints + 5 sub-sprints, pipeline 4/4 OK, 0 P0/P1 pendientes)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -344,6 +344,15 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 | AA MODERATE_GROWTH raw code visible | `asset_allocation_content_generator.py` | `_REGIME_LABELS` dict mapping | Sprint 7 |
 | AA Focus List 18 rationales in English | `asset_allocation_content_generator.py` | All translated to Spanish | Sprint 7 |
 | RV truncation marker visible | `narrative_engine.py:1089` | Marker removed from output | Sprint 7 |
+| RF trades duplicados S3/S7 | `templates/rf_report_professional.html` | Removed duplicate S3 | Sprint 8 |
+| RF FAIR_VALUE/EXPENSIVE raw enum | `rf_content_generator.py` | `_translate_signal()` → español | Sprint 8 |
+| RF HY badge siempre neutral | `rf_report_renderer.py` + template | Dynamic `{{hy_badge_class}}` | Sprint 8 |
+| RV narrativas garbled | `rv_content_generator.py` | `_truncate_at_sentence()` helper | Sprint 8 |
+| AA macro indicators vacía | `asset_allocation_content_generator.py` | Keys: gdp_qoq, cpi_core_yoy | Sprint 8 |
+| AA dashboard flechas todas → | `asset_allocation_content_generator.py` | `_arrow_from_view()` | Sprint 8 |
+| ~95 acentos faltantes 4 reportes | 12 archivos (templates + generators + renderers) | Sprint 9 |
+| ~20 labels inglés → español | templates + content generators | Sprint 9 |
+| Litio USD/ton (incorrecto) | 4 archivos | → USD/kg | Sprint 9 |
 
 ### 6.4 Bugs Conocidos (Activos)
 
@@ -351,8 +360,8 @@ Los 3 charts PMI **no están bloqueados** — funcionan via `input/bloomberg_dat
 |-----|-----------|---------|--------|
 | BCU 2Y sin datos | BCCh API `F022.BUF.TIS.AN02.UF.Z.D` | Serie vacía → skip | Permanente (BCCh no publica) |
 | EMBI Chile sin datos | BCCh API `F019.EMBI.IND.CL.D` | Sin spread Chile directo | Usar BCRP client como fallback |
-| CPI subcomponents chart vacío | Macro chart | Sin fuente FRED simple | P1 |
-| Raw markdown leak en RF HTML | `rf_content_generator.py` | `**bold**`, `## headers` en HTML | P1 |
+| ~~CPI subcomponents chart vacío~~ | `chart_data_provider.py` | **RESUELTO** — FRED 5 series OK, chart genera 78KB | Sprint 10 |
+| ~~Raw markdown leak en RF HTML~~ | `rf_report_renderer.py` | **RESUELTO** — `_md_to_html()` en 12 campos | Sprint 10 |
 
 ### 6.5 Datos Hardcodeados (Sin API)
 

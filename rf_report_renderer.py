@@ -187,11 +187,11 @@ class RFReportRenderer:
                 <td class="center">{r['duration']}</td>
                 <td class="center yield-high">{r['yield']}</td>
                 <td class="center">{r['spread']}</td>
-                <td>{r['driver']}</td>
+                <td>{_md_to_html(r['driver'])}</td>
             </tr>'''
         replacements['{{summary_table_rows}}'] = summary_rows
 
-        key_calls = ''.join([f'<li>{kc}</li>' for kc in resumen['key_calls']])
+        key_calls = ''.join([f'<li>{_md_to_html(kc)}</li>' for kc in resumen['key_calls']])
         replacements['{{key_calls_html}}'] = key_calls
 
         # 2. AMBIENTE DE TASAS
@@ -268,7 +268,7 @@ class RFReportRenderer:
                 <td class="center">{d['benchmark']}</td>
                 <td class="center">{d['recomendacion']}</td>
                 <td>{d['posicion_curva']}</td>
-                <td>{d['rationale']}</td>
+                <td>{_md_to_html(d['rationale'])}</td>
             </tr>'''
         replacements['{{duration_table_rows}}'] = dur_rows
 
@@ -278,9 +278,9 @@ class RFReportRenderer:
             dur_trades += f'''
             <div class="trade-card">
                 <div class="trade-header">
-                    <span class="trade-name">{t['trade']}</span>
+                    <span class="trade-name">{_md_to_html(t['trade'])}</span>
                 </div>
-                <p style="color: var(--text-medium); margin-bottom: 10px;">{t['rationale']}</p>
+                <p style="color: var(--text-medium); margin-bottom: 10px;">{_md_to_html(t['rationale'])}</p>
                 <div class="trade-metrics">
                     <div class="trade-metric">
                         <div class="label">Instrumento</div>
@@ -326,7 +326,7 @@ class RFReportRenderer:
                 <td>{r['rating']}</td>
                 <td class="center">{r['spread']}</td>
                 <td class="center">{r.get('percentil', '-')}</td>
-                <td>{r.get('señal', '')}</td>
+                <td>{_md_to_html(r.get('señal', ''))}</td>
             </tr>'''
         replacements['{{ig_rating_rows}}'] = ig_rating_rows
 
@@ -335,7 +335,7 @@ class RFReportRenderer:
             hy_rating_rows += f'''<tr>
                 <td>{r['rating']}</td>
                 <td class="center">{r['spread']}</td>
-                <td>{r.get('comentario', '')}</td>
+                <td>{_md_to_html(r.get('comentario', ''))}</td>
             </tr>'''
         replacements['{{hy_rating_rows}}'] = hy_rating_rows
 
@@ -364,7 +364,7 @@ class RFReportRenderer:
                 <td class="center yield-high">{c['yield_hc']}</td>
                 <td class="center">{c['spread']}</td>
                 <td class="center">{c['rating']}</td>
-                <td>{c['driver']}</td>
+                <td>{_md_to_html(c['driver'])}</td>
             </tr>'''
         replacements['{{em_country_rows}}'] = country_rows
 
@@ -417,13 +417,13 @@ class RFReportRenderer:
             risks_html += f'''
             <div class="risk-card">
                 <div class="risk-header">
-                    <span class="risk-name">{r['riesgo']}</span>
+                    <span class="risk-name">{_md_to_html(r['riesgo'])}</span>
                     <span style="font-size: 9pt; color: var(--text-light);">
                         Prob: <strong>{r['probabilidad']}</strong> | Impacto: <strong>{r['impacto']}</strong>
                     </span>
                 </div>
-                <p style="margin: 10px 0; color: var(--text-medium);">{r['descripcion']}</p>
-                <p style="font-size: 9pt; color: var(--text-light);"><strong>Cobertura:</strong> {r['hedge']}</p>
+                <p style="margin: 10px 0; color: var(--text-medium);">{_md_to_html(r['descripcion'])}</p>
+                <p style="font-size: 9pt; color: var(--text-light);"><strong>Cobertura:</strong> {_md_to_html(r['hedge'])}</p>
             </div>'''
         replacements['{{risks_html}}'] = risks_html
 
@@ -435,9 +435,9 @@ class RFReportRenderer:
             trades_html += f'''
             <div class="trade-card">
                 <div class="trade-header">
-                    <span class="trade-name">{t['trade']}</span>
+                    <span class="trade-name">{_md_to_html(t['trade'])}</span>
                 </div>
-                <p style="color: var(--text-medium); margin-bottom: 10px;">{t['rationale']}</p>
+                <p style="color: var(--text-medium); margin-bottom: 10px;">{_md_to_html(t['rationale'])}</p>
                 <div class="trade-metrics">
                     <div class="trade-metric">
                         <div class="label">Entrada</div>

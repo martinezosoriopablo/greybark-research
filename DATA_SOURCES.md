@@ -238,7 +238,7 @@ Calcula: Growth/Value spread, Large/Small spread, senales estilo
 | Cobre | `F019.PPB.PRE.100.D` | USc/lb + retornos |
 | Oro | `F019.PPB.PRE.44.D` | USD/oz + retornos |
 | WTI | `F019.PPB.PRE.41B.D` | USD/bbl + retornos |
-| Litio | `F019.PPB.PRE.37.D` | USD/ton + retornos |
+| Litio | `F019.PPB.PRE.37.D` | USD/kg + retornos |
 
 ### 11. Chile Top Picks (yfinance ADRs) — Nuevo 2026-02-12
 
@@ -409,7 +409,7 @@ Estructura:
 | Europe PMI chart | PMI propietario |
 | China trade chart | Sin datos BCCh de comercio total |
 | PMI global chart | PMI propietario |
-| CPI subcomponents USA (Shelter, Services ex-Housing) | Series complejas, sin FRED simple |
+| CPI subcomponents USA (Shelter, Services ex-Energy, Core Goods, Food, Energy) | FRED: CUSR0000SAH1, CUSR0000SAS, CUSR0000SACL1E, CPIUFDSL, CPIENGSL |
 | Componentes IPC Chile | Series no configuradas en BCCh |
 | LPR, RRR China | Sin serie en BCCh |
 | Salarios negociados Europa | Sin serie en BCCh |
