@@ -27,9 +27,9 @@ CLP_USD_DIRECTIVE = (
     "REGLA CRITICA USD/CLP: El tipo de cambio USD/CLP se expresa como pesos por dolar. "
     "Si USD/CLP SUBE (ej: 900→950) el peso se DEPRECIA (se DEBILITA) — eso es NEGATIVO para Chile. "
     "Si USD/CLP BAJA (ej: 900→850) el peso se APRECIA (se FORTALECE) — eso es POSITIVO para Chile. "
-    "Si eres ALCISTA en Chile, tu target USD/CLP debe ser MAS BAJO que el spot (apreciacion). "
-    "Si eres BAJISTA en Chile, tu target USD/CLP debe ser MAS ALTO que el spot (depreciacion). "
-    "NUNCA digas 'sobreponderamos CLP' con un target USD/CLP mas alto que el spot. "
+    "Si eres ALCISTA en Chile, tu target USD/CLP debe ser MAS BAJO que el spot (apreciación). "
+    "Si eres BAJISTA en Chile, tu target USD/CLP debe ser MAS ALTO que el spot (depreciación). "
+    "NUNCA digas 'sobreponderamos CLP' con un target USD/CLP más alto que el spot. "
 )
 
 
@@ -839,7 +839,7 @@ class AssetAllocationContentGenerator:
                 section_name="aa_key_points",
                 prompt=(
                     f"Genera exactamente 5 key points para asset allocation de {self.month_name} "
-                    f"{self.date.year}. Cubrir: regimen economico, politica monetaria, "
+                    f"{self.date.year}. Cubrir: régimen económico, política monetaria, "
                     "principal riesgo geopolitico/comercial, mercado destacado, y "
                     "nivel de riesgo/hedging. Cada punto en una linea. "
                     "Usa datos del council — NO inventes numeros. "
@@ -857,8 +857,8 @@ class AssetAllocationContentGenerator:
                     return lines[:5]
 
         return [
-            "Dinamicas macro requieren posicionamiento selectivo",
-            "Politica monetaria en evaluacion — proximos datos seran clave",
+            "Dinámicas macro requieren posicionamiento selectivo",
+            "Política monetaria en evaluación — próximos datos serán clave",
             "Monitorear desarrollos geopoliticos y comerciales",
             "Fundamentos regionales diferenciados ofrecen oportunidades",
             "Mantener coberturas activas ante incertidumbre",
@@ -893,7 +893,7 @@ class AssetAllocationContentGenerator:
             if result:
                 return result
 
-        return "Proximos datos macro y decisiones de politica monetaria"
+        return "Próximos datos macro y decisiones de política monetaria"
 
     # =========================================================================
     # SECCION 2: EL MES EN REVISION
@@ -1248,7 +1248,7 @@ class AssetAllocationContentGenerator:
             prompt=(
                 f"Escribe 2-3 parrafos sobre el panorama geopolitico de {self.month_name} "
                 f"{self.date.year} basandote en el council. Cubrir las principales dinamicas: "
-                "tensiones comerciales, politica monetaria, conflictos regionales. "
+                "tensiones comerciales, política monetaria, conflictos regionales. "
                 "Separa parrafos con linea vacia. Maximo 150 palabras."
                 + self._canon_constraints()
             ),
@@ -1272,7 +1272,7 @@ class AssetAllocationContentGenerator:
             eventos = [
                 {'evento': 'Tensiones comerciales', 'impacto': 'Alto',
                  'probabilidad': f'{int(tariff_prob)}%' if tariff_prob is not None else 'N/D'},
-                {'evento': 'Dinamica US-China', 'impacto': 'Alto',
+                {'evento': 'Dinámica US-China', 'impacto': 'Alto',
                  'probabilidad': f'{int(china_prob)}%' if china_prob is not None else 'N/D'},
             ]
 
@@ -1404,8 +1404,8 @@ class AssetAllocationContentGenerator:
             section_name="aa_chile_review",
             prompt=(
                 f"Escribe 2-3 parrafos sobre Chile para el reporte de asset allocation de "
-                f"{self.month_name} {self.date.year}. Cubrir: posicion relativa en LatAm, "
-                "dinamica del peso, politica monetaria BCCh, cobre, y IPSA. "
+                f"{self.month_name} {self.date.year}. Cubrir: posición relativa en LatAm, "
+                "dinámica del peso, política monetaria BCCh, cobre, y IPSA. "
                 f"IMPORTANTE: La tendencia de la TPM es {tpm_dir_text} — tu narrativa DEBE ser "
                 "coherente con esta direccion. No contradigas los datos. "
                 f"{CLP_USD_DIRECTIVE} "
@@ -1839,7 +1839,7 @@ class AssetAllocationContentGenerator:
             section_name="aa_usa_tesis",
             prompt=(
                 f"La postura asignada a Estados Unidos es {view_label}. "
-                "Escribe la tesis de inversion para Estados Unidos en 3-4 oraciones CONSISTENTE con esta postura. "
+                "Escribe la tesis de inversión para Estados Unidos en 3-4 oraciones CONSISTENTE con esta postura. "
                 "Cubrir: regimen economico, vista de equity, principal riesgo, y factor tilt. "
                 "Usa datos del council. Maximo 80 palabras. "
                 f"IMPORTANTE: La narrativa DEBE ser consistente con {usa_view}. NO contradigas la postura."
@@ -1952,8 +1952,8 @@ class AssetAllocationContentGenerator:
                 section_name="aa_europe_tesis",
                 prompt=(
                     f"La postura asignada a Europa es {view_label}. "
-                    "Escribe la tesis de inversion para Europa en 3-4 oraciones CONSISTENTE con esta postura. "
-                    "Cubrir: posicion relativa, valuaciones, politica BCE, y riesgos. "
+                    "Escribe la tesis de inversión para Europa en 3-4 oraciones CONSISTENTE con esta postura. "
+                    "Cubrir: posición relativa, valuaciones, política BCE, y riesgos. "
                     "Usa datos del council. Maximo 70 palabras. "
                     f"IMPORTANTE: La narrativa DEBE ser consistente con {europe_view}. NO contradigas la postura."
                     "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
@@ -2016,7 +2016,7 @@ class AssetAllocationContentGenerator:
             tesis = generate_narrative(
                 section_name="aa_china_tesis",
                 prompt=(
-                    "Escribe la tesis de inversion para China en 3-4 oraciones. "
+                    "Escribe la tesis de inversión para China en 3-4 oraciones. "
                     "Cubrir: regimen economico, credit impulse, desacople US-China, "
                     "y postura (cautelosa/neutral). Usa datos del council. Maximo 70 palabras."
                     "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."
@@ -2118,8 +2118,8 @@ class AssetAllocationContentGenerator:
             tesis = generate_narrative(
                 section_name="aa_chile_tesis",
                 prompt=(
-                    "Escribe la tesis de inversion para Chile en 3-4 oraciones. "
-                    "Cubrir: posicion relativa en LatAm, carry trade, cobre, y riesgos. "
+                    "Escribe la tesis de inversión para Chile en 3-4 oraciones. "
+                    "Cubrir: posición relativa en LatAm, carry trade, cobre, y riesgos. "
                     "Integrar datos cuantitativos. Usa datos del council. Maximo 80 palabras."
                     f"\n\n{CLP_USD_DIRECTIVE}"
                     "\n\nIncluye: dato→interpretación→acción, riesgo con trigger de salida cuantificado, horizonte temporal."

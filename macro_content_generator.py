@@ -220,8 +220,8 @@ class MacroContentGenerator:
         # Fallback minimal
         return (
             f"El escenario macro global de {self.month_name} {self.year} se caracteriza por "
-            f"dinamicas complejas en crecimiento, inflacion y politica monetaria. "
-            f"Este reporte detalla nuestro analisis por region y escenarios ponderados por probabilidad."
+            f"dinámicas complejas en crecimiento, inflación y política monetaria. "
+            f"Este reporte detalla nuestro análisis por región y escenarios ponderados por probabilidad."
         )
 
     def _generate_key_takeaways(self) -> List[str]:
@@ -293,11 +293,11 @@ class MacroContentGenerator:
         return {
             'gdp_growth': [
                 {'region': r, 'actual_2025': 'N/D', 'forecast_2026': 'N/D', 'consenso': 'N/D', 'vs_anterior': 'N/A'}
-                for r in ['USA', 'Euro Area', 'China', 'Chile']
+                for r in ['USA', 'Eurozona', 'China', 'Chile']
             ],
             'inflation_core': [
                 {'region': r, 'actual_2025': 'N/D', 'forecast_2026': 'N/D', 'consenso': 'N/D', 'vs_anterior': 'N/A'}
-                for r in ['USA', 'Euro Area', 'Chile']
+                for r in ['USA', 'Eurozona', 'Chile']
             ],
             'policy_rates': [
                 {'banco': b, 'actual': 'N/D', 'forecast_2026': 'N/D', 'consenso': 'N/D', 'vs_anterior': 'N/A'}
@@ -311,7 +311,7 @@ class MacroContentGenerator:
         # GDP Growth
         gdp_rows = []
         gdp_map = [
-            ('USA', 'usa'), ('Euro Area', 'eurozone'), ('China', 'china'), ('Chile', 'chile'),
+            ('USA', 'usa'), ('Eurozona', 'eurozone'), ('China', 'china'), ('Chile', 'chile'),
         ]
         for label, key in gdp_map:
             fc = self._fc('gdp_forecasts', key, default={})
@@ -330,7 +330,7 @@ class MacroContentGenerator:
         # Inflation
         infl_rows = []
         infl_map = [
-            ('USA', 'usa'), ('Euro Area', 'eurozone'), ('Chile', 'chile'),
+            ('USA', 'usa'), ('Eurozona', 'eurozone'), ('Chile', 'chile'),
         ]
         for label, key in infl_map:
             fc = self._fc('inflation_forecasts', key, default={})
@@ -1189,17 +1189,17 @@ class MacroContentGenerator:
         src = ' (datos BCCh)' if has_real else ''
 
         return {
-            'titulo': f'Crecimiento - Euro Area{src}',
+            'titulo': f'Crecimiento - Eurozona{src}',
             'narrativa': (
                 f"La economía europea muestra recuperación gradual. "
-                f"El ultimo GDP trimestral Eurozona: {gdp_ez}. "
+                f"El último GDP trimestral Eurozona: {gdp_ez}. "
                 f"Alemania: {gdp_de}, Francia: {gdp_fr}, UK: {gdp_uk}. "
                 f"Desempleo Eurozona: {desemp}. "
                 f"El sector manufacturero comienza a estabilizarse mientras servicios "
                 f"mantiene expansión moderada."
             ),
             'por_pais': [
-                {'pais': 'Euro Area', 'gdp_2025': gdp_ez, 'gdp_2026f': self._fc_pct('gdp_forecasts', 'eurozone', 'forecast_12m'), 'consenso': 'N/D'},
+                {'pais': 'Eurozona', 'gdp_2025': gdp_ez, 'gdp_2026f': self._fc_pct('gdp_forecasts', 'eurozone', 'forecast_12m'), 'consenso': 'N/D'},
                 {'pais': 'Alemania', 'gdp_2025': gdp_de, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
                 {'pais': 'Francia', 'gdp_2025': gdp_fr, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
                 {'pais': 'UK', 'gdp_2025': gdp_uk, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
@@ -1262,7 +1262,7 @@ class MacroContentGenerator:
         src = ' (datos BCCh)' if has_real else ''
 
         return {
-            'titulo': f'Inflación - Euro Area{src}',
+            'titulo': f'Inflación - Eurozona{src}',
             'narrativa': (
                 f"La inflación europea se ubica con HICP headline en {cpi_val}, "
                 f"mientras el core converge a {core_val}. "
@@ -1914,10 +1914,10 @@ class MacroContentGenerator:
                 litio_series = comm.get('litio')
                 if litio_series is not None and len(litio_series) > 0:
                     litio_val = float(litio_series.iloc[-1])
-                    litio_str = f'${litio_val:,.0f}/ton'
+                    litio_str = f'${litio_val:,.1f}/kg'
                     if len(litio_series) > 20:
                         litio_prev_val = float(litio_series.iloc[-21])
-                        litio_prev_str = f'${litio_prev_val:,.0f}/ton'
+                        litio_prev_str = f'${litio_prev_val:,.1f}/kg'
                         litio_chg = f'{((litio_val / litio_prev_val) - 1) * 100:+.1f}%'
                 brent_series = comm.get('petroleo')
                 if brent_series is not None and len(brent_series) > 0:
@@ -2301,7 +2301,7 @@ class MacroContentGenerator:
         )
         if not intro:
             intro = (
-                f"Las conclusiones de {self.month_name} {self.year} reflejan nuestro analisis "
+                f"Las conclusiones de {self.month_name} {self.year} reflejan nuestro análisis "
                 f"integrado de las principales variables macro."
             )
 
@@ -2340,8 +2340,8 @@ class MacroContentGenerator:
 
         if not vistas:
             vistas = [
-                {'tema': 'Panorama General', 'vista_grb': 'Ver seccion de analisis para detalle.',
-                 'vs_consenso': 'Ver detalle', 'vs_detalle': 'Analisis completo en secciones anteriores.'}
+                {'tema': 'Panorama General', 'vista_grb': 'Ver sección de análisis para detalle.',
+                 'vs_consenso': 'Ver detalle', 'vs_detalle': 'Análisis completo en secciones anteriores.'}
             ]
 
         # Generate positioning summary
@@ -2366,7 +2366,7 @@ class MacroContentGenerator:
             'vistas': vistas,
             'posicionamiento_resumen': pos_resumen,
             'proximo_reporte': (
-                'Este analisis macro sirve como input para los reportes complementarios de '
+                'Este análisis macro sirve como input para los reportes complementarios de '
                 'Asset Allocation y Renta Fija.'
             )
         }

@@ -287,7 +287,7 @@ class AssetAllocationRenderer:
                 <div class="scenario-name">{e['nombre']}</div>
                 <div class="scenario-prob">{e['probabilidad']}%</div>
                 <div class="scenario-desc">{e['descripcion']}</div>
-                <div style="font-size: 9pt; color: #718096;"><strong>Que comprar:</strong> {e['que_comprar']}</div>
+                <div style="font-size: 9pt; color: #718096;"><strong>Qué comprar:</strong> {e['que_comprar']}</div>
             </div>
             '''
         replacements['{{scenarios_html}}'] = scenario_html
@@ -346,7 +346,7 @@ class AssetAllocationRenderer:
                         </div>
                     </div>
                     <div class="trigger-box">
-                        <strong>Trigger para cambiar de opinion:</strong><br>
+                        <strong>Trigger para cambiar de opinión:</strong><br>
                         {view['trigger_cambio']}
                     </div>
                 </div>
@@ -419,7 +419,7 @@ class AssetAllocationRenderer:
                 </div>
                 <div class="risk-body">
                     <p>{r['descripcion']}</p>
-                    <p style="font-size: 9pt; color: #718096;"><strong>Senal temprana:</strong> {r['senal_temprana']}</p>
+                    <p style="font-size: 9pt; color: #718096;"><strong>Señal temprana:</strong> {r['senal_temprana']}</p>
                     <div class="risk-hedge">
                         <strong>Hedge recomendado:</strong><br>
                         {r['hedge']}

@@ -1034,7 +1034,7 @@ class EquityDataCollector:
             'copper': ('F019.PPB.PRE.100.D', 'Cobre (USc/lb)'),
             'gold': ('F019.PPB.PRE.44.D', 'Oro (USD/oz)'),
             'oil_wti': ('F019.PPB.PRE.41B.D', 'WTI (USD/bbl)'),
-            'lithium': ('F019.PPB.PRE.37.D', 'Litio (USD/ton)'),
+            'lithium': ('F019.PPB.PRE.37.D', 'Litio (USD/kg)'),
         }
         for key, (code, name) in commodities.items():
             val = _fetch_with_returns(code)

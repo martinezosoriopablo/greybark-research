@@ -206,10 +206,10 @@ class RFContentGenerator:
             narrativa = generate_narrative(
                 section_name="rf_global_stance",
                 prompt=(
-                    f"Escribe un parrafo de postura global en renta fija para {self.month_name} {self.year}. "
+                    f"Escribe un párrafo de postura global en renta fija para {self.month_name} {self.year}. "
                     f"La postura es {stance_word}. Explica en 3-4 oraciones el fundamento: "
-                    "ambiente de tasas, posicionamiento de duration, y credito. "
-                    "Integra los datos cuantitativos disponibles. Usa SOLO datos del council. Maximo 80 palabras."
+                    "ambiente de tasas, posicionamiento de duration, y crédito. "
+                    "Integra los datos cuantitativos disponibles. Usa SOLO datos del council. Máximo 80 palabras."
                     "\n\nEscribe 150-200 palabras. Incluye: qué cambió vs período anterior, principal riesgo con trigger cuantificado, horizonte temporal (táctico 1-3m o estratégico 6-12m). Explica jerga técnica (duration, carry, spread, IG, HY, OAS, steepener, flattener) con paréntesis en primera mención."
                 ),
                 council_context=f"RF PANEL:\n{rf_panel[:2000]}\n\nFINAL:\n{final[:1000]}",
@@ -1016,9 +1016,9 @@ class RFContentGenerator:
             result = generate_narrative(
                 section_name="rf_rates_narrative",
                 prompt=(
-                    f"Escribe un parrafo sobre el ambiente de tasas para {self.month_name} {self.year}. "
-                    "Cubrir: nivel actual de yields, dinamica de curvas, y preferencia de duration. "
-                    "Integrar datos cuantitativos. Maximo 60 palabras."
+                    f"Escribe un párrafo sobre el ambiente de tasas para {self.month_name} {self.year}. "
+                    "Cubrir: nivel actual de yields, dinámica de curvas, y preferencia de duration. "
+                    "Integrar datos cuantitativos. Máximo 60 palabras."
                     "\n\nSigue la cadena dato→interpretación→acción para cada posición de duration. Incluye horizonte temporal (táctico o estratégico) y trigger de salida."
                 ),
                 council_context=f"RF PANEL:\n{rf_panel[:1500]}\n\nFINAL:\n{final[:800]}",
@@ -1779,8 +1779,8 @@ class RFContentGenerator:
 
         # No council sector views and no Bloomberg — return minimal placeholder
         return [
-            {'sector': 'Sin recomendacion sectorial', 'view': 'N/D',
-             'spread_ig': 'N/D', 'fundamentales': 'Council no emitio vistas sectoriales de credito',
+            {'sector': 'Sin recomendación sectorial', 'view': 'N/D',
+             'spread_ig': 'N/D', 'fundamentales': 'Council no emitió vistas sectoriales de crédito',
              'driver': 'N/D'},
         ]
 
@@ -1801,7 +1801,7 @@ class RFContentGenerator:
         narrative = generate_narrative(
             section_name="rf_credit_narrative",
             prompt=(
-                "Escribe un parrafo de 2-3 oraciones sobre el mercado de credito corporativo. "
+                "Escribe un párrafo de 2-3 oraciones sobre el mercado de crédito corporativo. "
                 "Incluye IG spread, HY spread, y vista sectorial. "
                 "Usa SOLO los datos proporcionados. NO inventes preferencias sectoriales."
                 "\n\nIncluye riesgo por posición con trigger cuantificado. Explica terminología: IG (investment grade), HY (high yield), OAS (option-adjusted spread), bps (puntos base) en primera mención."
@@ -1904,7 +1904,7 @@ class RFContentGenerator:
             'narrativa': f"Deuda EM en moneda local. {em_lc_label}",
             'carry_trades': [
                 {'pais': 'Brasil', 'yield': self._fmt_pct(br_10y) if br_10y else 'N/D', 'fx_view': 'N/D', 'carry_ajustado': 'N/D'},
-                {'pais': 'Mexico', 'yield': self._fmt_pct(mx_10y) if mx_10y else 'N/D', 'fx_view': 'N/D', 'carry_ajustado': 'N/D'},
+                {'pais': 'México', 'yield': self._fmt_pct(mx_10y) if mx_10y else 'N/D', 'fx_view': 'N/D', 'carry_ajustado': 'N/D'},
                 {'pais': 'Chile', 'yield': chile_str, 'fx_view': 'N/D', 'carry_ajustado': 'N/D'},
             ]
         }
@@ -1960,18 +1960,18 @@ class RFContentGenerator:
                 'spread': _embi_spread('chile', chile_spread),
                 'rating': 'A',
                 'driver': chile_driver[:80] if len(chile_driver) > 80 else chile_driver,
-                'riesgo': 'Politica fiscal' if chile_view else 'N/D',
+                'riesgo': 'Política fiscal' if chile_view else 'N/D',
                 '_real': bool(chile_lc),
             },
             {
-                'pais': 'Mexico',
+                'pais': 'México',
                 'hc_view': em_default_view,
                 'lc_view': em_default_view,
                 'yield_hc': self._fmt_pct(mx_10y) if mx_10y else 'N/D',
                 'yield_lc': 'N/D',
                 'spread': _embi_spread('mexico', _spread('mexico')),
                 'rating': 'BBB',
-                'driver': f"10Y: {self._fmt_pct(mx_10y)}; nearshoring + Banxico hawkish" if mx_10y else 'Nearshoring + politica monetaria restrictiva',
+                'driver': f"10Y: {self._fmt_pct(mx_10y)}; nearshoring + Banxico hawkish" if mx_10y else 'Nearshoring + política monetaria restrictiva',
                 'riesgo': 'Nearshoring / fiscal',
                 '_real': bool(mx_10y),
             },
@@ -1988,15 +1988,15 @@ class RFContentGenerator:
                 '_real': bool(br_10y),
             },
             {
-                'pais': 'Peru',
+                'pais': 'Perú',
                 'hc_view': em_default_view,
                 'lc_view': em_default_view,
                 'yield_hc': self._fmt_pct(pe_10y) if pe_10y else 'N/D',
                 'yield_lc': 'N/D',
                 'spread': _embi_spread('peru', _spread('peru')),
                 'rating': 'BBB',
-                'driver': f"10Y: {self._fmt_pct(pe_10y)}; IG estable, exposicion minera" if pe_10y else 'Grado de inversion con exposicion cobre/mineria',
-                'riesgo': 'Politico / minero',
+                'driver': f"10Y: {self._fmt_pct(pe_10y)}; IG estable, exposición minera" if pe_10y else 'Grado de inversión con exposición cobre/minería',
+                'riesgo': 'Político / minero',
                 '_real': bool(pe_10y),
             },
             {
@@ -2007,7 +2007,7 @@ class RFContentGenerator:
                 'yield_lc': 'N/D',
                 'spread': _embi_spread('colombia', _spread('colombia')),
                 'rating': 'BB+',
-                'driver': f"10Y: {self._fmt_pct(co_10y)}; presion fiscal + ciclo de recortes" if co_10y else 'Presion fiscal con ciclo de recortes en curso',
+                'driver': f"10Y: {self._fmt_pct(co_10y)}; presión fiscal + ciclo de recortes" if co_10y else 'Presión fiscal con ciclo de recortes en curso',
                 'riesgo': 'Fiscal / seguridad',
                 '_real': bool(co_10y),
             },
@@ -2024,7 +2024,7 @@ class RFContentGenerator:
         if chile_10y:
             parts.append(f"Chile 10Y: {self._fmt_pct(chile_10y)}.")
         if mx_10y:
-            parts.append(f"Mexico 10Y: {self._fmt_pct(mx_10y)}.")
+            parts.append(f"México 10Y: {self._fmt_pct(mx_10y)}.")
         if br_10y:
             parts.append(f"Brasil 10Y: {self._fmt_pct(br_10y)}.")
 
@@ -2195,7 +2195,7 @@ class RFContentGenerator:
         if lending_commercial and tpm:
             spread_lending = round(lending_commercial - tpm, 1)
             narrativa += (
-                f"Tasas de credito comercial en {self._fmt_pct(lending_commercial)} "
+                f"Tasas de crédito comercial en {self._fmt_pct(lending_commercial)} "
                 f"(spread {self._fmt_pct(spread_lending)} sobre TPM). "
             )
         if lending_mortgage:
@@ -2277,7 +2277,7 @@ class RFContentGenerator:
 
         narrativa = f"Alternativas de corto plazo con TPM en {tpm_str}. "
         if dap_90_real:
-            narrativa += f"DAP 90 dias rinde {self._fmt_pct(dap_90_real)}. "
+            narrativa += f"DAP 90 días rinde {self._fmt_pct(dap_90_real)}. "
         if bcp_1y_str:
             narrativa += f"BCP 1Y rinde {bcp_1y_str}. "
         if interbank:
@@ -2317,10 +2317,10 @@ class RFContentGenerator:
         result = {
             'narrativa': narrativa,
             'alternativas': [
-                {'instrumento': 'DAP 30 dias', 'tasa': dap_30, 'liquidez': 'Al vencimiento', 'view': view_short},
-                {'instrumento': 'DAP 90 dias', 'tasa': dap_90, 'liquidez': 'Al vencimiento', 'view': view_short},
-                {'instrumento': 'DAP 180 dias', 'tasa': dap_180, 'liquidez': 'Al vencimiento', 'view': view_long},
-                {'instrumento': 'DAP 360 dias', 'tasa': dap_1y_str, 'liquidez': 'Al vencimiento', 'view': view_long},
+                {'instrumento': 'DAP 30 días', 'tasa': dap_30, 'liquidez': 'Al vencimiento', 'view': view_short},
+                {'instrumento': 'DAP 90 días', 'tasa': dap_90, 'liquidez': 'Al vencimiento', 'view': view_short},
+                {'instrumento': 'DAP 180 días', 'tasa': dap_180, 'liquidez': 'Al vencimiento', 'view': view_long},
+                {'instrumento': 'DAP 360 días', 'tasa': dap_1y_str, 'liquidez': 'Al vencimiento', 'view': view_long},
                 {'instrumento': 'FM Money Market', 'tasa': fm_mm, 'liquidez': 'Diaria', 'view': view_short},
                 {'instrumento': 'Pactos BC', 'tasa': pactos, 'liquidez': 'Al vencimiento', 'view': view_short},
             ],
@@ -2524,8 +2524,8 @@ class RFContentGenerator:
         narrativa = generate_narrative(
             section_name="rf_inflation_narrative",
             prompt=(
-                "Describe el panorama de inflacion y breakevens en 2-3 oraciones con los datos. "
-                "NO emitas opinion sobre valor tactico. Maximo 60 palabras."
+                "Describe el panorama de inflación y breakevens en 2-3 oraciones con los datos. "
+                "NO emitas opinión sobre valor táctico. Máximo 60 palabras."
             ),
             council_context=self.council.get('panel_outputs', {}).get('rf', '')[:1000],
             quant_context=f"Chile BCU 10Y real yield: {bcu_str}.",
@@ -2653,7 +2653,7 @@ class RFContentGenerator:
         if bcu_10y:
             ops.append(f"Chile BCU 10Y: Real yield de {self._fmt_pct(bcu_10y)}")
         if not ops:
-            ops.append("Ver analisis detallado del council para oportunidades")
+            ops.append("Ver análisis detallado del council para oportunidades")
         return ops
 
     def _generate_recommended_trades(self) -> List[Dict[str, Any]]:
@@ -2840,8 +2840,8 @@ class RFContentGenerator:
                 section_name="rf_positioning_msg",
                 prompt=(
                     "Escribe 2-3 oraciones resumiendo el posicionamiento en renta fija: "
-                    "postura general de duration, preferencia de credito, y mercado destacado. "
-                    "Usa datos del council. Maximo 60 palabras."
+                    "postura general de duration, preferencia de crédito, y mercado destacado. "
+                    "Usa datos del council. Máximo 60 palabras."
                 ),
                 council_context=f"RF PANEL:\n{rf_panel[:1500]}\n\nFINAL:\n{final[:1000]}",
                 company_name=self.company_name,
@@ -2850,7 +2850,7 @@ class RFContentGenerator:
             if result:
                 return result
 
-        return f'Ver analisis detallado de {self.month_name} {self.year} para posicionamiento en renta fija.'
+        return f'Ver análisis detallado de {self.month_name} {self.year} para posicionamiento en renta fija.'
 
     # =========================================================================
     # METODO PRINCIPAL

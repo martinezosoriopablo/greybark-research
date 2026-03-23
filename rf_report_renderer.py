@@ -291,11 +291,11 @@ class RFReportRenderer:
                         <div class="value">{t['carry']}</div>
                     </div>
                     <div class="trade-metric">
-                        <div class="label">Target</div>
+                        <div class="label">Objetivo</div>
                         <div class="value">{t['target']}</div>
                     </div>
                     <div class="trade-metric">
-                        <div class="label">Stop</div>
+                        <div class="label">Stop-loss</div>
                         <div class="value">{t['stop']}</div>
                     </div>
                 </div>
@@ -423,7 +423,7 @@ class RFReportRenderer:
                     </span>
                 </div>
                 <p style="margin: 10px 0; color: var(--text-medium);">{r['descripcion']}</p>
-                <p style="font-size: 9pt; color: var(--text-light);"><strong>Hedge:</strong> {r['hedge']}</p>
+                <p style="font-size: 9pt; color: var(--text-light);"><strong>Cobertura:</strong> {r['hedge']}</p>
             </div>'''
         replacements['{{risks_html}}'] = risks_html
 
@@ -440,15 +440,15 @@ class RFReportRenderer:
                 <p style="color: var(--text-medium); margin-bottom: 10px;">{t['rationale']}</p>
                 <div class="trade-metrics">
                     <div class="trade-metric">
-                        <div class="label">Entry</div>
+                        <div class="label">Entrada</div>
                         <div class="value">{t['entry']}</div>
                     </div>
                     <div class="trade-metric">
-                        <div class="label">Target</div>
+                        <div class="label">Objetivo</div>
                         <div class="value">{t['target']}</div>
                     </div>
                     <div class="trade-metric">
-                        <div class="label">Stop</div>
+                        <div class="label">Stop-loss</div>
                         <div class="value">{t['stop']}</div>
                     </div>
                 </div>

@@ -426,7 +426,7 @@ class RVContentGenerator:
                 f"para {self.month_name} {self.year}."
             )
         if not result['driver_principal']:
-            result['driver_principal'] = 'Ver analisis detallado en secciones siguientes'
+            result['driver_principal'] = 'Ver análisis detallado en secciones siguientes'
 
         return result
 
@@ -436,7 +436,7 @@ class RVContentGenerator:
         bcch_ret_map = {
             'Estados Unidos': 'sp500',
             'Europa': 'eurostoxx',
-            'Japon': 'nikkei',
+            'Japón': 'nikkei',
             'Chile': 'ipsa',
         }
 
@@ -449,7 +449,7 @@ class RVContentGenerator:
             'Estados Unidos': ['usa', 'estados unidos', 'us', 'eeuu'],
             'Europa': ['europa', 'europe'],
             'Emergentes': ['em', 'emergentes', 'emerging'],
-            'Japon': ['japón', 'japon', 'japan', 'japn'],
+            'Japón': ['japón', 'japon', 'japan', 'japn'],
             'Chile': ['chile'],
         }
 
@@ -458,7 +458,7 @@ class RVContentGenerator:
             {'mercado': 'Estados Unidos', 'indice': 'S&P 500', 'view': 'N', 'cambio': '=', 'driver': '-'},
             {'mercado': 'Europa', 'indice': 'Stoxx 600', 'view': 'N', 'cambio': '=', 'driver': '-'},
             {'mercado': 'Emergentes', 'indice': 'MSCI EM', 'view': 'N', 'cambio': '=', 'driver': '-'},
-            {'mercado': 'Japon', 'indice': 'Topix', 'view': 'N', 'cambio': '=', 'driver': '-'},
+            {'mercado': 'Japón', 'indice': 'Topix', 'view': 'N', 'cambio': '=', 'driver': '-'},
             {'mercado': 'Chile', 'indice': 'IPSA', 'view': 'N', 'cambio': '=', 'driver': '-'},
         ]
 
@@ -586,7 +586,7 @@ class RVContentGenerator:
 
         # Minimal fallback
         calls = [
-            "Ver analisis sectorial y regional en secciones siguientes",
+            "Ver análisis sectorial y regional en secciones siguientes",
         ]
         if chile_quant:
             calls.append(f"Chile: {chile_quant}")
@@ -1009,7 +1009,7 @@ class RVContentGenerator:
                 {'region': 'US', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
                 {'region': 'Europa', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
                 {'region': 'EM', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
-                {'region': 'Japon', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
+                {'region': 'Japón', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
                 {'region': 'Chile', 'upgrades': 'N/D', 'downgrades': 'N/D', 'net': 'N/D', 'tendencia': 'N/D'},
             ]
         }
@@ -1049,7 +1049,7 @@ class RVContentGenerator:
             elif upgrade_pct >= 35:
                 tendencia = 'Deteriorando'
             else:
-                tendencia = 'Debil'
+                tendencia = 'Débil'
 
             por_region.append({
                 'region': display_name,
@@ -1404,9 +1404,9 @@ class RVContentGenerator:
                 elif ytd > -3:
                     momentum = f'Neutro ({ytd:+.1f}% YTD)'
                 elif ytd > -10:
-                    momentum = f'Debil ({ytd:+.1f}% YTD)'
+                    momentum = f'Débil ({ytd:+.1f}% YTD)'
                 else:
-                    momentum = f'Muy debil ({ytd:+.1f}% YTD)'
+                    momentum = f'Muy débil ({ytd:+.1f}% YTD)'
             else:
                 momentum = 'N/D'
 
@@ -1608,7 +1608,7 @@ class RVContentGenerator:
         """Genera narrativa sectorial."""
         default = (
             "Preferencia sectorial no disponible. "
-            "Ver analisis del council para recomendaciones de sectores especificos."
+            "Ver análisis del council para recomendaciones de sectores específicos."
         )
 
         if not self._has_council():
@@ -2140,7 +2140,7 @@ class RVContentGenerator:
         return result
 
     def _generate_japan_view(self) -> Dict[str, Any]:
-        """Genera view de Japon con datos reales."""
+        """Genera view de Japón con datos reales."""
         v = self._val('japan') if self._has_data() else {}
         pe = v.get('pe_trailing') or v.get('pe_forward')
         price = v.get('price')
@@ -2155,7 +2155,7 @@ class RVContentGenerator:
         eq_target = self._get_equity_target('nikkei')
 
         return {
-            'mercado': 'Japon',
+            'mercado': 'Japón',
             'indice': 'Topix',
             'view': jp_council_view.get('view', 'N') if jp_council_view else 'N',
             'cambio': '=',
@@ -2231,7 +2231,7 @@ class RVContentGenerator:
         if copper is not None and copper_ytd is not None:
             parts.append(f"Cobre a {copper:.2f} USD/lb ({copper_ytd:+.1f}% YTD) apoya tesis de commodities. ")
         if lithium is not None and lithium_ytd is not None:
-            parts.append(f"Litio a {lithium:.0f} USD/ton ({lithium_ytd:+.1f}% YTD). ")
+            parts.append(f"Litio a {lithium:.1f} USD/kg ({lithium_ytd:+.1f}% YTD). ")
 
         # Agregar contexto de DF si disponible
         if ipsa_mentions > 3 or cobre_mentions > 3:
@@ -2290,7 +2290,7 @@ class RVContentGenerator:
             'narrativa': narrativa,
             'commodities_context': {
                 'cobre': f"{copper:.2f} USD/lb ({copper_ytd:+.1f}% YTD)" if copper and copper_ytd is not None else 'N/D',
-                'litio': f"{lithium:.0f} USD/ton ({lithium_ytd:+.1f}% YTD)" if lithium and lithium_ytd is not None else 'N/D',
+                'litio': f"{lithium:.1f} USD/kg ({lithium_ytd:+.1f}% YTD)" if lithium and lithium_ytd is not None else 'N/D',
             },
             'sectores_preferidos': [],
             'sectores_evitar': [],
@@ -2303,10 +2303,10 @@ class RVContentGenerator:
                 'escenarios': [
                     {'escenario': 'CLP fuerte (<$820)', 'impacto_ipsa': '-3%', 'impacto_earnings': '-5%', 'comentario': 'Negativo para exportadores'},
                     {'escenario': f'Neutral (~${usdclp:,.0f})' if usdclp else 'Neutral', 'impacto_ipsa': '0%', 'impacto_earnings': '0%', 'comentario': 'Base case'},
-                    {'escenario': 'CLP debil (>$900)', 'impacto_ipsa': '+2%', 'impacto_earnings': '+4%', 'comentario': 'Positivo para exportadores'}
+                    {'escenario': 'CLP débil (>$900)', 'impacto_ipsa': '+2%', 'impacto_earnings': '+4%', 'comentario': 'Positivo para exportadores'}
                 ],
                 'beta_ipsa_usdclp': 'N/D',
-                'comentario': 'IPSA tiene correlacion positiva con depreciacion CLP por peso exportadores'
+                'comentario': 'IPSA tiene correlación positiva con depreciación CLP por peso exportadores'
             }
         }
 
@@ -2433,7 +2433,7 @@ class RVContentGenerator:
             narrativa = (
                 f"{best['region']} lidera con retorno YTD de {best['retorno_ytd']}, "
                 f"mientras {worst['region']} rezaga con {worst['retorno_ytd']}. "
-                "Nota: Datos de flujos reales requieren suscripcion EPFR (no disponible)."
+                "Nota: Datos de flujos reales requieren suscripción EPFR (no disponible)."
             )
         else:
             narrativa = "Sin datos de retornos regionales. Ejecutar equity_data_collector."
@@ -2660,7 +2660,7 @@ class RVContentGenerator:
                           'Crisis energetica, recesion Alemania'),
             _build_scenario('MSCI EM', em_v, 1.20, 1.10, 0.85,
                           0.25, 0.50, 0.25,
-                          'China rally, USD debil, commodities up',
+                          'China rally, USD débil, commodities up',
                           'Earnings +10%, flujos neutrales',
                           'China hard landing, trade war, USD surge'),
         ]
@@ -2872,7 +2872,7 @@ class RVContentGenerator:
                 if len(lines) >= 3:
                     return lines
 
-        return ["Ver analisis del council para catalizadores especificos"]
+        return ["Ver análisis del council para catalizadores específicos"]
 
     def _generate_event_calendar(self) -> List[Dict[str, Any]]:
         """Genera calendario de eventos desde council data."""
@@ -2913,15 +2913,15 @@ class RVContentGenerator:
             {'fecha': f'Semana 1 {month_abbr}', 'evento': 'ISM Manufacturing PMI (USA)',
              'relevancia': 'Alta', 'impacto': 'Indicador adelantado de actividad industrial'},
             {'fecha': f'Semana 1 {month_abbr}', 'evento': 'Non-Farm Payrolls (NFP)',
-             'relevancia': 'Alta', 'impacto': 'Empleo USA - clave para politica Fed'},
+             'relevancia': 'Alta', 'impacto': 'Empleo USA - clave para política Fed'},
             {'fecha': f'Semana 2 {month_abbr}', 'evento': 'CPI USA (Inflacion)',
              'relevancia': 'Alta', 'impacto': 'Dato clave para expectativas de tasas'},
             {'fecha': f'Semana 3 {month_abbr}', 'evento': 'Reunion FOMC (Fed)',
-             'relevancia': 'Alta', 'impacto': 'Decision de tasa de politica monetaria'},
+             'relevancia': 'Alta', 'impacto': 'Decisión de tasa de política monetaria'},
             {'fecha': f'Semana 3 {month_abbr}', 'evento': 'Reunion BCE',
              'relevancia': 'Media', 'impacto': 'Politica monetaria Eurozona'},
             {'fecha': f'Semana 4 {month_abbr}', 'evento': 'PIB USA (GDP)',
-             'relevancia': 'Media', 'impacto': 'Crecimiento economico trimestral'},
+             'relevancia': 'Media', 'impacto': 'Crecimiento económico trimestral'},
         ]
 
     # =========================================================================
@@ -2958,7 +2958,7 @@ class RVContentGenerator:
                 prompt=(
                     "Genera una tabla de posicionamiento en renta variable como JSON array. "
                     "Cada fila: {\"categoria\": \"string\", \"recomendacion\": \"string\"}. "
-                    "Incluir: Equity Global (OW/N/UW), Region Preferida, Region a evitar/neutral, "
+                    "Incluir: Equity Global (OW/N/UW), Región Preferida, Región a evitar/neutral, "
                     "Sectores OW, Sectores UW, Style tilt, Factor tilt, Size preference. "
                     + views_str +
                     "IMPORTANTE: Usa exactamente los views regionales indicados arriba (OW/N/UW). "
@@ -2994,11 +2994,11 @@ class RVContentGenerator:
         # Fallbacks
         if not tabla_final:
             tabla_final = [
-                {'categoria': 'Equity Global', 'recomendacion': 'Ver analisis detallado'},
+                {'categoria': 'Equity Global', 'recomendacion': 'Ver análisis detallado'},
                 {'categoria': 'Posicionamiento', 'recomendacion': 'Basado en council del mes'},
             ]
         if not mensaje_clave:
-            mensaje_clave = f'Ver analisis detallado de {self.month_name} {self.year} para posicionamiento.'
+            mensaje_clave = f'Ver análisis detallado de {self.month_name} {self.year} para posicionamiento.'
 
         return {'tabla_final': tabla_final, 'mensaje_clave': mensaje_clave}
 
@@ -3071,7 +3071,7 @@ class RVContentGenerator:
             'Estados Unidos': 'us',
             'Europa': 'europe',
             'Emergentes': 'em',
-            'Japon': 'japan',
+            'Japón': 'japan',
             'Chile': 'chile',
         }
 

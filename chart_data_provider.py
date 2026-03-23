@@ -423,7 +423,7 @@ class ChartDataProvider:
             ('WTI', BCChSeries.WTI, 'USD/bbl', 'CL=F'),
             ('Gas Natural', BCChSeries.GAS_NATURAL, 'USD/MMBtu', 'NG=F'),
             ('Plata', BCChSeries.PLATA, 'USD/oz', 'SI=F'),
-            ('Litio', BCChSeries.LITIO, 'USD/ton', None),
+            ('Litio', BCChSeries.LITIO, 'USD/kg', None),
         ]
         result = []
         for name, sid, unit, yf_ticker in commodities:
