@@ -101,6 +101,21 @@ class RFContentGenerator:
         except (ValueError, TypeError):
             return str(value)
 
+    _SIGNAL_ES = {
+        'FAIR_VALUE': 'Valor Justo',
+        'EXPENSIVE': 'Caro',
+        'CHEAP': 'Barato',
+        'RICH': 'Caro',
+        'TIGHT': 'Ajustado',
+        'WIDE': 'Amplio',
+    }
+
+    def _translate_signal(self, signal: str) -> str:
+        """Translate raw enum signal to human-readable Spanish."""
+        if not signal:
+            return ''
+        return self._SIGNAL_ES.get(signal.upper().strip(), signal)
+
     def _council_rf_panel(self) -> str:
         """Extrae texto del panel RF del council."""
         try:
@@ -496,7 +511,7 @@ class RFContentGenerator:
                     'mercado': self._fmt_pct(c.get('market_rate', c.get('market'))),
                     'fed_dots': self._fmt_pct(c.get('fed_dots_median', c.get('fed_rate', c.get('fed_dots')))),
                     'diferencia': self._fmt_bp(c.get('diff_bps', c.get('difference', c.get('diff_bp')))),
-                    'señal': c.get('signal', ''),
+                    'señal': self._translate_signal(c.get('signal', '')),
                 })
 
         return {
@@ -520,7 +535,7 @@ class RFContentGenerator:
                     'mercado': self._fmt_pct(c.get('market_rate')),
                     'encuesta': self._fmt_pct(c.get('encuesta_rate', c.get('survey_rate'))),
                     'diferencia': self._fmt_bp(c.get('diff_bps', c.get('difference'))),
-                    'señal': c.get('signal', ''),
+                    'señal': self._translate_signal(c.get('signal', '')),
                 })
 
         return {
@@ -1569,7 +1584,7 @@ class RFContentGenerator:
                         'rating': key,
                         'spread': self._fmt_bp(rd['current_bps']),
                         'percentil': f"{int(rd.get('percentile_5y', 0))}%" if rd.get('percentile_5y') else 'N/D',
-                        'señal': rd.get('signal', ''),
+                        'señal': self._translate_signal(rd.get('signal', '')),
                     })
             if por_rating:
                 result['por_rating_real'] = por_rating

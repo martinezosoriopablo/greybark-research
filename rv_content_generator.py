@@ -93,8 +93,37 @@ class RVContentGenerator:
                 continue
             if len(p) > 80 and any(kw in p.lower() for kw in keywords):
                 self._used_council_paras.add(p_hash)
-                return self._md_to_html(p[:max_len])
+                # Truncate at sentence boundary to avoid cut-off mid-sentence
+                excerpt = p
+                if len(excerpt) > max_len:
+                    excerpt = excerpt[:max_len]
+                    # Find last sentence-ending punctuation within the truncated text
+                    last_period = max(excerpt.rfind('. '), excerpt.rfind('.\n'))
+                    if last_period > max_len * 0.5:
+                        excerpt = excerpt[:last_period + 1]
+                    else:
+                        # Fall back to word boundary
+                        last_space = excerpt.rfind(' ')
+                        if last_space > max_len * 0.6:
+                            excerpt = excerpt[:last_space]
+                return self._md_to_html(excerpt)
         return None
+
+    @staticmethod
+    def _truncate_at_sentence(text: str, max_len: int = 500) -> str:
+        """Truncate text at a sentence boundary to avoid cutting mid-sentence."""
+        if not text or len(text) <= max_len:
+            return text
+        excerpt = text[:max_len]
+        # Try to find last sentence-ending punctuation
+        last_period = max(excerpt.rfind('. '), excerpt.rfind('.\n'), excerpt.rfind('.'))
+        if last_period > max_len * 0.5:
+            return excerpt[:last_period + 1]
+        # Fall back to word boundary
+        last_space = excerpt.rfind(' ')
+        if last_space > max_len * 0.6:
+            return excerpt[:last_space]
+        return excerpt
 
     @staticmethod
     def _md_to_html(text: str) -> str:
@@ -1497,15 +1526,25 @@ class RVContentGenerator:
         sector_lower = sector_name.lower()
         avoid_keywords = ['evitar', 'reducir', 'uw', 'subponderar', 'riesgo']
         for para in combined.split('\n'):
-            p = para.strip().lower()
-            if sector_lower in p and any(kw in p for kw in avoid_keywords):
-                # Extract the specific mention (up to 40 chars after keyword)
-                for kw in avoid_keywords:
-                    idx = p.find(kw)
-                    if idx >= 0:
-                        snippet = para.strip()[max(0, idx-10):idx+40].strip()
-                        if snippet and snippet not in found:
-                            found.append(snippet[:30])
+            p = para.strip()
+            p_lower = p.lower()
+            if sector_lower in p_lower and any(kw in p_lower for kw in avoid_keywords):
+                # Extract a clean sentence containing the avoid keyword
+                # Split the paragraph into sentences and pick the relevant one
+                sentences = re.split(r'(?<=[.;])\s+', p)
+                for sent in sentences:
+                    s_lower = sent.strip().lower()
+                    if any(kw in s_lower for kw in avoid_keywords):
+                        clean = sent.strip()
+                        # Cap length but at a word boundary
+                        if len(clean) > 80:
+                            truncated = clean[:80]
+                            last_space = truncated.rfind(' ')
+                            if last_space > 40:
+                                truncated = truncated[:last_space]
+                            clean = truncated
+                        if clean and clean not in found:
+                            found.append(clean)
                             break
         return found[:3]
 
@@ -1518,7 +1557,7 @@ class RVContentGenerator:
         for para in rv_text.split('\n'):
             p = para.strip()
             if sector_lower in p.lower() and len(p) > 30:
-                return self._md_to_html(p.strip()[:200])
+                return self._md_to_html(self._truncate_at_sentence(p.strip(), 200))
         return None
 
     def _generate_avoid_sectors(self) -> List[Dict[str, Any]]:
@@ -1539,7 +1578,7 @@ class RVContentGenerator:
                     for para in rv_text.split('\n'):
                         p = para.strip().lower()
                         if k.lower() in p and any(t in p for t in ['cambiaría', 'revertiría', 'si ', 'trigger', 'salida']):
-                            que_cambiaria = self._md_to_html(para.strip()[:150])
+                            que_cambiaria = self._md_to_html(self._truncate_at_sentence(para.strip(), 150))
                             break
 
                 avoid.append({
@@ -1992,7 +2031,7 @@ class RVContentGenerator:
                 for para in source.split('\n\n'):
                     p = para.strip()
                     if len(p) > 80 and any(kw in p.lower() for kw in ['estados unidos', 's&p', 'us ', 'eeuu', 'norteam']):
-                        result['narrativa'] = self._md_to_html(p[:500])
+                        result['narrativa'] = self._md_to_html(self._truncate_at_sentence(p, 500))
                         break
 
         return result
@@ -2041,7 +2080,7 @@ class RVContentGenerator:
                 for para in source.split('\n\n'):
                     p = para.strip()
                     if len(p) > 80 and any(kw in p.lower() for kw in ['europa', 'stoxx', 'bce', 'eurozona']):
-                        result['narrativa'] = self._md_to_html(p[:500])
+                        result['narrativa'] = self._md_to_html(self._truncate_at_sentence(p, 500))
                         break
 
         return result
@@ -2095,7 +2134,7 @@ class RVContentGenerator:
                 for para in source.split('\n\n'):
                     p = para.strip()
                     if len(p) > 80 and any(kw in p.lower() for kw in ['emergent', 'em ', 'china', 'india', 'latam']):
-                        result['narrativa'] = self._md_to_html(p[:500])
+                        result['narrativa'] = self._md_to_html(self._truncate_at_sentence(p, 500))
                         break
 
         return result
@@ -2220,7 +2259,7 @@ class RVContentGenerator:
                 for para in source.split('\n\n'):
                     p = para.strip()
                     if len(p) > 80 and any(kw in p.lower() for kw in ['chile', 'ipsa', 'bcch', 'tpm']):
-                        narrativa = self._md_to_html(p[:500])
+                        narrativa = self._md_to_html(self._truncate_at_sentence(p, 500))
                         break
 
         # USD/CLP sensitivity con datos reales
@@ -2826,7 +2865,7 @@ class RVContentGenerator:
                 ),
                 council_context=council_ctx,
                 company_name=self.company_name,
-                max_tokens=300,
+                max_tokens=500,
             )
             if result:
                 lines = [l.strip() for l in result.split('\n') if l.strip()]

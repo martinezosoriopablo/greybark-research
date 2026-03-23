@@ -436,6 +436,21 @@ class AssetAllocationContentGenerator:
         except (ValueError, TypeError):
             return str(value)
 
+    @staticmethod
+    def _arrow_from_view(view: str) -> str:
+        """Derive dashboard arrow from OW/UW/N view when no prior-month data exists.
+
+        OW (overweight) implies increasing allocation -> up arrow.
+        UW (underweight) implies decreasing allocation -> down arrow.
+        N (neutral) or unknown -> flat arrow.
+        """
+        v = (view or '').upper().strip()
+        if v == 'OW':
+            return '\u2191'   # ↑
+        elif v == 'UW':
+            return '\u2193'   # ↓
+        return '\u2192'       # →
+
     def _get_spanish_month(self, month: int) -> str:
         meses = {
             1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
@@ -913,10 +928,13 @@ class AssetAllocationContentGenerator:
         if self.data:
             try:
                 usa = self.data.get_usa_latest()
-                if gdp is None and usa.get('gdp_saar') is not None:
-                    gdp = usa['gdp_saar']
-                if cpi is None and usa.get('cpi_core') is not None:
-                    cpi = usa['cpi_core']
+                # ChartDataProvider keys: gdp_qoq, cpi_core_yoy (not gdp_saar/cpi_core)
+                if gdp is None and usa.get('gdp_qoq') is not None:
+                    gdp = usa['gdp_qoq']
+                if cpi is None and usa.get('cpi_core_yoy') is not None:
+                    cpi = usa['cpi_core_yoy']
+                # Retail sales YoY not in ChartDataProvider; use quant_data below
+                # Previous period values (ChartDataProvider doesn't provide prev for GDP/CPI)
                 gdp_prev = usa.get('gdp_qoq_prev')
                 cpi_prev = usa.get('cpi_core_yoy_prev')
                 retail_prev = usa.get('retail_sales_yoy_prev')
@@ -924,15 +942,27 @@ class AssetAllocationContentGenerator:
             except Exception:
                 pass
 
-        # Also try quant_data
+        # Also try quant_data (from council_data_collector)
+        # macro_usa keys from FREDClient.get_us_macro_dashboard():
+        #   gdp={'value': QoQ%}, retail_sales={'value': MoM%, 'yoy': YoY%}, unemployment={...}
         if gdp is None:
             gdp = self._q('macro_usa', 'gdp')
         if cpi is None:
-            cpi = self._q('macro_usa', 'core_cpi')
+            # core_cpi is NOT in macro_usa; it's in the inflation module
+            cpi = self._q('inflation', 'cpi_core_yoy')
         if retail is None:
-            retail = self._q('macro_usa', 'retail_sales')
+            # Use YoY from retail_sales (not MoM 'value')
+            retail = self._q('macro_usa', 'retail_sales', 'yoy')
+            if retail is None:
+                retail = self._q('macro_usa', 'retail_sales')
         if recession is None:
             recession = self._q('macro_usa', 'recession_prob')
+        # GDP prev: use qoq_change from prior quarter if available
+        if gdp_prev is None and gdp is not None:
+            gdp_prev = self._q('macro_usa', 'gdp', 'qoq_change')
+            # If it's the same as gdp, we don't have a real prev
+            if gdp_prev is not None and abs(float(gdp_prev) - float(gdp)) < 0.01:
+                gdp_prev = None
 
         gdp_str = f'{gdp}%' if gdp is not None else 'N/D'
         cpi_str = f'{cpi}%' if cpi is not None else 'N/D'
@@ -1019,10 +1049,11 @@ class AssetAllocationContentGenerator:
         if self.data:
             try:
                 usa = self.data.get_usa_latest()
-                if usa.get('cpi_core') is not None:
-                    cpi_str = f"{usa['cpi_core']}%"
-                if usa.get('gdp') is not None:
-                    gdp_str = f"{usa['gdp']}%"
+                # ChartDataProvider keys: cpi_core_yoy, gdp_qoq (not cpi_core/gdp)
+                if usa.get('cpi_core_yoy') is not None:
+                    cpi_str = f"{usa['cpi_core_yoy']}%"
+                if usa.get('gdp_qoq') is not None:
+                    gdp_str = f"{usa['gdp_qoq']}%"
                 if usa.get('unemployment') is not None:
                     unemployment_str = f"{usa['unemployment']}%"
                 if usa.get('fed_funds') is not None:
@@ -1031,7 +1062,7 @@ class AssetAllocationContentGenerator:
                 pass
 
         if cpi_str == 'N/D':
-            cpi_str = self._fmt_pct(self._q('macro_usa', 'core_cpi'))
+            cpi_str = self._fmt_pct(self._q('inflation', 'cpi_core_yoy'))
         if gdp_str == 'N/D':
             gdp_str = self._fmt_pct(self._q('macro_usa', 'gdp'))
         if unemployment_str == 'N/D':
@@ -3222,10 +3253,11 @@ class AssetAllocationContentGenerator:
             conv = r.get('conviccion', 'N/D')
             if conv == 'N/D' and has_text:
                 conv = 'MEDIA'
+            mapped_view = view_map.get(r['view'], r['view'])
             renta_variable.append({
                 'asset': r['region'],
-                'view': view_map.get(r['view'], r['view']),
-                'cambio': '→',
+                'view': mapped_view,
+                'cambio': self._arrow_from_view(mapped_view),
                 'conviccion': conv,
             })
 
@@ -3239,10 +3271,11 @@ class AssetAllocationContentGenerator:
         }
         for c in rf.get('curva', []):
             label = tramo_labels.get(c['tramo'], c['tramo'])
+            mapped_view = view_map.get(c['view'], c['view'])
             renta_fija.append({
                 'asset': label,
-                'view': view_map.get(c['view'], c['view']),
-                'cambio': '→',
+                'view': mapped_view,
+                'cambio': self._arrow_from_view(mapped_view),
                 'conviccion': 'MEDIA' if has_text else 'N/D',
             })
 
@@ -3279,8 +3312,8 @@ class AssetAllocationContentGenerator:
             else:
                 hy_view = 'N'
         conv_default = 'MEDIA' if self.parser.has_council_text() else 'N/D'
-        renta_fija.append({'asset': 'IG Credit', 'view': ig_view, 'cambio': '→', 'conviccion': conv_default})
-        renta_fija.append({'asset': 'HY Credit', 'view': hy_view, 'cambio': '→', 'conviccion': conv_default})
+        renta_fija.append({'asset': 'IG Credit', 'view': ig_view, 'cambio': self._arrow_from_view(ig_view), 'conviccion': conv_default})
+        renta_fija.append({'asset': 'HY Credit', 'view': hy_view, 'cambio': self._arrow_from_view(hy_view), 'conviccion': conv_default})
 
         # Build Commodities+FX dashboard
         commodities_fx = []
@@ -3290,7 +3323,10 @@ class AssetAllocationContentGenerator:
                 v = 'OW'
             elif 'UW' in c['view'].upper():
                 v = 'UW'
-            cambio = '↓' if 'reducir' in c['view'].lower() else '→'
+            if 'reducir' in c['view'].lower():
+                cambio = '\u2193'  # ↓
+            else:
+                cambio = self._arrow_from_view(v)
             commodities_fx.append({
                 'asset': c['nombre'],
                 'view': v,
@@ -3330,8 +3366,8 @@ class AssetAllocationContentGenerator:
         if canon_usd != 'N/D':
             usd_view = canon_usd
             clp_view = {'OW': 'UW', 'UW': 'OW', 'N': 'N'}.get(usd_view, 'N')
-        commodities_fx.append({'asset': 'USD (DXY)', 'view': usd_view, 'cambio': '→', 'conviccion': conv_fx})
-        commodities_fx.append({'asset': 'CLP', 'view': clp_view, 'cambio': '→', 'conviccion': conv_fx})
+        commodities_fx.append({'asset': 'USD (DXY)', 'view': usd_view, 'cambio': self._arrow_from_view(usd_view), 'conviccion': conv_fx})
+        commodities_fx.append({'asset': 'CLP', 'view': clp_view, 'cambio': self._arrow_from_view(clp_view), 'conviccion': conv_fx})
 
         # Override RF tramo views with canonical values
         canon_rf = {
@@ -3343,6 +3379,7 @@ class AssetAllocationContentGenerator:
             for tramo_key, canon_view in canon_rf.items():
                 if tramo_key in item.get('asset', '') and canon_view and canon_view != item.get('view'):
                     item['view'] = canon_view
+                    item['cambio'] = self._arrow_from_view(canon_view)
 
         # Override oro view with canonical
         canon_oro = self.canon.get('oro_view')
@@ -3350,6 +3387,7 @@ class AssetAllocationContentGenerator:
             for item in commodities_fx:
                 if 'Oro' in item.get('asset', ''):
                     item['view'] = canon_oro
+                    item['cambio'] = self._arrow_from_view(canon_oro)
 
         return {
             'renta_variable': renta_variable,

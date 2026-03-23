@@ -314,6 +314,7 @@ class RFReportRenderer:
 
         hy = credito['high_yield']
         replacements['{{hy_view}}'] = hy['view']
+        replacements['{{hy_badge_class}}'] = self._get_view_class(hy['view'])
         replacements['{{hy_spread}}'] = hy['spread_actual']
         replacements['{{hy_yield}}'] = hy['yield_total']
         replacements['{{hy_vs_historia}}'] = hy['spread_vs_historia']
