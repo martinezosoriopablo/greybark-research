@@ -269,12 +269,30 @@ class RFChartsGenerator:
                         ha='center', fontsize=8, color=self.COLORS['text_light'],
                         bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
 
+        # Overlay sovereign curves (Bund, JGB) if available
+        sov = self.data.get('sovereign_curves', {}) if self.data else {}
+        sov_colors = {'alemania': '#1565C0', 'japon': '#C62828'}
+        sov_labels = {'alemania': 'Bund (Alemania)', 'japon': 'JGB (Japón)'}
+        sov_yields_all = []
+        for country in ('alemania', 'japon'):
+            cdata = sov.get(country, {})
+            tenor_map = cdata.get('tenors', {})
+            if tenor_map and len(tenor_map) >= 3:
+                # Map integer tenors to x-axis years
+                sov_x = [int(t) for t in sorted(tenor_map.keys(), key=lambda k: int(k))]
+                sov_y = [tenor_map[str(t)] for t in sov_x]
+                ax.plot(sov_x, sov_y, color=sov_colors[country], linewidth=1.5,
+                        marker='s', markersize=3, linestyle='--', alpha=0.7,
+                        label=sov_labels[country], zorder=2)
+                sov_yields_all.extend(sov_y)
+
         # Y-axis: tight range (don't start at 0)
         all_yields = yields_now[:]
         if curve_1m:
             all_yields += [v for v in [curve_1m.get(t) for t in tenors] if v is not None]
         if curve_1y:
             all_yields += [v for v in [curve_1y.get(t) for t in tenors] if v is not None]
+        all_yields.extend(sov_yields_all)
         y_min = min(all_yields) - 0.25
         y_max = max(all_yields) + 0.35
         ax.set_ylim(y_min, y_max)
@@ -283,7 +301,7 @@ class RFChartsGenerator:
         ax.set_xticklabels(tenors, fontsize=8)
         ax.set_xlabel('Plazo', fontsize=9)
         ax.set_ylabel('Yield (%)', fontsize=9)
-        ax.set_title('Curva UST: Actual vs 1M vs 1A', fontsize=12, fontweight='bold',
+        ax.set_title('Curvas Soberanas: UST vs Bund vs JGB', fontsize=12, fontweight='bold',
                       color=self.COLORS['primary'], pad=10)
         ax.legend(loc='lower right', fontsize=7)
 

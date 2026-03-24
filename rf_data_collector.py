@@ -586,6 +586,29 @@ class RFDataCollector:
             self._print(f"  [ERR] Chile Rates: {e}")
             return {'error': str(e)}
 
+    def collect_sovereign_curves(self) -> Dict[str, Any]:
+        """Módulo 13: Curvas soberanas Alemania (Bund) y Japón (JGB)."""
+        self._print("  -> Curvas soberanas (ECB + MoF Japan)...")
+        try:
+            from data_fetchers.curvas_soberanas import get_yield_curves
+            raw = get_yield_curves(use_cache=True, cache_hours=4)
+            result = {}
+            for country in ('alemania', 'japon'):
+                cdata = raw.get(country, {})
+                if isinstance(cdata, dict) and 'datos' in cdata:
+                    result[country] = {
+                        'tenors': cdata['datos'],
+                        'spreads': cdata.get('spreads', {}),
+                        'fecha': cdata.get('fecha', ''),
+                        'fuente': cdata.get('fuente', ''),
+                    }
+            summary = ', '.join(f'{k} ({len(v["tenors"])}T)' for k, v in result.items())
+            self._print(f"  [OK] Sovereign curves: {summary}")
+            return result
+        except Exception as e:
+            self._print(f"  [ERR] Sovereign curves: {e}")
+            return {'error': str(e)}
+
     # =========================================================================
     # ORQUESTADOR: collect_all()
     # =========================================================================
@@ -657,6 +680,9 @@ class RFDataCollector:
 
         # Módulo 12: Chile Rates & Indicators (BCCh)
         data['chile_rates'] = self.collect_chile_rates()
+
+        # Módulo 13: Sovereign Yield Curves (ECB Data Portal + MoF Japan)
+        data['sovereign_curves'] = self.collect_sovereign_curves()
 
         # Metadata
         elapsed = (datetime.now() - t0).total_seconds()

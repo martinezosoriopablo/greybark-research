@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-23 (73 bugs resueltos, 10 sprints + 5 sub-sprints, pipeline 4/4 OK, 0 P0/P1 pendientes)
+> Última actualización: 2026-03-23 (75 bugs resueltos, 11 sprints + 5 sub-sprints, pipeline 4/4 OK, 0 P0/P1 pendientes)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -157,7 +157,7 @@ Plataforma automatizada de research de inversiones que genera **4 reportes mensu
 10. BCCh Indices (IPSA/IGPA, índices intl, FX, commodities)
 11. Chile Top Picks (yfinance ADRs: BCH, BSAC, SQM, LTM, CCU)
 
-**RF Data Collector** (`rf_data_collector.py`) — 12 módulos:
+**RF Data Collector** (`rf_data_collector.py`) — 13 módulos:
 1. Duration analytics
 2. Yield Curve (UST: 2Y, 5Y, 10Y + spreads)
 3. Credit Spreads (IG/HY OAS + momentum)
@@ -170,6 +170,7 @@ Plataforma automatizada de research de inversiones que genera **4 reportes mensu
 10. International Yields (8 países via BCCh)
 11. Chile Yields (BCP 1Y-10Y, BCU 5Y-30Y, breakevens, slopes)
 12. Chile Rates (TPM, DAP, interbancaria, consumo/comercial/vivienda, intl policy rates)
+13. Sovereign Curves (Bund 9T via ECB + JGB 11T via MoF Japan)
 
 **Forecast Engine** (`forecast_engine.py`) — 4 módulos + IMF:
 1. **Inflation** (3 regiones): Breakevens 40% + ARIMA 20% + Phillips 20% + IMF 20%
@@ -408,7 +409,7 @@ consejo_ia/
 ├── # ---- FASE 1: Recopilación ----
 ├── council_data_collector.py         # 10+ módulos macro quant
 ├── equity_data_collector.py          # 11 módulos equity
-├── rf_data_collector.py              # 12 módulos renta fija
+├── rf_data_collector.py              # 13 módulos renta fija
 ├── forecast_engine.py                # 4 módulos + IMF
 ├── econometric_models.py             # ARIMA, VAR, Taylor, Phillips
 ├── imf_weo_client.py                 # IMF WEO consensus

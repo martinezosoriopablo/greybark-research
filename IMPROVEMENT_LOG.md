@@ -176,6 +176,15 @@
 
 **Resultado:** 0 bugs P1 pendientes. inflation_components_ts genera correctamente (21/24 macro charts OK, 3 son Bloomberg-only).
 
+### Sprint 11 — Curvas Soberanas en RF (2026-03-23)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 74 | Yield curve chart solo muestra UST (faltaban Bund + JGB) | `rf_data_collector.py` | Módulo 13 `collect_sovereign_curves()` importa `data_fetchers/curvas_soberanas.py` (ECB 9T + MoF Japan 11T) |
+| 75 | Chart title no refleja contenido multi-curva | `rf_chart_generator.py` | Título "Curva UST: Actual vs 1M vs 1A" → "Curvas Soberanas: UST vs Bund vs JGB" + overlay Bund (azul) + JGB (rojo) |
+
+**Resultado:** Yield curve chart ahora muestra 3 curvas soberanas con datos reales. RF data collector ampliado a 13 módulos.
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
@@ -202,7 +211,7 @@
 - [x] BCCh dates dayfirst=True (era DD-MM swap)
 - [x] Tasas auto-fetch: TPM 4.50% (BCCh), Fed Funds 3.64% (FRED)
 - [x] ~95 acentos corregidos, ~20 labels traducidos, litio USD/kg
-- [ ] Pendiente: regenerar 4 reportes post Sprint 9+10 para verificar visualmente
+- [x] Regenerado RF con curvas soberanas Bund+JGB (Sprint 11), TPM 4.50% OK
 
 ---
 
@@ -325,5 +334,5 @@
 | 2 (Library) | — | 0 | — | — | — |
 | 3 (Coherence) | — | 7 | 3 | 2 | 2 |
 | 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 |
-| 5 (Auditoría) | 9 | 71 | 28 | 25 | 18 |
-| **Total** | **9** | **71+13** | **35** | **28** | **21** |
+| 5 (Auditoría) | 11 | 75 | 28 | 27 | 20 |
+| **Total** | **11** | **75+13** | **35** | **30** | **23** |
