@@ -308,6 +308,7 @@ class RFReportRenderer:
 
         ig = credito['investment_grade']
         replacements['{{ig_view}}'] = ig['view']
+        replacements['{{ig_badge_class}}'] = self._get_view_class(ig['view'])
         replacements['{{ig_spread}}'] = ig['spread_actual']
         replacements['{{ig_yield}}'] = ig['yield_total']
         replacements['{{ig_vs_historia}}'] = ig['spread_vs_historia']

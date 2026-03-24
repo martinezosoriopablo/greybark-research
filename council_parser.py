@@ -258,14 +258,29 @@ class CouncilParser:
             return None
 
         views = {}
-        # Pattern: Segment: {OW|NEUTRAL|UW}, {CORTA|NEUTRAL|LARGA}, {rationale}
-        pattern = r'([^:\n]+?):\s*(OW|NEUTRAL|UW),\s*(CORTA|NEUTRAL|LARGA),\s*(.+?)(?:\n|$)'
+        # Two-pass parsing: first capture segment + view, then extract
+        # duration optionally (council may use CORTA-MEDIA, free text, etc.)
+        pattern = r'([^:\n]+?):\s*(OW|NEUTRAL|UW),\s*(.+?)(?:\n|$)'
+        dur_pattern = re.compile(
+            r'(CORTA(?:\s*-\s*MEDIA)?|MEDIA(?:\s*-\s*LARGA)?|NEUTRAL|LARGA)'
+            r'(?:\s*\([^)]*\))?,\s*(.*)',
+            re.IGNORECASE,
+        )
         for match in re.finditer(pattern, block, re.IGNORECASE):
             segment = match.group(1).strip()
+            rest = match.group(3).strip()
+            dur_m = dur_pattern.match(rest)
+            if dur_m:
+                duration = dur_m.group(1).upper().replace(' ', '')
+                rationale = dur_m.group(2).strip()
+            else:
+                # No structured duration — treat entire rest as rationale
+                duration = 'N/D'
+                rationale = rest
             views[segment.lower()] = {
                 'view': match.group(2).upper(),
-                'duration': match.group(3).upper(),
-                'rationale': match.group(4).strip(),
+                'duration': duration,
+                'rationale': rationale,
             }
 
         return views if views else None
@@ -282,9 +297,10 @@ class CouncilParser:
             return None
 
         result = {}
-        stance_m = re.search(r'Stance:\s*(.+?)(?:\n|$)', block)
+        # Capture multiline stance (until next keyword or end)
+        stance_m = re.search(r'Stance:\s*(.+?)(?=\nBenchmark:|\nRecomendaci|\Z)', block, re.DOTALL)
         if stance_m:
-            result['stance'] = stance_m.group(1).strip()
+            result['stance'] = ' '.join(stance_m.group(1).split())
         bench_m = re.search(r'Benchmark:\s*([\d.]+)', block)
         if bench_m:
             result['benchmark'] = float(bench_m.group(1))

@@ -309,7 +309,11 @@ class RFContentGenerator:
             """Extract duration stance from council FI positioning."""
             if fi_views:
                 v = fi_views.get(segment_key, {})
-                dur_map = {'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga'}
+                dur_map = {
+                    'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga',
+                    'CORTA-MEDIA': 'Corta-Media', 'MEDIA-LARGA': 'Media-Larga',
+                    'MEDIA': 'Media',
+                }
                 return dur_map.get(v.get('duration', ''), fallback)
             return fallback
 
@@ -1249,7 +1253,11 @@ class RFContentGenerator:
             """Get duration view from council for a segment."""
             if fi_views:
                 v = fi_views.get(segment_key, {})
-                dur_map = {'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga'}
+                dur_map = {
+                    'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga',
+                    'CORTA-MEDIA': 'Corta-Media', 'MEDIA-LARGA': 'Media-Larga',
+                    'MEDIA': 'Media',
+                }
                 return dur_map.get(v.get('duration', ''), _fallback)
             return _fallback
 
@@ -2169,7 +2177,11 @@ class RFContentGenerator:
         if fi_views:
             cv = fi_views.get('chile soberanos', fi_views.get('chile', fi_views.get('chile corporativos', {})))
             chile_sv = cv.get('view', 'Sin vista')
-            dur_map = {'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga'}
+            dur_map = {
+                'CORTA': 'Corta', 'NEUTRAL': 'Neutral', 'LARGA': 'Larga',
+                'CORTA-MEDIA': 'Corta-Media', 'MEDIA-LARGA': 'Media-Larga',
+                'MEDIA': 'Media',
+            }
             chile_dur_v = dur_map.get(cv.get('duration', ''), 'N/D')
 
         result = {
