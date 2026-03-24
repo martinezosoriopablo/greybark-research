@@ -30,6 +30,7 @@ Thumbs.db
 
 # Database
 *.db
+!deploy/layout_seed/*.db
 
 # Temp
 *.tmp
