@@ -36,10 +36,14 @@ logger = logging.getLogger("portal")
 # ── Platform import ───────────────────────────────────────
 
 # Support running from consejo_ia/ or from Docker /app/
-_layout_dir = os.environ.get(
-    "GREYBARK_LAYOUT_DIR",
-    str(Path(__file__).resolve().parents[4] / "Layout")  # -> documentos/Layout
-)
+_layout_dir = os.environ.get("GREYBARK_LAYOUT_DIR")
+if not _layout_dir:
+    # Local dev: deploy/app.py -> consejo_ia/deploy/ -> 4 levels up -> documentos/Layout
+    _app_path = Path(__file__).resolve()
+    try:
+        _layout_dir = str(_app_path.parents[4] / "Layout")
+    except IndexError:
+        _layout_dir = str(_app_path.parent.parent / "layout")
 if _layout_dir not in sys.path:
     sys.path.insert(0, _layout_dir)
 
