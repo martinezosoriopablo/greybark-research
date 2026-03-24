@@ -6,6 +6,8 @@
 |---|---|---|
 | BCCh REST | `bcch_client.py` | Diaria/Mensual |
 | FRED | `fred_client.py` | Diaria/Mensual |
+| ECB Data Portal | `data_fetchers/curvas_soberanas.py` | Diaria (cache 4h) |
+| MoF Japan | `data_fetchers/curvas_soberanas.py` | Diaria (cache 4h) |
 
 Capa de datos centralizada: `chart_data_provider.py` (ChartDataProvider)
 
@@ -100,6 +102,17 @@ Capa de datos centralizada: `chart_data_provider.py` (ChartDataProvider)
 
 **Chart migrado**: `china_dashboard` (GDP, CPI, PPI, Desempleo)
 **Contenido migrado**: `china_growth`, `pboc_policy` (2 metodos)
+
+### Curvas Soberanas (ECB + MoF Japan) — Nuevo 2026-03-23
+
+| Pais | API | Tenores | Serie/Endpoint |
+|---|---|---|---|
+| Alemania (Bund) | ECB Data Portal | 1,2,3,5,7,10,15,20,30Y | AAA Svensson curve |
+| Japon (JGB) | MoF Japan | 1,2,3,5,7,10,15,20,25,30,40Y | JGB benchmark yields |
+
+Cliente: `data_fetchers/curvas_soberanas.py` (`get_yield_curves()`)
+Cache: 4 horas. Collector: `rf_data_collector.py` Modulo 13.
+Uso: Overlay en yield curve chart RF (Bund=azul, JGB=rojo sobre UST).
 
 ---
 
@@ -409,7 +422,7 @@ Estructura:
 | Europe PMI chart | PMI propietario |
 | China trade chart | Sin datos BCCh de comercio total |
 | PMI global chart | PMI propietario |
-| CPI subcomponents USA (Shelter, Services ex-Energy, Core Goods, Food, Energy) | FRED: CUSR0000SAH1, CUSR0000SAS, CUSR0000SACL1E, CPIUFDSL, CPIENGSL |
+| ~~CPI subcomponents USA~~ | **RESUELTO** — FRED: CUSR0000SAH1, CUSR0000SAS, CUSR0000SACL1E, CPIUFDSL, CPIENGSL → `get_usa_cpi_breakdown()` |
 | Componentes IPC Chile | Series no configuradas en BCCh |
 | LPR, RRR China | Sin serie en BCCh |
 | Salarios negociados Europa | Sin serie en BCCh |

@@ -1,5 +1,5 @@
 # Greybark Research - Sistema de Reportes de Inversion
-## Version 4.0 | Febrero 2026
+## Version 4.1 | Marzo 2026
 
 > **Nota**: Este modulo es parte del sistema Greybark Research.
 > Para documentacion completa del proyecto, ver el [README principal](../README.md).
@@ -26,7 +26,7 @@ consejo_ia/
 ├── RECOPILACION DE DATOS (Data Collectors)
 │   ├── council_data_collector.py         # 10 modulos macro cuantitativos
 │   ├── equity_data_collector.py          # 10 modulos equity (yfinance/AV/BCCh)
-│   ├── rf_data_collector.py              # 12 modulos renta fija (FRED/BCCh)
+│   ├── rf_data_collector.py              # 13 modulos renta fija (FRED/BCCh/ECB/MoF)
 │   ├── daily_intelligence_digest.py      # Digesto de reportes diarios (30d)
 │   └── research_analyzer.py              # Sintesis research externo (LLM)
 │
@@ -135,7 +135,7 @@ python run_monthly.py --open
 │  DATA COLLECTORS                                                │
 │                                                                 │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐           │
-│  │  Macro (10)  │ │ Equity (10)  │ │  RF (12)     │           │
+│  │  Macro (10)  │ │ Equity (10)  │ │  RF (13)     │           │
 │  │  council_    │ │ equity_data_ │ │ rf_data_     │           │
 │  │  data_coll.  │ │ collector    │ │ collector    │           │
 │  └──────────────┘ └──────────────┘ └──────────────┘           │

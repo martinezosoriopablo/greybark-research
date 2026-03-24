@@ -6,21 +6,23 @@ Last updated: 2026-03-23
 
 | Report | Total Charts | 100% Real | Partial Real | Fallback/Estimated |
 |--------|-------------|-----------|-------------|-------------------|
-| Macro  | 24          | 16        | 3           | 5                 |
+| Macro  | 24          | 17        | 3           | 4                 |
 | RV     | 12          | 12        | 0           | 0                 |
 | RF     | 8           | 8         | 0           | 0                 |
-| **Total** | **44**   | **36**    | **3**       | **5**             |
+| **Total** | **44**   | **37**    | **3**       | **4**             |
 
-Real data percentage: **82%** (36/44)
+Real data percentage: **84%** (37/44)
 
-### Recent Changes (Sprint 3-4)
+### Recent Changes (Sprint 3-11)
 - Commodity charts enriched with yfinance spot when BCCh data >35 days stale
 - Factor Performance chart: yfinance fallback (was placeholder "sin scores")
 - RV now 12/12 charts (was 11/12)
+- inflation_components_ts: now uses FRED CPI series (was estimated fallback)
+- RF yield curve chart: Bund + JGB sovereign curves overlaid (ECB + MoF Japan data)
 
 ## Macro Report Charts (22)
 
-### 100% Real API Data (14)
+### 100% Real API Data (15)
 | Chart | Source | API |
 |-------|--------|-----|
 | inflation_evolution | BCCh API | USA PCE, Euro HICP, Chile IPC YoY |
@@ -37,6 +39,7 @@ Real data percentage: **82%** (36/44)
 | chile_inflation_components | BCCh API | 13 COICOP divisions (F074.IPC) |
 | latam_rates | BCCh API | LatAm policy rates |
 | yield_curve / yield_spreads | FRED API | UST curve 1M-30Y |
+| inflation_components_ts | FRED API | CPI Shelter/Services/Goods/Food/Energy YoY |
 
 ### Partial Real + Latest Override (3)
 | Chart | Historical | Latest Point | Source |
@@ -45,10 +48,9 @@ Real data percentage: **82%** (36/44)
 | europe_pmi | Interpolated pattern | Bloomberg latest | Markit proprietary |
 | china_dashboard | BCCh if available | BCCh/AKShare | BCCh F019 + NBS |
 
-### Fully Estimated Fallback (5)
+### Fully Estimated Fallback (4)
 | Chart | Reason | Notes |
 |-------|--------|-------|
-| inflation_components_ts | CPI subcomponents (Shelter, Services ex-Housing) no simple FRED series | 5-component decomposition |
 | europe_dashboard | Euro GDP by country not in BCCh/FRED | Would need Eurostat API |
 | china_trade | China exports/imports proprietary | Would need NBS/Customs |
 | chile_external | Chile trade balance from BCCh (partial) | Exports+Imports+Copper+Balance |
@@ -65,6 +67,7 @@ All 12 charts use real data from `EquityDataCollector`:
 All 8 charts use real data:
 - BCCh API: Chile BCP/BCU curves, international yields, TPM
 - FRED API: UST yield curve, credit spreads, breakevens, Fed expectations
+- ECB Data Portal + MoF Japan: Bund (9T) + JGB (11T) overlaid on yield curve chart
 
 ## Dynamic Benchmarks
 
