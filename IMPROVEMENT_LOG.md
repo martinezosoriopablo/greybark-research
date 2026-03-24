@@ -185,6 +185,18 @@
 
 **Resultado:** Yield curve chart ahora muestra 3 curvas soberanas con datos reales. RF data collector ampliado a 13 módulos.
 
+### Sprint 12 — RF Vistas Vacías: Parser FI_POSITIONING (2026-03-24)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 76 | FI_POSITIONING parser solo extrae 1/6 segmentos (regex `CORTA\|NEUTRAL\|LARGA` rechaza `CORTA-MEDIA` y texto libre) | `council_parser.py:262` | Two-pass parser: captura segment+view primero, duración opcionalmente. Acepta CORTA-MEDIA, MEDIA-LARGA, texto libre |
+| 77 | 22 badges "Sin vista" / "---" en RF (5 segmentos, 5 países EM, 6 BCP/BCU, IG/EM HC/LC) | `rf_content_generator.py` | Ahora 6/6 segmentos extraídos → vistas propagan a todos los consumidores |
+| 78 | IG badge hardcoded `badge-ow` (verde) aún cuando view = "Sin vista" | `templates/rf_report_professional.html` + `rf_report_renderer.py` | `{{ig_badge_class}}` dinámico vía `_get_view_class()` |
+| 79 | Duration stance truncada ("...servicios 3.43% y") — regex captura solo hasta primer `\n` | `council_parser.py:300` | Regex multiline: captura hasta siguiente keyword (Benchmark/Recomendación) |
+| 80 | `dur_map` no incluye duraciones compuestas (CORTA-MEDIA, MEDIA-LARGA) | `rf_content_generator.py` (×3 instancias) | Agregados a los 3 `dur_map` dicts |
+
+**Resultado:** 0 instancias "Sin vista" en RF (era 22+). 6/6 segmentos FI parseados (era 1/6). Duration stance completa.
+
 ### Bugs Pendientes
 
 | Prioridad | Bug | Impacto |
@@ -334,5 +346,5 @@
 | 2 (Library) | — | 0 | — | — | — |
 | 3 (Coherence) | — | 7 | 3 | 2 | 2 |
 | 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 |
-| 5 (Auditoría) | 11 | 75 | 28 | 27 | 20 |
-| **Total** | **11** | **75+13** | **35** | **30** | **23** |
+| 5 (Auditoría) | 12 | 80 | 28 | 32 | 20 |
+| **Total** | **12** | **80+13** | **35** | **35** | **23** |
