@@ -1,15 +1,21 @@
 # FastAPI portal
-fastapi>=0.109.0
+fastapi>=0.109.0,<0.112.0
 uvicorn[standard]>=0.27.0
+starlette>=0.36.0,<0.38.0
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
 python-multipart>=0.0.6
 jinja2>=3.1.3
+python-dotenv>=1.0.0
 
-# Platform deps (already in project but needed in Docker)
+# Pipeline deps (needed for subprocess runs)
 anthropic>=0.18.0
 yfinance>=0.2.36
 fredapi>=0.5.1
 requests>=2.31.0
 pandas>=2.1.0
 matplotlib>=3.8.0
+numpy>=1.24.0
+pmdarima>=2.0.0
+statsmodels>=0.14.0
+scipy>=1.11.0
