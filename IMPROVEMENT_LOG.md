@@ -211,6 +211,7 @@
 - 2026-03-20 (post Sprint 1): 4/4 reportes, 41 min, spreads IG 91bp/HY 320bp OK
 - 2026-03-21 (post Sprint 2): 4/4 reportes, 43.6 min, anti-fabricación 10 correcciones
 - 2026-03-22 (post Sprint 4): 4/4 reportes, 34.9 min, forecasts 5/5 modelos OK
+- 2026-03-24 (post Sprint 12): RF regenerado, 8/8 charts, 0 "Sin vista", 23.4 min
 
 **Checks pasados:**
 - [x] Credit spreads: IG ~90bp, HY ~320bp (era 1bp sin ×100)
@@ -224,6 +225,7 @@
 - [x] Tasas auto-fetch: TPM 4.50% (BCCh), Fed Funds 3.64% (FRED)
 - [x] ~95 acentos corregidos, ~20 labels traducidos, litio USD/kg
 - [x] Regenerado RF con curvas soberanas Bund+JGB (Sprint 11), TPM 4.50% OK
+- [x] FI_POSITIONING parser: 6/6 segmentos (era 1/6), 0 "Sin vista" en RF (Sprint 12)
 
 ---
 
@@ -339,7 +341,20 @@
 - P2 = nice-to-have pero contribuyen a calidad profesional
 - Cada sprint debe terminar con: código compilado + commit + push + .md actualizados
 
+### Patrones Recurrentes de Bugs
+
+| Patrón | Frecuencia | Ejemplo | Lección |
+|--------|-----------|---------|---------|
+| **Regex demasiado estricto para output LLM** | 3 veces | FI_POSITIONING exigía `CORTA\|NEUTRAL\|LARGA`, council escribió `CORTA-MEDIA` | Parsers de output LLM deben ser tolerantes: capturar lo seguro (OW/N/UW) primero, detalles opcionales después |
+| **Dict keys incorrectos** (path mismatch) | 6+ veces | `pe` no existe, es `pe_forward`; `yield_curve.us_2y` no existe, es `current_curve.2Y` | Siempre verificar keys reales con `print(data.keys())` antes de asumir estructura |
+| **Datos stale con `--skip-collect`** | 2 veces | TPM 5.0% en JSON viejo cuando API ya retorna 4.5% | `--skip-collect` usa cache — si se corrigió auto-fetch, hay que re-colectar |
+| **Fallback silencioso oculta errores** | 5+ veces | `ChartDataProvider(bloomberg=...)` → TypeError → `None` → 0 charts sin error | Logear warnings cuando un fallback se activa; no tragarse excepciones silenciosamente |
+| **Badge CSS hardcoded** | 3 veces | IG `badge-ow` cuando view es NEUTRAL | Siempre usar `_get_view_class()` dinámico, nunca hardcodear clase CSS de badge |
+| **Acentos faltantes** | ~95 instancias | "Credito" → "Crédito", "Analisis" → "Análisis" | Revisar templates + content generators + renderers en conjunto; buscar regex `[aeiou][^a-z]` |
+
 ### Estadísticas
+
+**Por ciclo:**
 | Ciclo | Sprints | Bugs resueltos | P0 | P1 | P2 |
 |-------|---------|----------------|----|----|-----|
 | 1 (Setup) | — | 0 | — | — | — |
@@ -347,4 +362,22 @@
 | 3 (Coherence) | — | 7 | 3 | 2 | 2 |
 | 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 |
 | 5 (Auditoría) | 12 | 80 | 28 | 32 | 20 |
-| **Total** | **12** | **80+13** | **35** | **35** | **23** |
+| **Total** | **12** | **93** | **35** | **35** | **23** |
+
+**Desglose Ciclo 5 (auditoría completa):**
+| Sprint | Fecha | Bugs | Tema principal |
+|--------|-------|------|----------------|
+| 1 | 2026-03-20 | #13-17 (5) | HY duplicado, señal temprana, EV/EBITDA, acentos templates |
+| 2 | 2026-03-21 | #20-23 (4) | Regex Fed rate, max_tokens panel, oil fabricado, badges español |
+| 3 | 2026-03-22 | #24-28 (5) | Commodity stale, S&P target, consensus, regime, EuroStoxx ticker |
+| 4 | 2026-03-22 | #29-32 (4) | Factor scores yfinance, acentos RV |
+| 5 | 2026-03-23 | #33-48 (16) | Acentos RF/AA, PE/VIX/TPM paths, calendar 4→3 cols |
+| 6 | 2026-03-23 | #49-51 (3) | TPM/Fed auto-fetch desde API |
+| 7 | 2026-03-23 | #52-58 (7) | BCCh date swap, earnings headers, escenarios 100%, régimen labels |
+| 8 | 2026-03-23 | #59-65 (7) | RF trades duplicados, signals, narrativas garbled, AA dashboard |
+| 9 | 2026-03-23 | #66-71 (6) | ~95 acentos, ~20 labels traducidos, litio USD/kg |
+| 10 | 2026-03-23 | #72-73 (2) | CPI chart verificado, RF markdown leak |
+| 11 | 2026-03-23 | #74-75 (2) | Curvas soberanas Bund+JGB en RF |
+| 12 | 2026-03-24 | #76-80 (5) | FI_POSITIONING parser 1/6→6/6, IG badge, duration truncada |
+
+**Velocidad promedio:** 6.7 bugs/sprint, ~2 sprints/día en ciclo intensivo
