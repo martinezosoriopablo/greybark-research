@@ -9,9 +9,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bcrypt as _bcrypt
 from fastapi import Request, HTTPException, status
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 # ── Config ────────────────────────────────────────────────
 
@@ -20,17 +20,15 @@ ALGORITHM = "HS256"
 TOKEN_EXPIRE_MINUTES = int(os.environ.get("TOKEN_EXPIRE_MINUTES", "480"))  # 8 hours
 COOKIE_NAME = "gb_session"
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 # ── Password helpers ──────────────────────────────────────
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return _bcrypt.hashpw(plain.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return _bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 # ── JWT helpers ───────────────────────────────────────────
