@@ -174,7 +174,6 @@ class CouncilDataCollector:
                 'eee_expectations': bcch.get_eee_expectations(),
                 'eof_expectations': bcch.get_eof_expectations(),
                 'imce': bcch.get_imce(),
-                'ipc_detail': bcch.get_ipc_detail(),
             }
         try:
             self._print("  -> Chile extended (BCCh)...")
