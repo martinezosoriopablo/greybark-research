@@ -55,13 +55,32 @@
 - akshare v1.18.46 instalado y funcional en container
 - Portal live en `http://87.99.133.124` (Ashburn, VA)
 
-### Patrón Recurrente Nuevo
+### Sprint 17 — Daily Reports + Data Sync + Fixes
+
+**Trigger:** Pipeline generaba reportes sin narrativas — 0 daily reports en servidor, API key inválida, chile_extended crasheaba.
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 100 | Daily reports 0 en servidor (path apunta a `~/OneDrive/` local) | `daily_report_parser.py` usa `DAILY_REPORTS_PATH` | Subidos 150 daily reports a `/data/daily_reports/`, env var + volumen Docker |
+| 101 | DF summaries 0 en servidor | `DF_SUMMARY_DIR` no seteado | Subidos 88 resúmenes a `/data/df_data/`, env var + volumen Docker |
+| 102 | Anthropic API key inválida (401 auth error) | `/data/.env` | Key reemplazada — ahora API responde OK |
+| 103 | `chile_extended` crash: `get_ipc_detail()` no existe en BCChExtendedClient | `council_data_collector.py:177` | Eliminado método inexistente del dict |
+
+**Validación:**
+- `DailyReportParser.get_monthly_summary()` → 43 reportes encontrados (Feb 24 - Mar 25)
+- 88 resúmenes DF disponibles para intelligence digest
+- `chile_extended` ahora GREEN (7 submódulos OK)
+- Anthropic API OK (test directo desde container)
+
+### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
 |--------|-----------|---------|
 | **Scraper web bloqueado desde servidor** | 1 vez (CommLoan) | Siempre tener fallback API para scrapers. Servidores reciben CAPTCHAs/bloqueos que laptops no. |
 | **Paquete importado pero no en requirements.txt** | 2 (akshare, beautifulsoup4) | Auditar imports vs requirements antes de cada deploy. `try/except` oculta la falta del paquete. |
 | **Latencia geográfica a APIs** | 3 módulos (BCCh desde Helsinki) | Elegir datacenter cercano a las APIs principales (US East para FRED/NY Fed, BCCh funciona global). |
+| **Paths hardcodeados a `~/OneDrive/`** | 2 (daily reports, DF summaries) | En servidor, TODO path externo debe venir de env var + volumen Docker. Auditar antes de deploy. |
+| **Método inexistente llamado silenciosamente** | 1 (get_ipc_detail) | Cuando se agrega un método a un collector, verificar que existe en el client. Falla oculta por `try/except`. |
 
 ### Inconsistencias Detectadas en Audit
 
@@ -437,8 +456,8 @@
 | 3 (Coherence) | — | 7 | 3 | 2 | 2 | — |
 | 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 | — |
 | 5 (Auditoría) | 12 | 80 | 28 | 32 | 20 | — |
-| 6 (Prompt Audit + Deploy) | 4 | 18 | 1 | 2 | — | 6 prompts mejorados |
-| **Total** | **16** | **111** | **36** | **37** | **23** | **6** |
+| 6 (Prompt Audit + Deploy) | 5 | 22 | 2 | 3 | — | 6 prompts mejorados |
+| **Total** | **17** | **115** | **37** | **38** | **23** | **6** |
 
 **Desglose Ciclo 5 (auditoría completa):**
 | Sprint | Fecha | Bugs | Tema principal |
@@ -459,5 +478,6 @@
 | 14 | 2026-03-25 | #87-90 (4) | Dashboard client isolation + company name editable + Streamlit eliminado |
 | 15 | 2026-03-25 | #91-95 (5) | Hetzner deploy: Helsinki→Ashburn migration |
 | 16 | 2026-03-25 | #96-99 (4) | Dependency audit: +akshare, NY Fed SOFR fallback, timeouts |
+| 17 | 2026-03-25 | #100-103 (4) | Daily reports sync, DF sync, API key fix, chile_extended fix |
 
-**Velocidad promedio:** 6.9 bugs/sprint, ~2 sprints/día en ciclo intensivo
+**Velocidad promedio:** 6.8 bugs/sprint, ~2 sprints/día en ciclo intensivo
