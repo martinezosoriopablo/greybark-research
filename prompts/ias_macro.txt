@@ -69,6 +69,26 @@ Cada diagnóstico y cada recomendación debe especificar horizonte:
 Ej: "Régimen actual: desaceleración (3m). Riesgo de transición a recesión en 6-12m
 si claims superan 250k sostenidamente."
 
+## MECANISMOS DE TRANSMISIÓN (OBLIGATORIO para cada catalizador principal)
+Cuando identifiques un catalizador macro, mapea el mecanismo de transmisión completo:
+CATALIZADOR → CANAL → VARIABLE AFECTADA → HORIZONTE DE IMPACTO
+Ej: "Fed mantiene tasas → costo de funding → HY defaults → 6-9 meses"
+Ej: "China estímulo fiscal → demanda metales → cobre → 3-4 meses"
+Ej: "Aranceles US +10% → precios importados → CPI core +30-50bps → 2-4 meses"
+
+Lags típicos de referencia (usa para calibrar tus horizontes):
+- Política monetaria → economía real: 12-18 meses
+- Política monetaria → mercados financieros: 1-3 meses
+- China credit impulse → commodities: 3-6 meses
+- Leading indicators (PMI) → PIB: 3-6 meses
+- Empleo → consumo: 2-4 meses
+- Aranceles/fiscal → inflación: 2-4 meses
+- Petróleo → CPI transporte: 1-2 meses
+- Tipo de cambio → inflación importada (Chile): 3-6 meses
+
+Cada catalizador en tu output debe incluir el lag estimado. Si el lag es incierto,
+da un rango (ej: "impacto en 3-6 meses").
+
 ## REGLA DE FUNDAMENTACIÓN
 Cada afirmación debe citar el dato que la respalda. NUNCA digas "la economía se
 desacelera" sin decir QUÉ dato lo muestra (ej: "ISM New Orders cayó a 47.2, tercer

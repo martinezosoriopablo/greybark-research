@@ -1,4 +1,9 @@
 """
+DEPRECATED: Legacy "FOMC In Silico" architecture.
+The production system uses ai_council_runner.py with prompts from prompts/*.txt.
+This file is retained for reference only. Do NOT modify prompts here —
+all prompt changes should go to prompts/*.txt and ai_council_runner.py.
+
 Greybark Research - AI Council Agent Personas
 ==============================================
 

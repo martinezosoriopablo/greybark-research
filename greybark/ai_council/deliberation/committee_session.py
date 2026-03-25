@@ -1,4 +1,9 @@
 """
+DEPRECATED: Legacy "FOMC In Silico" deliberation architecture.
+The production system uses ai_council_runner.py with a 3-layer process
+(Panel → CIO+Contrarian → Refinador) and prompts from prompts/*.txt.
+This file is retained for reference only. Do NOT modify prompts here.
+
 Greybark Research - AI Council Committee Session
 =================================================
 
