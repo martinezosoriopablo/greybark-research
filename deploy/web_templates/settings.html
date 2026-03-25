@@ -49,6 +49,13 @@
             </div>
 
             <form action="/settings/branding" method="post" id="branding-form">
+                <div class="form-group">
+                    <label for="company_name">Nombre de empresa</label>
+                    <input type="text" id="company_name_input" name="company_name"
+                           value="{{ company_name or '' }}"
+                           placeholder="Ej: Mi Empresa Research">
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="primary_color">Color primario</label>
@@ -185,6 +192,7 @@
     var accent = document.getElementById('accent_color');
     var font = document.getElementById('font_family');
     var footer = document.getElementById('footer_text');
+    var companyInput = document.getElementById('company_name_input');
     var header = document.getElementById('preview-header');
     var company = document.getElementById('preview-company');
     var accentLine = document.getElementById('preview-accent-line');
@@ -196,8 +204,8 @@
     function update() {
         var pv = primary.value;
         var av = accent.value;
-        if (header) header.style.background = pv;
-        if (company) company.style.color = pv;
+        if (header) { header.style.background = pv; header.textContent = companyInput.value || '{{ company_name }}'; }
+        if (company) { company.style.color = pv; company.textContent = companyInput.value || '{{ company_name }}'; }
         if (accentLine) accentLine.style.background = av;
         if (dateEl) dateEl.style.color = av;
         if (footerEl) footerEl.textContent = footer.value;
@@ -243,6 +251,7 @@
     accent.addEventListener('input', update);
     font.addEventListener('change', update);
     footer.addEventListener('input', update);
+    companyInput.addEventListener('input', update);
 
     // Also listen to prompt fields
     ['tone','audience','focus','custom_instructions','podcast_intro','podcast_outro','report_disclaimer'].forEach(function(id) {

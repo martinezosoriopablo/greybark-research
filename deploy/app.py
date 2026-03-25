@@ -988,6 +988,7 @@ async def settings_page(
 async def save_branding(
     request: Request,
     client_id: str = Depends(get_current_client),
+    company_name: str = Form(""),
     primary_color: str = Form(...),
     accent_color: str = Form(...),
     font_family: str = Form(...),
@@ -995,6 +996,8 @@ async def save_branding(
     email_header_html: str = Form(""),
 ):
     platform = _get_platform()
+    if company_name.strip():
+        platform.update_client(client_id, company_name=company_name.strip())
     platform.set_branding(
         client_id,
         primary_color=primary_color,
