@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-24 (80 bugs resueltos, 12 sprints + 5 sub-sprints, pipeline 4/4 OK, 0 P0/P1 pendientes)
+> Última actualización: 2026-03-25 (94 bugs/mejoras resueltos, 15 sprints, pipeline 4/4 OK, prompt audit completado, deploy Hetzner live)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
@@ -204,7 +204,7 @@ Plataforma automatizada de research de inversiones que genera **4 reportes mensu
 | Agente | Modelo | Recibe | Produce |
 |--------|--------|--------|---------|
 | **CIO** | claude-opus | 5 paneles + research + Bloomberg context | Síntesis coherente (~800 words) |
-| **CONTRARIAN** | claude-opus | CIO síntesis + 5 paneles | Crítica + escenarios alternativos (~600 words) |
+| **CONTRARIAN** | claude-opus | CIO síntesis + 5 paneles | Crítica + supuesto más peligroso + analogías históricas (~600-800 words) |
 | **REFINADOR** | claude-opus | CIO + Contrarian + council_input completo | Documento final con `[BLOQUE: X]` (~8000 words) |
 
 ### 4.3 Output Estructurado (Capa 3)
@@ -213,7 +213,8 @@ El Refinador produce bloques delimitados que `council_parser.py` extrae:
 - `[BLOQUE: EQUITY_VIEWS]` → OW/N/UW por región con convicción
 - `[BLOQUE: FI_POSITIONING]` → Duración, crédito, curva
 - `[BLOQUE: ESCENARIOS]` → Base/Bull/Bear con probabilidades
-- `[BLOQUE: RISK_ASSESSMENT]` → Top 5 riesgos con probabilidad/impacto
+- `[BLOQUE: RISK_MATRIX]` → Top 5 riesgos con prob/impacto/equity%/RF bps/análogo
+- `[BLOQUE: CORRELACIONES]` → Equity-bonds, cross-asset, Gold-USD (actual/1Y/5Y)
 - `[BLOQUE: SECTOR_VIEWS]` → 11 GICS con OW/N/UW
 - `[BLOQUE: FX_VIEWS]` → USD/CLP, EUR/USD, etc.
 - `[BLOQUE: REGIONAL_ALLOCATION]` → Pesos por región vs benchmark
@@ -449,7 +450,7 @@ consejo_ia/
 │
 ├── # ---- Utilidades ----
 ├── api_health_checker.py             # Health check de APIs
-├── dashboard.py                      # Dashboard web (Flask)
+├── # dashboard.py ELIMINADO          # Era Streamlit, reemplazado por deploy/app.py
 ├── html_nd_cleaner.py                # Limpieza N/D en HTML
 │
 ├── # ---- Library ----

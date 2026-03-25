@@ -1,5 +1,9 @@
 # Greybark Research - AI Council Module
 
+> **DEPRECATED**: Este módulo es la arquitectura legacy "FOMC In Silico" (6 agentes, 5 rondas).
+> El sistema de producción usa `ai_council_runner.py` (5 agentes, 3 capas) con prompts en `prompts/*.txt`.
+> Este código se conserva como referencia. No modificar prompts aquí.
+
 ## 🎯 Descripción
 
 El **AI Council** es un sistema multi-agente para decisiones de inversión basado en el paper académico ["FOMC In Silico: A Multi-Agent System for Monetary Policy Decision Modeling"](https://www2.gwu.edu/~forcpgm/2025-005.pdf) de Kazinnik & Sinclair (2025).

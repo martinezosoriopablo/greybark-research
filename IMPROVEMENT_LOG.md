@@ -5,6 +5,51 @@
 
 ---
 
+## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy
+
+**Trigger:** Audit completo de los 31 prompts del AI Council + deploy a producción.
+
+### Sprint 13 — Prompt Audit (5 mejoras implementadas)
+
+| # | Archivo | Mejora | Impacto |
+|---|---------|--------|---------|
+| 81 | `ias_riesgo.txt` | +Calibración histórica obligatoria (GFC/COVID/Taper/SVB/Volmageddon), +Correlaciones obligatorias (3 métricas con actual/1Y/5Y), +RISK_MATRIX con magnitud equity%/RF bps condicional (dato/ref./omitir), +BLOQUE: CORRELACIONES | Downstream: AA scenario tables ahora reciben impactos cuantificados |
+| 82 | `ias_contrarian.txt` | +SUPUESTO MÁS PELIGROSO obligatorio (ranked #1 con prob/impacto/señal), +Analogías históricas obligatorias con resultado cuantificado, word limit 500-600→600-800 | Refinador recibe input priorizado en vez de lista sin ranking |
+| 83 | `ias_macro.txt` | +Mecanismos de transmisión obligatorios (CATALIZADOR→CANAL→VARIABLE→HORIZONTE), +Tabla de lags típicos (8 referencias: pol monetaria 12-18m, China credit 3-6m, etc.) | Agentes downstream saben CUÁNDO impacta cada catalizador |
+| 84 | `ias_cio.txt` | +Referencia explícita a 9 bloques del panel con fuente, +Regla de precedencia bloque > prosa | Reduce riesgo de que CIO ignore datos estructurados |
+| 85 | `personas.py` + `committee_session.py` | +Header DEPRECATED (legacy FOMC In Silico, no es producción) | Elimina riesgo de confusión con sistema de producción |
+| 86 | `refinador.txt` | +Regla: omitir campos vacíos del RISK_MATRIX del output final | Evita placeholders sin dato en reportes finales |
+
+### Sprint 14 — Dashboard Client Isolation
+
+| # | Archivo | Mejora |
+|---|---------|--------|
+| 87 | `deploy/app.py` | `_get_client_reports()` solo busca en carpeta del cliente, no en `output/reports/` compartido |
+| 88 | `deploy/app.py` | +`_copy_reports_to_client()` copia reportes a `<output>/<client_id>/<YYYY-MM-DD>/` post-pipeline |
+| 89 | `deploy/web_templates/settings.html` + `deploy/app.py` | +Campo editable "Nombre de empresa" con live preview |
+| 90 | `dashboard.py` | Eliminado (Streamlit legacy) |
+
+### Sprint 15 — Hetzner Deploy
+
+| # | Cambio |
+|---|--------|
+| 91 | Dockerfile con QuantLib + layout_seed (greybark_platform.py, greybark.db, passwords.json) |
+| 92 | Nginx reverse proxy + persistent volumes (`/data/layout`, `/data/research`) |
+| 93 | API keys configuradas en servidor (ANTHROPIC, FRED, AV, BCCh) |
+| 94 | Portal live en `http://95.217.222.55` (Hetzner CX22, Helsinki) |
+
+### Inconsistencias Detectadas en Audit
+
+| ID | Inconsistencia | Severidad | Acción |
+|----|---------------|-----------|--------|
+| I1 | `personas.py` CIO "NO tienes opinión propia" vs `ias_cio.txt` "INTEGRADOR con criterio propio" | Alta | Deprecado `personas.py` (no es runtime) |
+| I2 | `committee_session.py` 6 agentes/5 rondas vs producción 5 agentes/3 capas | Alta | Deprecado `committee_session.py` |
+| I3 | RISK_MATRIX sin magnitud de impacto | Media | Agregados campos equity%/RF bps condicionales |
+| I4 | CIO no referencia bloques del panel explícitamente | Media | Agregada sección BLOQUES DE INPUT |
+| I5 | Contrarian analogías históricas opcionales | Media | Hechas obligatorias |
+
+---
+
 ## Ciclo 5 — 2026-03-19: Auditoría Completa 4 Reportes
 
 **Trigger:** Revisión manual post-pipeline detectó reportes con datos incorrectos.
@@ -306,6 +351,11 @@
 │     - Clasificar bugs: P0 (datos erróneos que engañan),  │
 │       P1 (contenido roto/vacío), P2 (cosmético/idioma)   │
 │     - Registrar en "Bugs Pendientes" con prioridad       │
+│     - PROMPT AUDIT (periódico, cada ~5 ciclos):          │
+│       · Leer los 8 .txt + 23 prompts embebidos en código │
+│       · Evaluar: claridad, output spec, frameworks, gaps │
+│       · Detectar inconsistencias entre prompts           │
+│       · Proponer mejoras con diffs antes de implementar  │
 ├─────────────────────────────────────────────────────────┤
 │  2. FIX                                                  │
 │     - Atacar por prioridad: P0 → P1 → P2                │
@@ -355,14 +405,15 @@
 ### Estadísticas
 
 **Por ciclo:**
-| Ciclo | Sprints | Bugs resueltos | P0 | P1 | P2 |
-|-------|---------|----------------|----|----|-----|
-| 1 (Setup) | — | 0 | — | — | — |
-| 2 (Library) | — | 0 | — | — | — |
-| 3 (Coherence) | — | 7 | 3 | 2 | 2 |
-| 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 |
-| 5 (Auditoría) | 12 | 80 | 28 | 32 | 20 |
-| **Total** | **12** | **93** | **35** | **35** | **23** |
+| Ciclo | Sprints | Bugs/Mejoras | P0 | P1 | P2 | Prompts |
+|-------|---------|--------------|----|----|-----|---------|
+| 1 (Setup) | — | 0 | — | — | — | — |
+| 2 (Library) | — | 0 | — | — | — | — |
+| 3 (Coherence) | — | 7 | 3 | 2 | 2 | — |
+| 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 | — |
+| 5 (Auditoría) | 12 | 80 | 28 | 32 | 20 | — |
+| 6 (Prompt Audit + Deploy) | 3 | 14 | — | — | — | 6 prompts mejorados |
+| **Total** | **15** | **107** | **35** | **35** | **23** | **6** |
 
 **Desglose Ciclo 5 (auditoría completa):**
 | Sprint | Fecha | Bugs | Tema principal |
@@ -379,5 +430,8 @@
 | 10 | 2026-03-23 | #72-73 (2) | CPI chart verificado, RF markdown leak |
 | 11 | 2026-03-23 | #74-75 (2) | Curvas soberanas Bund+JGB en RF |
 | 12 | 2026-03-24 | #76-80 (5) | FI_POSITIONING parser 1/6→6/6, IG badge, duration truncada |
+| 13 | 2026-03-25 | #81-86 (6) | Prompt audit: riesgo, contrarian, macro, CIO, deprecations, refinador |
+| 14 | 2026-03-25 | #87-90 (4) | Dashboard client isolation + company name editable + Streamlit eliminado |
+| 15 | 2026-03-25 | #91-94 (4) | Hetzner deploy: Dockerfile, nginx, volumes, API keys |
 
-**Velocidad promedio:** 6.7 bugs/sprint, ~2 sprints/día en ciclo intensivo
+**Velocidad promedio:** 7.1 bugs/sprint, ~2 sprints/día en ciclo intensivo
