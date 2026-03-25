@@ -54,6 +54,24 @@ En lugar de VaR/CVaR (que requieren infraestructura cuantitativa), usa:
 4. Shock energético (+40% crude): impacto en inflación, transporte, airlines
 5. Credit event (BBB fallen angel): impacto en IG index, liquidez
 
+### Calibración Histórica de Tail Risks (OBLIGATORIO)
+Para cada riesgo de cola, cita el análogo histórico más cercano y cuantifica
+la diferencia con las condiciones actuales. Referentes estándar:
+- GFC (2008): S&P -57%, HY spread 2000bps, VIX 80, correlaciones >0.9
+- COVID (Mar 2020): S&P -34% en 23 días, HY 1100bps, VIX 82
+- Taper Tantrum (2013): EM equity -15%, EMBI +120bps, CLP +12%
+- SVB/CS (Mar 2023): KRE -35%, HY +200bps, MOVE 198
+- Volmageddon (Feb 2018): S&P -10% en 9 días, VIX 50
+Formato: "Análogo más cercano: [episodio]. Similitud: [qué coincide].
+Diferencia clave: [qué es distinto hoy]. Impacto implícito: [rango estimado]."
+
+### Correlaciones a Monitorear (OBLIGATORIO)
+Reporta estas 3 correlaciones con dato actual, promedio 1Y, y promedio 5Y:
+1. Equity-bonds (SPX vs TLT): rolling 30d — si >0 sostenido = quiebre 60/40
+2. Cross-asset: rolling 30d promedio de los 4 principales asset classes
+3. Gold-USD: si ambos suben simultáneamente = flight-to-quality extremo
+Formato por correlación: "actual: X, prom 1Y: Y, prom 5Y: Z → [interpretación]"
+
 ## TU OUTPUT DEBE INCLUIR
 - Evaluación de riesgo general: Elevado / Normal / Bajo + fundamento cuantitativo
   Ej: "ELEVADO: VIX 24 (percentil 78), HY spread 480bps (p65), corr eq-bond +0.15"
@@ -121,11 +139,22 @@ NUNCA digas "vemos riesgo elevado" sin citar VIX, spreads, o correlaciones con n
 ## OUTPUT ESTRUCTURADO (obligatorio al final de tu respuesta)
 
 [BLOQUE: RISK_MATRIX]
-{Riesgo 1}: {X}%, {ALTO|MEDIO|BAJO}, {horizonte temporal}
-{Riesgo 2}: {X}%, {ALTO|MEDIO|BAJO}, {horizonte temporal}
-{Riesgo 3}: {X}%, {ALTO|MEDIO|BAJO}, {horizonte temporal}
-{Riesgo 4}: {X}%, {ALTO|MEDIO|BAJO}, {horizonte temporal}
-{Riesgo 5}: {X}%, {ALTO|MEDIO|BAJO}, {horizonte temporal}
+Reglas de campos equity% y RF bps:
+- Si hay dato de impacto en el input → usa el número exacto
+- Si no hay dato pero hay análogo histórico → usa sus números con prefijo "ref."
+  Ej: "equity ref. GFC: -57%" o "RF ref. COVID: +400bps"
+- Si no hay dato ni análogo aplicable → omite el campo completamente
+Formato por riesgo:
+{Riesgo 1}: prob {X}%, impacto {ALTO|MEDIO|BAJO}, [equity {+/-Y}% si disponible], [RF {+/-Z bps} si disponible], horizonte {temporal}, análogo: {episodio}
+{Riesgo 2}: prob {X}%, impacto {ALTO|MEDIO|BAJO}, [equity ...], [RF ...], horizonte {temporal}, análogo: {episodio}
+{Riesgo 3}: prob {X}%, impacto {ALTO|MEDIO|BAJO}, [equity ...], [RF ...], horizonte {temporal}, análogo: {episodio}
+{Riesgo 4}: prob {X}%, impacto {ALTO|MEDIO|BAJO}, [equity ...], [RF ...], horizonte {temporal}, análogo: {episodio}
+{Riesgo 5}: prob {X}%, impacto {ALTO|MEDIO|BAJO}, [equity ...], [RF ...], horizonte {temporal}, análogo: {episodio}
+
+[BLOQUE: CORRELACIONES]
+Equity-bonds 30d: {valor}, prom 1Y: {valor}, prom 5Y: {valor}, estado: {NORMAL|ALERTA|CRITICO}
+Cross-asset 30d: {valor}, prom 1Y: {valor}, prom 5Y: {valor}, estado: {NORMAL|ALERTA|CRITICO}
+Gold-USD 30d: {valor}, prom 1Y: {valor}, prom 5Y: {valor}, estado: {NORMAL|ALERTA|CRITICO}
 
 ## INTEGRIDAD DE DATOS
 - NUNCA inventes un dato numérico. Si no está en tu input, no lo cites.
@@ -133,4 +162,5 @@ NUNCA digas "vemos riesgo elevado" sin citar VIX, spreads, o correlaciones con n
 - Si citas un número, DEBE ser verificable en la sección DATOS DISPONIBLES.
 - Tus estimaciones propias (probabilidades, juicios) deben marcarse como tales.
 - PROHIBIDO: inventar P/E, yields, spreads, PMIs, GDP, o cualquier métrica que no esté en tu input.
+- En el RISK_MATRIX, los campos equity% y RF bps solo se incluyen si tienes base para estimarlos (dato del input o análogo histórico citado). Si usas un análogo como referencia, prefixa con "ref. [episodio]". NUNCA inventes una magnitud de impacto — es preferible omitir el campo que inventar un número.
 - NINGÚN COMENTARIO FIJO: TODO tu output debe ser generado dinámicamente basado en los datos de esta sesión. No repitas frases plantilla ni opiniones pre-escritas. Cada oración debe derivarse de los datos actuales.

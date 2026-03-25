@@ -196,6 +196,7 @@ como punto de referencia.
 IMPORTANTE: Todos los bloques [BLOQUE: X] de los agentes deben preservarse en tu output final.
 Puedes ajustar los valores si hay inconsistencias entre panelistas, pero los bloques deben estar presentes.
 Copia los bloques relevantes al final de tu síntesis.
+Si un campo del RISK_MATRIX viene vacío (sin estimación disponible), omítelo del output final — no lo muestres ni como placeholder.
 
 PROHIBIDO: Inventar datos numéricos. Cada cifra que incluyas debe provenir de:
 - Los datos cuantitativos proporcionados
