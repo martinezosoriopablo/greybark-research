@@ -2,9 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for matplotlib + bcrypt
+# System deps for matplotlib, bcrypt, QuantLib
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libffi-dev && \
+    gcc g++ libffi-dev libboost-all-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
