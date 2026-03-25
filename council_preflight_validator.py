@@ -38,8 +38,8 @@ from dataclasses import dataclass, field, asdict
 
 # Criticidad por módulo
 CRITICAL_MODULES = {'regime', 'macro_usa', 'chile'}
-IMPORTANT_MODULES = {'inflation', 'rates', 'risk', 'china'}
-OPTIONAL_MODULES = {'chile_extended', 'international', 'breadth'}
+IMPORTANT_MODULES = {'inflation', 'risk', 'china'}
+OPTIONAL_MODULES = {'chile_extended', 'international', 'breadth', 'rates'}
 
 ALL_MODULES = CRITICAL_MODULES | IMPORTANT_MODULES | OPTIONAL_MODULES
 

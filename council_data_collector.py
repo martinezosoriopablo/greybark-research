@@ -178,7 +178,7 @@ class CouncilDataCollector:
             }
         try:
             self._print("  -> Chile extended (BCCh)...")
-            data['chile_extended'] = resilient_fetch('bcch_extended', _fetch_chile_extended, verbose_fn=_log)
+            data['chile_extended'] = resilient_fetch('bcch_extended', _fetch_chile_extended, timeout_sec=120, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Chile Extended: {e}")
             data['chile_extended'] = {'error': str(e)}
@@ -213,7 +213,7 @@ class CouncilDataCollector:
             }
         try:
             self._print("  -> Rate expectations (Fed)...")
-            data['rates'] = resilient_fetch('fred', _fetch_rates, cache_key='rate_expectations', verbose_fn=_log)
+            data['rates'] = resilient_fetch('fred', _fetch_rates, cache_key='rate_expectations', timeout_sec=120, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] Rates: {e}")
             data['rates'] = {'error': str(e)}
@@ -289,7 +289,7 @@ class CouncilDataCollector:
             }
         try:
             self._print("  -> International data...")
-            data['international'] = resilient_fetch('bcch', _fetch_international, cache_key='bcch_international', verbose_fn=_log)
+            data['international'] = resilient_fetch('bcch', _fetch_international, cache_key='bcch_international', timeout_sec=120, verbose_fn=_log)
         except Exception as e:
             self._print(f"  [ERR] International: {e}")
             data['international'] = {'error': str(e)}

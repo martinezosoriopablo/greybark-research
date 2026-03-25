@@ -309,7 +309,7 @@ def resilient_fetch(
     *args,
     cache_key: Optional[str] = None,
     ttl: Optional[int] = None,
-    timeout_sec: float = 60.0,
+    timeout_sec: float = 90.0,
     max_retries: int = 3,
     verbose_fn: Optional[Callable] = None,
     **kwargs,
