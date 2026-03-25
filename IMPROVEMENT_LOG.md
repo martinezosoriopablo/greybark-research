@@ -29,14 +29,39 @@
 | 89 | `deploy/web_templates/settings.html` + `deploy/app.py` | +Campo editable "Nombre de empresa" con live preview |
 | 90 | `dashboard.py` | Eliminado (Streamlit legacy) |
 
-### Sprint 15 — Hetzner Deploy
+### Sprint 15 — Hetzner Deploy (Helsinki → Ashburn)
 
 | # | Cambio |
 |---|--------|
 | 91 | Dockerfile con QuantLib + layout_seed (greybark_platform.py, greybark.db, passwords.json) |
 | 92 | Nginx reverse proxy + persistent volumes (`/data/layout`, `/data/research`) |
 | 93 | API keys configuradas en servidor (ANTHROPIC, FRED, AV, BCCh) |
-| 94 | Portal live en `http://95.217.222.55` (Hetzner CX22, Helsinki) |
+| 94 | Helsinki descartado (BCCh timeout, CommLoan bloqueado geográficamente) |
+| 95 | Servidor migrado a **Ashburn, VA** (CPX11) — `http://87.99.133.124` |
+
+### Sprint 16 — Dependency Audit + Rates Fallback
+
+**Trigger:** Pipeline fallaba en servidor: `rates` RED (CommLoan bloqueado), `china` silenciosamente sin datos (akshare no instalado), `chile_extended`/`international` timeout.
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 96 | akshare no en requirements → módulo China falla silencioso | `deploy/requirements.txt` | +akshare>=1.12.0, +beautifulsoup4>=4.12.0 |
+| 97 | CommLoan scraper bloqueado desde servidores (devuelve HTML) | `greybark/analytics/rate_expectations/usd_expectations.py` | Fallback NY Fed SOFR API + FRED SOFR averages (30d/90d/180d). Curva 9 tenors: ON→10Y |
+| 98 | Default timeout 60s insuficiente para BCCh desde US | `data_resilience.py` | Default 60s→90s; chile_extended/international/rates explícitamente 120s |
+| 99 | `rates` como IMPORTANT bloqueaba council innecesariamente | `council_preflight_validator.py` | Temporalmente OPTIONAL durante Helsinki; restaurado a IMPORTANT tras fix NY Fed |
+
+**Validación:**
+- NY Fed fallback produce 9 tenors: SOFR ON 3.63%, 1M 3.66%, 3M 3.69%, 6M 3.88%, 1Y-10Y extrapolados
+- akshare v1.18.46 instalado y funcional en container
+- Portal live en `http://87.99.133.124` (Ashburn, VA)
+
+### Patrón Recurrente Nuevo
+
+| Patrón | Frecuencia | Lección |
+|--------|-----------|---------|
+| **Scraper web bloqueado desde servidor** | 1 vez (CommLoan) | Siempre tener fallback API para scrapers. Servidores reciben CAPTCHAs/bloqueos que laptops no. |
+| **Paquete importado pero no en requirements.txt** | 2 (akshare, beautifulsoup4) | Auditar imports vs requirements antes de cada deploy. `try/except` oculta la falta del paquete. |
+| **Latencia geográfica a APIs** | 3 módulos (BCCh desde Helsinki) | Elegir datacenter cercano a las APIs principales (US East para FRED/NY Fed, BCCh funciona global). |
 
 ### Inconsistencias Detectadas en Audit
 
@@ -412,8 +437,8 @@
 | 3 (Coherence) | — | 7 | 3 | 2 | 2 | — |
 | 4 (CLP/TPM) | — | 6 | 4 | 1 | 1 | — |
 | 5 (Auditoría) | 12 | 80 | 28 | 32 | 20 | — |
-| 6 (Prompt Audit + Deploy) | 3 | 14 | — | — | — | 6 prompts mejorados |
-| **Total** | **15** | **107** | **35** | **35** | **23** | **6** |
+| 6 (Prompt Audit + Deploy) | 4 | 18 | 1 | 2 | — | 6 prompts mejorados |
+| **Total** | **16** | **111** | **36** | **37** | **23** | **6** |
 
 **Desglose Ciclo 5 (auditoría completa):**
 | Sprint | Fecha | Bugs | Tema principal |
@@ -432,6 +457,7 @@
 | 12 | 2026-03-24 | #76-80 (5) | FI_POSITIONING parser 1/6→6/6, IG badge, duration truncada |
 | 13 | 2026-03-25 | #81-86 (6) | Prompt audit: riesgo, contrarian, macro, CIO, deprecations, refinador |
 | 14 | 2026-03-25 | #87-90 (4) | Dashboard client isolation + company name editable + Streamlit eliminado |
-| 15 | 2026-03-25 | #91-94 (4) | Hetzner deploy: Dockerfile, nginx, volumes, API keys |
+| 15 | 2026-03-25 | #91-95 (5) | Hetzner deploy: Helsinki→Ashburn migration |
+| 16 | 2026-03-25 | #96-99 (4) | Dependency audit: +akshare, NY Fed SOFR fallback, timeouts |
 
-**Velocidad promedio:** 7.1 bugs/sprint, ~2 sprints/día en ciclo intensivo
+**Velocidad promedio:** 6.9 bugs/sprint, ~2 sprints/día en ciclo intensivo

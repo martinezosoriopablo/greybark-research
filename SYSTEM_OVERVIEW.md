@@ -1,6 +1,6 @@
 # Greybark Research — AI Council System: Descripción Completa
 
-> Última actualización: 2026-03-25 (94 bugs/mejoras resueltos, 15 sprints, pipeline 4/4 OK, prompt audit completado, deploy Hetzner live)
+> Última actualización: 2026-03-25 (111 bugs/mejoras resueltos, 16 sprints, pipeline 4/4 OK, prompt audit completado, deploy Hetzner Ashburn live)
 > Pipeline: 4 reportes mensuales en español para comité de inversiones
 > Estado: 10/10 fuentes de datos OK, 0 módulos faltantes, mejora continua activa
 
