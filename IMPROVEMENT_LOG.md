@@ -137,6 +137,22 @@
 - Directivas persisten entre `docker stop/start/rebuild`
 - Output (cache, council, reports) persiste entre rebuilds
 
+### Sprint 21 — Briefing Data Formatting + Macro LatAm Fix
+
+**Trigger:** Briefing de BVC mostraba datos raw de numpy/dict en la tabla de "Datos de Mercado Verificados" (ej: `{'value': np.float64(0.7), 'period': 'Q4 2025', ...}%` en PIB USA). Macro report no se generó (no seleccionado en form). RF yield curve OK con datos actuales.
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 120 | Briefing muestra dicts raw en vez de valores formateados — APIs devuelven `{'value': 0.7, 'period': ...}` pero el formatter solo chequeaba `isinstance(float)` | `pre_council_package.py:624-631` | Agregar unwrap de dicts (extraer key `value`/`current`/`latest`/`rate`) + conversión de `np.float64` a `float` antes de formatear |
+| 121 | `macro_content_generator.py:2033` aún llamaba `get_latam_macro()` (inexistente) — escapó del fix del Sprint 18 | `macro_content_generator.py:2033` | Renombrar a `get_latam_rates()` — tabla LatAm del macro report mostraba N/D para todos los países |
+| 122 | Macro report no generado en run de BVC | N/A | No era bug de código — macro no fue seleccionado en el form del portal. Datos cacheados permiten re-run con `--skip-collect` |
+
+**Validación:**
+- 8/8 RF charts generan OK en servidor (incluyendo `rf_yield_curve`)
+- `pre_council_package.py` y `macro_content_generator.py` compilan OK
+- Container reconstruido y desplegado con datos persistentes
+- Commit `d078ab7` pushed y desplegado en producción
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
@@ -145,7 +161,8 @@
 | **Paquete importado pero no en requirements.txt** | 2 (akshare, beautifulsoup4) | Auditar imports vs requirements antes de cada deploy. `try/except` oculta la falta del paquete. |
 | **Latencia geográfica a APIs** | 3 módulos (BCCh desde Helsinki) | Elegir datacenter cercano a las APIs principales (US East para FRED/NY Fed, BCCh funciona global). |
 | **Paths hardcodeados a `~/OneDrive/`** | 2 (daily reports, DF summaries) | En servidor, TODO path externo debe venir de env var + volumen Docker. Auditar antes de deploy. |
-| **Método inexistente llamado silenciosamente** | 4 (get_ipc_detail, get_usa_cpi_components, get_latam_macro, format_for_council) | Cuando se agrega un método a un collector, verificar que existe en el client. Falla oculta por `try/except`. |
+| **Método inexistente llamado silenciosamente** | 5 (get_ipc_detail, get_usa_cpi_components, get_latam_macro×2, format_for_council) | Cuando se renombra un método, grep TODOS los callers — no solo el que reportó error. El Sprint 18 arregló `council_data_collector` pero no `macro_content_generator`. |
+| **API devuelve dict donde se espera escalar** | 2 (PIB USA, Desempleo USA en briefing) | Siempre unwrap dicts de APIs antes de formatear: `val.get('value')`. Agregar unwrap genérico en helpers de formato, no confiar en `isinstance(float)`. |
 | **Timezone-naive vs aware comparisons** | 3 ubicaciones (equity YTD) | yfinance devuelve index tz-aware (America/New_York). Siempre usar `pd.Timestamp.tz_localize()` al comparar. |
 | **Nested dict pasado donde se espera lista** | 1 (risk_matrix) | Validar tipo antes de iterar: `isinstance(x, dict)` → extraer la key correcta. |
 | **Nuevo cliente sin productos habilitados** | 3 (bvc, vantrust, mbi) | `add_client()` deja `product_ai_council=False` por defecto. Siempre activar productos explícitamente post-creación. `update_client()` no acepta campos de producto — requiere SQL directo o ampliar la API. |
