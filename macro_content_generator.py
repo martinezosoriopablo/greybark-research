@@ -893,7 +893,7 @@ class MacroContentGenerator:
             return [{'componente': c, 'valor': 'N/D', 'tendencia': '-'} for c in
                     ['Shelter (Vivienda)', 'Services ex-Energy (Servicios excl. Energía)', 'Core Goods (Bienes subyacentes)', 'Food (Alimentos)', 'Energy (Energía)']]
         try:
-            comp = self.data.get_usa_cpi_components()
+            comp = self.data.get_usa_cpi_breakdown()
         except Exception:
             comp = {}
         mapping = [

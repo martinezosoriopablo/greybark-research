@@ -33,6 +33,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 # Fix Windows console encoding for library modules that use unicode
@@ -160,7 +162,8 @@ class EquityDataCollector:
                     returns['1y'] = ((current_price / hist['Close'].iloc[-1 * min(252, len(hist))]) - 1) * 100
 
                 # YTD
-                ytd_start = hist.loc[hist.index >= f'{datetime.now().year}-01-01']
+                ytd_cutoff = pd.Timestamp(f'{datetime.now().year}-01-01').tz_localize(hist.index.tz)
+                ytd_start = hist.loc[hist.index >= ytd_cutoff]
                 if not ytd_start.empty:
                     returns['ytd'] = ((current_price / ytd_start['Close'].iloc[0]) - 1) * 100
 
@@ -230,7 +233,8 @@ class EquityDataCollector:
                         returns['1y'] = round(((current / hist['Close'].iloc[-1 * min(252, len(hist))]) - 1) * 100, 2)
 
                     # YTD
-                    ytd_start = hist.loc[hist.index >= f'{datetime.now().year}-01-01']
+                    ytd_cutoff = pd.Timestamp(f'{datetime.now().year}-01-01').tz_localize(hist.index.tz)
+                    ytd_start = hist.loc[hist.index >= ytd_cutoff]
                     if not ytd_start.empty:
                         returns['ytd'] = round(((current / ytd_start['Close'].iloc[0]) - 1) * 100, 2)
 
@@ -718,7 +722,8 @@ class EquityDataCollector:
                     if len(hist) >= 63:
                         returns['3m'] = round(((current / hist['Close'].iloc[-63]) - 1) * 100, 2)
 
-                    ytd_start = hist.loc[hist.index >= f'{datetime.now().year}-01-01']
+                    ytd_cutoff = pd.Timestamp(f'{datetime.now().year}-01-01').tz_localize(hist.index.tz)
+                    ytd_start = hist.loc[hist.index >= ytd_cutoff]
                     if not ytd_start.empty:
                         returns['ytd'] = round(((current / ytd_start['Close'].iloc[0]) - 1) * 100, 2)
 

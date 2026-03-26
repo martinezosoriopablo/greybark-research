@@ -322,9 +322,9 @@ class CouncilDataCollector:
             from chart_data_provider import ChartDataProvider
             cdp = ChartDataProvider(lookback_months=36)
             return {
-                'cpi_components': cdp.get_usa_cpi_components(),
+                'cpi_components': cdp.get_usa_cpi_breakdown(),
                 'fiscal': cdp.get_usa_fiscal(),
-                'latam_macro': cdp.get_latam_macro(),
+                'latam_macro': cdp.get_latam_rates(),
             }
         try:
             self._print("  -> CPI components, fiscal, LatAm macro...")

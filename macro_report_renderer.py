@@ -83,8 +83,10 @@ class MacroReportRenderer:
         # Initialize ChartDataProvider for real data (with Bloomberg for PMI/trade)
         try:
             self._data_provider = ChartDataProvider(lookback_months=120)
-        except Exception:
+        except Exception as e:
             self._data_provider = None
+            if verbose:
+                print(f"  [WARN] ChartDataProvider init failed: {e}")
 
         # Inject spot values from quant_data so chart annotations match text
         if self._data_provider and self.quant_data:

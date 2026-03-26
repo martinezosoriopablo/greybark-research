@@ -242,7 +242,7 @@ class PreCouncilPackage:
         if intelligence and 'error' not in intelligence:
             try:
                 from daily_intelligence_digest import DailyIntelligenceDigest
-                daily_context = DailyIntelligenceDigest.format_for_council(intelligence)
+                daily_context = DailyIntelligenceDigest().format_for_council(intelligence)
             except Exception as e:
                 logger.warning("Intelligence formatting failed: %s", e)
 

@@ -79,12 +79,14 @@ class MonthlyPipeline:
         no_confirm: bool = False,
         reports: List[str] = None,
         open_browser: bool = False,
+        client_id: Optional[str] = None,
     ):
         self.dry_run = dry_run
         self.skip_collect = skip_collect
         self.no_confirm = no_confirm
         self.reports = reports or VALID_REPORTS
         self.open_browser = open_browser
+        self.client_id = client_id
         self.date_str = datetime.now().strftime('%Y-%m-%d')
         self.timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -736,6 +738,32 @@ class MonthlyPipeline:
     # FASE 5: RESUMEN Y ENTREGA
     # =====================================================================
 
+    def _sync_to_client(self, report_results: List[Dict[str, Any]]):
+        """Copy generated reports to client directory (Layout/output/{client_id}/{date}/)."""
+        if not self.client_id:
+            return
+
+        # Resolve Layout output dir
+        layout_dir = BASE_DIR.parent.parent.parent / "Layout"
+        output_base = Path(os.environ.get("GREYBARK_OUTPUT", str(layout_dir / "output")))
+        dest_dir = output_base / self.client_id / self.date_str
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        copied = 0
+        for r in report_results:
+            if r['status'] != 'OK' or not r.get('path'):
+                continue
+            src = Path(r['path'])
+            if src.exists():
+                import shutil
+                dest = dest_dir / src.name
+                shutil.copy2(str(src), str(dest))
+                copied += 1
+                self._print_ok(f"Synced → {self.client_id}/{self.date_str}/{src.name}")
+
+        if copied:
+            self._print(f"  {copied} reportes sincronizados a {dest_dir}")
+
     def print_summary(self, report_results: List[Dict[str, Any]]):
         """Muestra resumen final del pipeline."""
         total_elapsed = time.time() - self.start_time
@@ -796,6 +824,8 @@ class MonthlyPipeline:
         print("=" * 70)
         print(f"  Fecha: {self.date_str}")
         print(f"  Reportes: {', '.join(self.reports)}")
+        if self.client_id:
+            print(f"  Cliente: {self.client_id}")
         print(f"  Modo: {'DRY RUN' if self.dry_run else 'PRODUCCIÓN'}")
         if self.skip_collect:
             print(f"  Skip collect: sí (usando datos existentes)")
@@ -895,6 +925,10 @@ class MonthlyPipeline:
             self.council_result, equity_data, forecast_data
         )
 
+        # ---- FASE 5.5: Sync to client directory ----
+        if self.client_id:
+            self._sync_to_client(self.report_results)
+
         # ---- FASE 6: Resumen ----
         self.print_summary(self.report_results)
 
@@ -941,6 +975,10 @@ Ejemplos:
         '--open', action='store_true', dest='open_browser',
         help='Abrir reportes en browser al finalizar'
     )
+    parser.add_argument(
+        '--client', type=str, default=None,
+        help='Client ID — copies reports to Layout/output/{client_id}/{date}/'
+    )
 
     args = parser.parse_args()
 
@@ -950,6 +988,7 @@ Ejemplos:
         no_confirm=args.no_confirm,
         reports=args.reports,
         open_browser=args.open_browser,
+        client_id=args.client,
     )
 
     exit_code = pipeline.run()

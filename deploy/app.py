@@ -12,6 +12,7 @@ import uuid
 import shutil
 import logging
 import subprocess
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
@@ -62,6 +63,7 @@ templates = Jinja2Templates(directory=str(_deploy_dir / "web_templates"))
 
 # In-memory job tracker (job_id → status dict)
 _jobs: Dict[str, dict] = {}
+_jobs_lock = threading.Lock()
 
 # Passwords file: JSON {client_id: bcrypt_hash}
 _PASSWORDS_FILE = os.environ.get(
@@ -103,7 +105,11 @@ def _client_context(request: Request, client_id: str, platform: Platform, **extr
     """Build template context with client branding."""
     data = platform.get_client_for_dashboard(client_id)
     if not data:
-        return {"request": request, "client": None}
+        return {"request": request, "client": None,
+                "branding": None, "usage": {}, "recent_jobs": [],
+                "primary_color": "#dd6b20", "accent_color": "#dd6b20",
+                "font_family": "Segoe UI", "company_name": client_id,
+                "logo_path": "", **extra}
 
     client = data["client"]
     branding = data["branding"]
