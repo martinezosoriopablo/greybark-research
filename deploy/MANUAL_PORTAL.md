@@ -1,15 +1,15 @@
-# Manual de Usuario — Portal de Investigacion
+# Greybark Research — Manual del Portal de Clientes
 
 ## Acceso al Portal
+
+**URL:** `http://87.99.133.124`
 
 ### Iniciar Sesion
 
 1. Abrir el enlace del portal en el navegador
-2. Ingresar el **ID de cliente** (ejemplo: `mbi`)
+2. Ingresar el **ID de cliente** (ejemplo: `mbi`, `vantrust`, `bvc`)
 3. Ingresar la **contrasena** asignada
 4. Hacer click en **"Ingresar"**
-
-> Si no se ha configurado una contrasena personalizada, la contrasena por defecto es igual al ID de cliente.
 
 La sesion dura **8 horas**. Despues de ese tiempo, sera necesario ingresar nuevamente.
 
@@ -94,8 +94,12 @@ Ejemplos de directivas:
 - "Foco en impacto de aranceles en Chile"
 - "Creo que BCCh mantiene TPM"
 - "Hay valor en Europa?"
+- "Me preocupa la valorizacion de tech en USA, evaluar sostenibilidad de earnings"
+- "Ponderar riesgo geopolitico Iran-USA"
 
 Hacer click en **"Guardar directivas"** para persistir los cambios.
+
+> **Importante:** Las directivas son **independientes por cliente**. Lo que escriba MBI no afecta a Vantrust ni a BVC. Cada cliente tiene su propio archivo de directivas.
 
 ### Columna Derecha
 
@@ -314,19 +318,58 @@ Uso de disco de las carpetas clave:
 ## Preguntas Frecuentes
 
 **¿Cuanto tarda el pipeline mensual?**
-Depende de los reportes seleccionados. Una ejecucion completa (Macro + RV + RF) toma aproximadamente 15-25 minutos. Con Asset Allocation incluido, puede tomar 20-35 minutos.
+
+| Modo | Tiempo aproximado |
+|------|-------------------|
+| Completo (recopilacion + council + 4 reportes) | 35-50 minutos |
+| Sin recopilacion (skip collect + 4 reportes) | 15-35 minutos |
+| Dry run (solo recopilacion) | 10-15 minutos |
+
+**¿Que reportes se generan?**
+
+| Reporte | Contenido | Charts | Paginas aprox. |
+|---------|-----------|--------|----------------|
+| **Macro** | USA, Europa, China, Chile/LatAm, commodities, tasas | 29 | 25-30 |
+| **Renta Variable** | Valuaciones, sectores, factores, earnings, flujos | 12 | 15-20 |
+| **Renta Fija** | Duration, credito IG/HY, EM debt, Chile soberano | 8 | 12-15 |
+| **Asset Allocation** | 5 portafolios modelo, escenarios, views regionales | 0 (tablas) | 10-12 |
+| **Intelligence Briefing** | Datos verificados, charts macro, contexto pre-council | 44 | 15-20 |
 
 **¿Puedo ejecutar multiples pipelines a la vez?**
 Si, cada ejecucion genera un job independiente con su propio ID. Sin embargo, ejecutar multiples pipelines simultaneos consume mas creditos de API.
 
 **¿Que pasa si el pipeline falla?**
-La pagina de estado mostrara el error y la fase donde fallo. Puede reintentar desde la pagina de pipeline. Revise la seccion "Estado del Sistema" para verificar que todas las APIs esten disponibles.
+La pagina de estado mostrara el error y la fase donde fallo. Los reportes que SI se generaron correctamente se copian automaticamente a la carpeta del cliente — no se pierden. Puede reintentar desde la pagina de pipeline.
 
 **¿Los cambios de branding afectan reportes ya generados?**
 No. Los cambios de branding solo afectan reportes generados despues de guardar la configuracion. Los reportes existentes mantienen el branding con el que fueron creados.
 
+**¿Las directivas de un cliente afectan a otro?**
+No. Cada cliente tiene sus propias directivas independientes. Lo que escriba MBI no afecta a Vantrust ni a BVC.
+
 **¿Como cambio mi contrasena?**
-Contacte al administrador del sistema para actualizar la contrasena en el archivo de configuracion.
+Contacte al administrador del sistema para actualizar la contrasena.
 
 **¿Como descargo el podcast?**
 Los podcasts aparecen junto a los reportes diarios. Busque archivos `.mp3` en la seccion de reportes o en el historico del dia correspondiente.
+
+---
+
+## Flujo Recomendado
+
+### Primera vez (demo)
+```
+1. Ingresar al portal
+2. Ir a Config → subir logo, ajustar colores y nombre de empresa
+3. Ir a Pipeline → escribir directivas especificas
+4. Seleccionar los 4 reportes (Macro + RV + RF + AA)
+5. Ejecutar Pipeline → esperar ~40 minutos
+6. Ver reportes en la seccion Reportes
+```
+
+### Ejecuciones posteriores
+```
+1. Ir a Pipeline → ajustar directivas si es necesario
+2. Marcar "Saltar recopilacion" si los datos son del mismo dia
+3. Ejecutar → ~20 minutos
+```
