@@ -545,6 +545,9 @@ def _run_pipeline_task(
 
         return_code = process.returncode
 
+        # Always copy whatever reports were generated (even on partial failure)
+        _copy_reports_to_client(client_id)
+
         if return_code == 0:
             for k in phases:
                 if phases[k] == "running":
@@ -552,9 +555,6 @@ def _run_pipeline_task(
             _jobs[job_id]["status"] = "completed"
             _jobs[job_id]["progress"] = 100
             _jobs[job_id]["message"] = "Pipeline completado exitosamente."
-
-            # Copy generated reports to client-specific folder
-            _copy_reports_to_client(client_id)
         else:
             for k in phases:
                 if phases[k] == "running":

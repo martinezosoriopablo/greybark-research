@@ -2025,7 +2025,7 @@ class MacroContentGenerator:
         }
 
     def _build_latam_table(self) -> List[Dict]:
-        """Build LatAm macro table from BCCh data."""
+        """Build LatAm macro table from BCCh data (get_latam_rates returns pd.Series per rate)."""
         if not self.data:
             return [{'pais': p, 'gdp': 'N/D', 'inflación': 'N/D', 'tasa': 'N/D', 'outlook': '-', 'riesgo_principal': '-'}
                     for p in ['Brasil', 'Mexico', 'Colombia']]
@@ -2033,16 +2033,26 @@ class MacroContentGenerator:
             latam = self.data.get_latam_rates()
         except Exception:
             latam = {}
+        # Map country names to series keys returned by get_latam_rates()
+        rate_map = {
+            'Brasil': ('Selic (Brasil)', 'Selic'),
+            'Mexico': ('Banxico (Mexico)', 'Banxico'),
+            'Colombia': ('BanRep (Colombia)', 'BanRep'),
+            'Chile': ('BCCh TPM (Chile)', 'BCCh'),
+        }
         result = []
-        names = {'Brasil': 'Selic', 'Mexico': 'Banxico', 'Colombia': 'BanRep', 'Peru': 'BCRP'}
-        for country, rate_name in names.items():
-            d = latam.get(country, {})
-            cpi = d.get('cpi')
-            tasa = d.get('tasa')
+        import pandas as pd
+        for country, (series_key, rate_name) in rate_map.items():
+            series = latam.get(series_key)
+            tasa = None
+            if isinstance(series, pd.Series) and not series.empty:
+                tasa = float(series.iloc[-1])
+            elif isinstance(series, (int, float)):
+                tasa = float(series)
             result.append({
                 'pais': country,
                 'gdp': 'N/D',
-                'inflación': f"{cpi:.1f}%" if cpi is not None else 'N/D',
+                'inflación': 'N/D',
                 'tasa': f"{tasa:.2f}% ({rate_name})" if tasa is not None else 'N/D',
                 'outlook': '-',
                 'riesgo_principal': '-',
