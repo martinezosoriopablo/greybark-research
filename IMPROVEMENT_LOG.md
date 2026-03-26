@@ -169,6 +169,57 @@
 - 3 reportes de run anterior (rv, rf, aa) copiados exitosamente a `/app/layout/output/bvc/`
 - Commit `3a8b448` desplegado en producción
 
+### Sprint 23 — Pre-Demo Audit (MBI, Vantrust, BVC)
+
+**Trigger:** Antes de correr 3 pipelines independientes para demos de clientes, auditoría completa de 4 capas: reportes, prompts, renderers, data collection.
+
+#### Auditoría de Reportes BVC (4 HTML generados)
+
+| Reporte | N/D | Placeholders `{{}}` | numpy raw | Charts | Verdict |
+|---------|-----|---------------------|-----------|--------|---------|
+| RV | 0 | 0 | 0 | 12 imgs | CLEAN |
+| RF | 0 | 0 | 0 | 8 imgs | CLEAN |
+| AA | 0 | 0 | 0 | 0 (text-only) | CLEAN |
+| Briefing | 0 | 0 | 0 | 44 imgs | CLEAN |
+| Macro | — | — | — | — | MISSING (crash fixeado Sprint 22) |
+
+#### Auditoría de Prompts (8 archivos)
+
+| Check | Resultado |
+|-------|-----------|
+| Bloques consistentes con parser | 11/12 OK (`CORRELACIONES` no parseado) |
+| Calidad español / encoding | 8/8 OK |
+| Anti-fabricación | 8/8 tienen `INTEGRIDAD DE DATOS` |
+| Word limits | 3/8 tienen (panel agents sin límite) |
+| Data references vs collectors | OK — sin campos fantasma |
+
+**Issues menores (no bloqueantes):**
+- `CORRELACIONES` block producido por riesgo pero no parseado por `council_parser.py`
+- 5 panel agents sin word limit (controla tokens/costo)
+- `ias_geo.txt`: dice "max 3" pero template muestra 4
+
+#### Auditoría de Renderers (4 renderers + 4 content generators)
+
+| Severidad | Count | Tipo |
+|-----------|-------|------|
+| CRITICAL | ~28 | `dict['key']` directo sin `.get()` — KeyError si council output incompleto |
+| HIGH | ~7 | `_get_view_class(None)` crash, falsy check en `0.0` |
+| MEDIUM | ~3 | Format issues dentro de try/except |
+
+**Archivos más frágiles:**
+- `rv_report_renderer.py` — 9 crash points (sectores, earnings, flows, risks)
+- `rf_report_renderer.py` — 5 crash points (duration, credit, EM debt, Chile)
+- `macro_report_renderer.py` — 4 crash points (USA/Europe/China/Chile sections)
+- `asset_allocation_renderer.py` — 6 crash points (scenarios, views, portfolios)
+
+**Fix pattern requerido:** `content['key']` → `content.get('key', {})` + `_get_view_class` null-safe
+
+#### Estado para Demos
+
+- **Reportes**: Limpios cuando council output es completo (caso normal)
+- **Riesgo**: Si Claude devuelve output incompleto en algún run, el reporte crashea
+- **Acción recomendada**: Blindar los `_get_view_class()` y los top-level dict accesses antes de correr demos
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
