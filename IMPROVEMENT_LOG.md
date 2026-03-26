@@ -72,6 +72,25 @@
 - `chile_extended` ahora GREEN (7 submódulos OK)
 - Anthropic API OK (test directo desde container)
 
+### Sprint 18 — Pipeline Error Sweep (7 fixes)
+
+**Trigger:** Revisión de `pipeline_log_20260318` reveló 7 errores activos: charts crasheando, métodos inexistentes, timezone mismatch, intelligence digest sin instanciar.
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 104 | `risk_matrix` chart crash: `'str' object has no attribute 'get'` — se pasaba dict `{riesgos, narrativa}` en vez de lista | `chart_generator.py:1154` | Extraer `.get('riesgos', [])` del dict antes de pasar a `generate_risk_matrix()` |
+| 105 | YTD return crash: `TypeError: Invalid comparison between datetime64[ns, America/New_York] and datetime` — yfinance devuelve index tz-aware, comparado con string naive | `equity_data_collector.py:163,234,723` | Usar `pd.Timestamp(...).tz_localize(hist.index.tz)` en las 3 ubicaciones + agregar `import pandas as pd` |
+| 106 | `get_usa_cpi_components()` no existe en ChartDataProvider | `council_data_collector.py:325`, `macro_content_generator.py:896` | Renombrar a `get_usa_cpi_breakdown()` (método real) |
+| 107 | `get_latam_macro()` no existe en ChartDataProvider | `council_data_collector.py:327` | Renombrar a `get_latam_rates()` (método real) |
+| 108 | `DailyIntelligenceDigest.format_for_council()` llamado como classmethod pero es instance method | `pre_council_package.py:245` | `DailyIntelligenceDigest.format_for_council(x)` → `DailyIntelligenceDigest().format_for_council(x)` |
+| 109 | ChartDataProvider init falla silenciosamente (`except Exception: pass`) — sin log del error real | `macro_report_renderer.py:86` | Agregar log: `print(f"[WARN] ChartDataProvider init failed: {e}")` |
+| 110 | Dashboard `_client_context()` retorna dict incompleto cuando cliente no tiene data → templates crashean | `deploy/app.py:105` | Agregar fallback values (primary_color, company_name, etc.) + `threading.Lock` para `_jobs` |
+
+**Validación:**
+- 7/7 archivos compilan OK (`py_compile`)
+- Commit `530b4d6` pushed a `origin/main`
+- BCChExtendedClient, akshare_client, AlphaVantageClient, curvas_soberanas — verificados OK (errores del log eran de estado previo)
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
@@ -80,7 +99,9 @@
 | **Paquete importado pero no en requirements.txt** | 2 (akshare, beautifulsoup4) | Auditar imports vs requirements antes de cada deploy. `try/except` oculta la falta del paquete. |
 | **Latencia geográfica a APIs** | 3 módulos (BCCh desde Helsinki) | Elegir datacenter cercano a las APIs principales (US East para FRED/NY Fed, BCCh funciona global). |
 | **Paths hardcodeados a `~/OneDrive/`** | 2 (daily reports, DF summaries) | En servidor, TODO path externo debe venir de env var + volumen Docker. Auditar antes de deploy. |
-| **Método inexistente llamado silenciosamente** | 1 (get_ipc_detail) | Cuando se agrega un método a un collector, verificar que existe en el client. Falla oculta por `try/except`. |
+| **Método inexistente llamado silenciosamente** | 4 (get_ipc_detail, get_usa_cpi_components, get_latam_macro, format_for_council) | Cuando se agrega un método a un collector, verificar que existe en el client. Falla oculta por `try/except`. |
+| **Timezone-naive vs aware comparisons** | 3 ubicaciones (equity YTD) | yfinance devuelve index tz-aware (America/New_York). Siempre usar `pd.Timestamp.tz_localize()` al comparar. |
+| **Nested dict pasado donde se espera lista** | 1 (risk_matrix) | Validar tipo antes de iterar: `isinstance(x, dict)` → extraer la key correcta. |
 
 ### Inconsistencias Detectadas en Audit
 
