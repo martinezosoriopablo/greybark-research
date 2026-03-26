@@ -91,6 +91,24 @@
 - Commit `530b4d6` pushed a `origin/main`
 - BCChExtendedClient, akshare_client, AlphaVantageClient, curvas_soberanas — verificados OK (errores del log eran de estado previo)
 
+### Sprint 19 — Multi-Client Onboarding (producción)
+
+**Trigger:** Plataforma en `87.99.133.124` solo tenía 2 clientes (greybark, demo_corp). Se necesitaban 3 clientes reales. Pipeline de bvc no corría: `?error=no_council`.
+
+| # | Cambio | Detalle |
+|---|--------|---------|
+| 111 | Crear cliente `mbi` (MBI Inversiones) en producción | `Platform.add_client()` + bcrypt hash en `/app/layout/passwords.json` |
+| 112 | Crear cliente `vantrust` (Vantrust Capital) en producción | Idem — `product_ai_council` estaba en `False` por defecto |
+| 113 | Crear cliente `bvc` (BVC Asset Management) en producción | Idem — mismo problema con flag deshabilitado |
+| 114 | Pipeline crash `?error=no_council` para bvc y vantrust | `clients.product_ai_council = 0` por defecto en `add_client()` → UPDATE SQL directo a `1` para los 3 nuevos clientes |
+
+**Causa raíz:** `Platform.add_client()` no setea `product_ai_council=True` por defecto, y `update_client()` no acepta campos de producto (solo campos de perfil). Los nuevos clientes quedan sin acceso al pipeline.
+
+**Validación:**
+- 5/5 clientes con `product_ai_council=1` en DB producción
+- Login verificado con bcrypt para mbi/vantrust/bvc
+- Pipeline de bvc ya no redirige a `?error=no_council`
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
@@ -102,6 +120,7 @@
 | **Método inexistente llamado silenciosamente** | 4 (get_ipc_detail, get_usa_cpi_components, get_latam_macro, format_for_council) | Cuando se agrega un método a un collector, verificar que existe en el client. Falla oculta por `try/except`. |
 | **Timezone-naive vs aware comparisons** | 3 ubicaciones (equity YTD) | yfinance devuelve index tz-aware (America/New_York). Siempre usar `pd.Timestamp.tz_localize()` al comparar. |
 | **Nested dict pasado donde se espera lista** | 1 (risk_matrix) | Validar tipo antes de iterar: `isinstance(x, dict)` → extraer la key correcta. |
+| **Nuevo cliente sin productos habilitados** | 3 (bvc, vantrust, mbi) | `add_client()` deja `product_ai_council=False` por defecto. Siempre activar productos explícitamente post-creación. `update_client()` no acepta campos de producto — requiere SQL directo o ampliar la API. |
 
 ### Inconsistencias Detectadas en Audit
 
