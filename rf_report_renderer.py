@@ -414,43 +414,43 @@ class RFReportRenderer:
         risks = content['riesgos_oportunidades']
 
         risks_html = ''
-        for r in risks['top_risks']:
+        for r in risks.get('top_risks', []):
             risks_html += f'''
             <div class="risk-card">
                 <div class="risk-header">
-                    <span class="risk-name">{_md_to_html(r['riesgo'])}</span>
+                    <span class="risk-name">{_md_to_html(r.get('riesgo', 'N/D'))}</span>
                     <span style="font-size: 9pt; color: var(--text-light);">
-                        Prob: <strong>{r['probabilidad']}</strong> | Impacto: <strong>{r['impacto']}</strong>
+                        Prob: <strong>{r.get('probabilidad', 'N/D')}</strong> | Impacto: <strong>{r.get('impacto', r.get('severidad', 'N/D'))}</strong>
                     </span>
                 </div>
-                <p style="margin: 10px 0; color: var(--text-medium);">{_md_to_html(r['descripcion'])}</p>
-                <p style="font-size: 9pt; color: var(--text-light);"><strong>Cobertura:</strong> {_md_to_html(r['hedge'])}</p>
+                <p style="margin: 10px 0; color: var(--text-medium);">{_md_to_html(r.get('descripcion', ''))}</p>
+                <p style="font-size: 9pt; color: var(--text-light);"><strong>Cobertura:</strong> {_md_to_html(r.get('hedge', r.get('mitigacion', 'N/D')))}</p>
             </div>'''
         replacements['{{risks_html}}'] = risks_html
 
-        opps = ''.join([f'<li>{_md_to_html(o)}</li>' for o in risks['oportunidades']])
+        opps = ''.join([f'<li>{_md_to_html(o)}</li>' for o in risks.get('oportunidades', [])])
         replacements['{{opportunities_html}}'] = opps
 
         trades_html = ''
-        for t in risks['trades']:
+        for t in risks.get('trades', []):
             trades_html += f'''
             <div class="trade-card">
                 <div class="trade-header">
-                    <span class="trade-name">{_md_to_html(t['trade'])}</span>
+                    <span class="trade-name">{_md_to_html(t.get('trade', 'N/D'))}</span>
                 </div>
-                <p style="color: var(--text-medium); margin-bottom: 10px;">{_md_to_html(t['rationale'])}</p>
+                <p style="color: var(--text-medium); margin-bottom: 10px;">{_md_to_html(t.get('rationale', ''))}</p>
                 <div class="trade-metrics">
                     <div class="trade-metric">
                         <div class="label">Entrada</div>
-                        <div class="value">{t['entry']}</div>
+                        <div class="value">{t.get('entry', 'N/D')}</div>
                     </div>
                     <div class="trade-metric">
                         <div class="label">Objetivo</div>
-                        <div class="value">{t['target']}</div>
+                        <div class="value">{t.get('target', 'N/D')}</div>
                     </div>
                     <div class="trade-metric">
                         <div class="label">Stop-loss</div>
-                        <div class="value">{t['stop']}</div>
+                        <div class="value">{t.get('stop', 'N/D')}</div>
                     </div>
                 </div>
             </div>'''
