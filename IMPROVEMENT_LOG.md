@@ -153,6 +153,22 @@
 - Container reconstruido y desplegado con datos persistentes
 - Commit `d078ab7` pushed y desplegado en producción
 
+### Sprint 22 — Macro Series.__format__ Crash + Report Copy on Partial Failure
+
+**Trigger:** Pipeline de BVC terminaba con código 1 (macro crash) y los 3 reportes OK no se copiaban a la carpeta del cliente. Macro crasheaba: `unsupported format string passed to Series.__format__`.
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 123 | Macro crash `Series.__format__`: `_build_latam_table()` recibía `pd.Series` completas de `get_latam_rates()` e intentaba `f"{series:.1f}%"` | `macro_content_generator.py:2027-2050` | Reescrito: mapea keys de series (`'Selic (Brasil)'` etc.), extrae último valor con `.iloc[-1]`, convierte a float |
+| 124 | Reportes OK no copiados a carpeta del cliente cuando pipeline termina con error parcial | `deploy/app.py:548-557` | Mover `_copy_reports_to_client()` **antes** del check de `return_code` — siempre copia lo que haya en `output/reports/` |
+
+**Causa raíz #123:** `get_latam_rates()` retorna `Dict[str, pd.Series]` (series completas de tasas por país), no `Dict[country, {cpi, tasa}]` como esperaba `_build_latam_table()`. El rename de Sprint 18 (`get_latam_macro` → `get_latam_rates`) cambió el método sin adaptar el consumer.
+
+**Validación:**
+- Macro report genera OK con tabla LatAm (tasas reales de BCCh)
+- 3 reportes de run anterior (rv, rf, aa) copiados exitosamente a `/app/layout/output/bvc/`
+- Commit `3a8b448` desplegado en producción
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
