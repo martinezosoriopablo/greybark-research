@@ -221,19 +221,26 @@ def _get_research_files() -> List[dict]:
     return files
 
 
-def _get_directives() -> str:
-    """Read current user directives (without comment lines)."""
-    if _DIRECTIVES_FILE.exists():
-        text = _DIRECTIVES_FILE.read_text(encoding="utf-8")
+def _client_directives_file(client_id: str) -> Path:
+    """Per-client directives file in layout output dir."""
+    output_base = os.environ.get("GREYBARK_OUTPUT", str(Path(_layout_dir) / "output"))
+    client_dir = Path(output_base) / client_id
+    client_dir.mkdir(parents=True, exist_ok=True)
+    return client_dir / "directives.txt"
+
+
+def _get_directives(client_id: str = None) -> str:
+    """Read user directives for a specific client (without comment lines)."""
+    path = _client_directives_file(client_id) if client_id else _DIRECTIVES_FILE
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
         lines = [l.rstrip() for l in text.split("\n")
                  if l.strip() and not l.strip().startswith("#")]
         return "\n".join(lines)
     return ""
 
 
-def _save_directives(content: str):
-    """Save directives preserving standard header."""
-    header = """# =============================================================
+_DIRECTIVES_HEADER = """# =============================================================
 # DIRECTIVAS DEL USUARIO PARA EL AI COUNCIL
 # =============================================================
 #
@@ -245,8 +252,17 @@ def _save_directives(content: str):
 # =============================================================
 
 """
+
+
+def _save_directives(content: str, client_id: str = None):
+    """Save directives for a specific client + sync to shared file for pipeline."""
+    # Save per-client copy
+    if client_id:
+        client_file = _client_directives_file(client_id)
+        client_file.write_text(_DIRECTIVES_HEADER + content, encoding="utf-8")
+    # Always sync to shared file (pipeline reads this one)
     _DIRECTIVES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _DIRECTIVES_FILE.write_text(header + content, encoding="utf-8")
+    _DIRECTIVES_FILE.write_text(_DIRECTIVES_HEADER + content, encoding="utf-8")
 
 
 def _get_recent_council_results(client_id: str = None) -> List[dict]:
@@ -580,7 +596,7 @@ async def pipeline_page(
 ):
     platform = _get_platform()
     research_files = _get_research_files()
-    directives = _get_directives()
+    directives = _get_directives(client_id)
     ctx = _client_context(
         request, client_id, platform,
         research_files=research_files,
@@ -627,7 +643,7 @@ async def save_directives_route(
     client_id: str = Depends(get_current_client),
     directives: str = Form(""),
 ):
-    _save_directives(directives)
+    _save_directives(directives, client_id)
     return RedirectResponse(url="/pipeline?saved=1", status_code=303)
 
 
@@ -662,9 +678,9 @@ async def run_pipeline(
         "result": None,
     }
 
-    # Save directives before running
+    # Save directives before running (per-client + sync to shared file)
     if directives.strip():
-        _save_directives(directives)
+        _save_directives(directives, client_id)
 
     background_tasks.add_task(
         _run_pipeline_task, job_id, client_id, directives,
