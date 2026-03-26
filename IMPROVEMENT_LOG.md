@@ -109,6 +109,34 @@
 - Login verificado con bcrypt para mbi/vantrust/bvc
 - Pipeline de bvc ya no redirige a `?error=no_council`
 
+### Sprint 20 — RF KeyError + Docker Volume Persistence
+
+**Trigger:** Pipeline de BVC completó 3/4 reportes. RF crasheó con `KeyError: 'impacto'`. Reportes no aparecían en portal (no se copiaron a carpeta del cliente). Directivas se perdían entre rebuilds.
+
+| # | Bug | Fix |
+|---|-----|-----|
+| 115 | RF report crash: `KeyError: 'impacto'` — council devuelve `severidad` en vez de `impacto`, `mitigacion` en vez de `hedge` | `rf_report_renderer.py:417-428` — todos los accesos a risks/trades usan `.get()` con fallback a alias alternativos (`severidad`, `mitigacion`) y `N/D` por defecto |
+| 116 | Reportes no se copiaban a carpeta del cliente cuando pipeline terminaba con código 1 (error parcial) | `_copy_reports_to_client()` solo corre si `return_code == 0`. Reportes copiados manualmente. Fix futuro: copiar reportes OK aunque haya errores parciales |
+| 117 | Reportes generados se perdían entre rebuilds del container | Montar `/app/consejo_ia/output` → `/data/pipeline_output` como volumen Docker persistente |
+| 118 | Directivas de usuario se perdían entre rebuilds | Montar `/app/consejo_ia/input` → `/data/input` como volumen Docker persistente |
+| 119 | Macro report no se generó en segundo run de BVC | Pendiente de investigar — posible timeout o error en fase 4 |
+
+**Docker volumes finales (producción):**
+```
+-v /data/layout:/app/layout                          # DB, passwords, platform
+-v /data/pipeline_output:/app/consejo_ia/output      # Reportes, cache, council
+-v /data/input:/app/consejo_ia/input                 # Directivas, bloomberg, logos
+-v /data/daily_reports:/app/daily_reports             # Daily reports
+-v /data/df_data:/app/df_data                        # DF summaries
+-v /data/research:/app/consejo_ia/input/research     # Research files
+```
+
+**Validación:**
+- RF report genera OK con `.get()` fallbacks
+- 4 reportes de BVC copiados a `/app/layout/output/bvc/2026-03-26/`
+- Directivas persisten entre `docker stop/start/rebuild`
+- Output (cache, council, reports) persiste entre rebuilds
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
@@ -121,6 +149,9 @@
 | **Timezone-naive vs aware comparisons** | 3 ubicaciones (equity YTD) | yfinance devuelve index tz-aware (America/New_York). Siempre usar `pd.Timestamp.tz_localize()` al comparar. |
 | **Nested dict pasado donde se espera lista** | 1 (risk_matrix) | Validar tipo antes de iterar: `isinstance(x, dict)` → extraer la key correcta. |
 | **Nuevo cliente sin productos habilitados** | 3 (bvc, vantrust, mbi) | `add_client()` deja `product_ai_council=False` por defecto. Siempre activar productos explícitamente post-creación. `update_client()` no acepta campos de producto — requiere SQL directo o ampliar la API. |
+| **Datos efímeros en container Docker** | 3 (output, input, directivas) | TODO path que el pipeline escribe (output/, input/) debe ser volumen Docker. Si no, se pierde en rebuild. Auditar `docker run` antes de cada deploy. |
+| **Council output con keys variables** | 1 (impacto vs severidad, hedge vs mitigacion) | Los renderers deben usar `.get()` con alias alternativos para keys que el LLM puede nombrar distinto. Nunca `r['key']` directo en datos generados por council. |
+| **Reportes no copiados en error parcial** | 1 (RF fail → 3 reportes OK no copiados) | `_copy_reports_to_client()` solo corre si pipeline exit code=0. Cambiar a copiar reportes individuales que sí se generaron. |
 
 ### Inconsistencias Detectadas en Audit
 
