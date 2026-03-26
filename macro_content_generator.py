@@ -2030,7 +2030,7 @@ class MacroContentGenerator:
             return [{'pais': p, 'gdp': 'N/D', 'inflación': 'N/D', 'tasa': 'N/D', 'outlook': '-', 'riesgo_principal': '-'}
                     for p in ['Brasil', 'Mexico', 'Colombia']]
         try:
-            latam = self.data.get_latam_macro()
+            latam = self.data.get_latam_rates()
         except Exception:
             latam = {}
         result = []

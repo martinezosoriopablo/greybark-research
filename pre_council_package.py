@@ -624,7 +624,19 @@ Formato: JSON con las 6 claves. Solo el JSON, sin markdown.
         for key, (label, unit) in stat_labels.items():
             val = stats.get(key)
             if val is not None:
-                if isinstance(val, float):
+                # Unwrap dict values (APIs return {'value': x, ...})
+                if isinstance(val, dict):
+                    val = val.get('value', val.get('current', val.get('latest', val.get('rate'))))
+                # Unwrap numpy types
+                try:
+                    import numpy as np
+                    if isinstance(val, (np.integer, np.floating)):
+                        val = float(val)
+                except (ImportError, TypeError):
+                    pass
+                if val is None:
+                    continue
+                if isinstance(val, (int, float)):
                     formatted = f"{val:,.2f}{unit}"
                 else:
                     formatted = f"{val}{unit}"
