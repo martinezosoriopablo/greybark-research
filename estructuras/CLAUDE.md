@@ -122,7 +122,16 @@ python run_monthly.py --dry-run
 - Panel composition: `ai_council_runner.py`
 - Output structure: `council_parser.py` (block extraction patterns)
 
-## Recent Bug Fixes (2026-03-25)
+## Recent Bug Fixes (2026-03-27)
+1. RF report KeyError `'impacto'` -> `.get()` with alias fallbacks (severidad/mitigacion)
+2. Macro crash `Series.__format__` -> `_build_latam_table()` extracts `.iloc[-1]` from pd.Series
+3. Briefing numpy/dict raw display -> unwrap dict values + convert np.float64 to float
+4. Reports not copied on partial failure -> `_copy_reports_to_client()` always runs
+5. Per-client directives -> each client reads/writes own `directives.txt`
+6. Docker volumes: `/app/consejo_ia/output` + `/app/consejo_ia/input` now persistent
+7. Multi-client onboarding: MBI, Vantrust, BVC with `product_ai_council=True`
+
+### Previous (2026-03-25)
 1. risk_matrix chart crash: `'str' object has no .get()` -> extract `riesgos` list from nested dict
 2. YTD timezone mismatch: yfinance tz-aware index vs naive string -> `pd.Timestamp.tz_localize()`
 3. CPI method mismatch: `get_usa_cpi_components()` -> `get_usa_cpi_breakdown()` (3 callers)
