@@ -247,6 +247,21 @@
 - **Renderers**: Crash points teóricos (28) — no se manifiestan en runs normales; único crash real (`KeyError: 'impacto'`) ya fixeado
 - **Veredicto**: **GO para demos** — pipeline estable en producción
 
+### Sprint 24 — Per-Client Directives + Manual de Portal
+
+**Trigger:** Las directivas eran compartidas entre clientes (MBI, Vantrust, BVC escribían al mismo archivo). Se necesitaba aislamiento para demos independientes + manual de usuario del portal.
+
+| # | Cambio | Archivo | Detalle |
+|---|--------|---------|---------|
+| 125 | Directivas per-client | `deploy/app.py` | `_get_directives(client_id)` lee de `/layout/output/{client_id}/directives.txt`; `_save_directives(content, client_id)` guarda per-client + sync a archivo compartido para pipeline |
+| 126 | Manual del portal actualizado | `deploy/MANUAL_PORTAL.md` | Tabla de reportes (contenido/charts/páginas), tiempos por modo, flujo recomendado para demos, FAQ con directivas independientes |
+
+**Validación:**
+- Directivas de BVC no afectan a MBI ni Vantrust
+- Pipeline lee archivo compartido (sync automático al correr)
+- Manual cubre las 8 secciones del portal + FAQ
+- Commit `dc10077` desplegado en producción
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
