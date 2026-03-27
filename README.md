@@ -1,14 +1,18 @@
 # Greybark Research - Sistema de Reportes de Inversion
-## Version 4.1 | Marzo 2026
+## Version 5.0 | Marzo 2026
 
-> **Nota**: Este modulo es parte del sistema Greybark Research.
-> Para documentacion completa del proyecto, ver el [README principal](../README.md).
+> **Nota**: Para documentacion completa del sistema, ver [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md).
+> Para registro de mejoras, ver [IMPROVEMENT_LOG.md](IMPROVEMENT_LOG.md).
+> Para manual del portal, ver [deploy/MANUAL_PORTAL.md](deploy/MANUAL_PORTAL.md).
 
 ## Descripcion General
 
 Sistema automatizado de generacion de reportes de inversion para Greybark Research.
-Genera reportes profesionales estilo Goldman Sachs / JPMorgan para clientes institucionales.
-Incluye integracion opcional con el AI Council (panel de 5 especialistas IA).
+Genera 5 reportes profesionales mensuales en español para comites de inversiones institucionales.
+Arquitectura multi-agente: 8 agentes IA (5 panelistas + CIO + Contrarian + Refinador).
+Portal multi-cliente en produccion (MBI, Vantrust, BVC).
+
+**Metricas:** 13 APIs, 300+ metricas, 44+ modulos, 43 charts, 5 modelos forecast.
 
 ---
 
@@ -468,5 +472,5 @@ Para mas informacion sobre la arquitectura completa, ver el [README principal](.
 ## Contacto
 
 Greybark Research
-Sistema de Reportes de Inversion v4.0
-Febrero 2026
+Sistema de Reportes de Inversion v5.0
+Marzo 2026

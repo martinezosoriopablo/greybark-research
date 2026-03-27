@@ -1,13 +1,25 @@
-# Fuentes de Datos — Macro Report Mensual
+# Fuentes de Datos — Sistema Greybark Research
 
-## APIs Integradas
+> Última actualización: 2026-03-27
+> Para resumen completo del sistema, ver [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md)
 
-| API | Cliente | Frecuencia |
-|---|---|---|
-| BCCh REST | `bcch_client.py` | Diaria/Mensual |
-| FRED | `fred_client.py` | Diaria/Mensual |
-| ECB Data Portal | `data_fetchers/curvas_soberanas.py` | Diaria (cache 4h) |
-| MoF Japan | `data_fetchers/curvas_soberanas.py` | Diaria (cache 4h) |
+## APIs Integradas (13+)
+
+| API | Cliente | Frecuencia | Módulos |
+|---|---|---|---|
+| BCCh REST | `bcch_client.py` + `bcch_extended.py` | Diaria/Mensual | Macro Chile, internacional, commodities, tasas |
+| FRED | `fred_client.py` | Diaria/Mensual | Macro USA, inflación, yields, spreads |
+| AlphaVantage | `alphavantage_client.py` | Bajo demanda | Earnings, estimaciones, fundamentales |
+| yfinance | Directo (librería) | Tiempo real | ETFs, valuaciones, retornos, factores |
+| Bloomberg | `bloomberg_reader.py` (Excel) | Manual | PMI, CDS, EPFR, SOFR, EMBI (95 series) |
+| ECB Data Portal | `data_fetchers/curvas_soberanas.py` | Diaria (cache 4h) | Bund yield curve |
+| MoF Japan | `data_fetchers/curvas_soberanas.py` | Diaria (cache 4h) | JGB yield curve |
+| BEA | `bea_client.py` | Trimestral | GDP componentes, PCE, profits |
+| OECD KEI | `oecd_client.py` | Mensual | CLI, confidence, macro |
+| IMF WEO | `imf_weo_client.py` | Semestral | GDP/inflación consensus global |
+| NY Fed | `nyfed_client.py` | Diaria | SOFR, GSCPI, R-star, term premia |
+| AKShare | `akshare_client.py` | Mensual | China NBS macro (TSF, PMI) |
+| CommLoan/SOFR | `commloan_scraper.py` | Diaria | Fed Funds forwards, SOFR curve |
 
 Capa de datos centralizada: `chart_data_provider.py` (ChartDataProvider)
 

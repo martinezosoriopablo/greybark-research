@@ -1,24 +1,25 @@
 # Chart Data Sources — Greybark Research
 
-Last updated: 2026-03-23
+Last updated: 2026-03-27
 
 ## Summary
 
 | Report | Total Charts | 100% Real | Partial Real | Fallback/Estimated |
 |--------|-------------|-----------|-------------|-------------------|
-| Macro  | 24          | 17        | 3           | 4                 |
+| Macro  | 23          | 17        | 3           | 3                 |
 | RV     | 12          | 12        | 0           | 0                 |
 | RF     | 8           | 8         | 0           | 0                 |
-| **Total** | **44**   | **37**    | **3**       | **4**             |
+| Briefing | 44        | 44        | 0           | 0                 |
+| **Total** | **87**   | **81**    | **3**       | **3**             |
 
-Real data percentage: **84%** (37/44)
+Real data percentage: **93%** (81/87)
 
-### Recent Changes (Sprint 3-11)
-- Commodity charts enriched with yfinance spot when BCCh data >35 days stale
-- Factor Performance chart: yfinance fallback (was placeholder "sin scores")
-- RV now 12/12 charts (was 11/12)
-- inflation_components_ts: now uses FRED CPI series (was estimated fallback)
-- RF yield curve chart: Bund + JGB sovereign curves overlaid (ECB + MoF Japan data)
+### Recent Changes (Sprint 18-24)
+- risk_matrix chart fix: extract `riesgos` list from nested dict (was crashing)
+- inflation_components_ts: Bloomberg fallback when FRED incomplete
+- RF yield_curve: 8/8 charts generating on server (was blocked by ChartDataProvider init)
+- Briefing: 44 charts all base64 embedded, verified clean on production
+- All RV/RF charts verified generating correctly on Hetzner server (matplotlib Agg backend)
 
 ## Macro Report Charts (22)
 
