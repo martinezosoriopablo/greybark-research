@@ -167,7 +167,9 @@ def _get_client_reports(client_id: str, platform: Platform) -> list:
         stat = html_file.stat()
         name_lower = html_file.name.lower()
         report_type = "otro"
-        if "intelligence_briefing" in name_lower:
+        if "council_deliberation" in name_lower:
+            report_type = "council"
+        elif "intelligence_briefing" in name_lower or "pre_council_briefing" in name_lower:
             report_type = "briefing"
         elif "macro" in name_lower:
             report_type = "macro"

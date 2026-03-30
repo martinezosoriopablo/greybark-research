@@ -912,6 +912,20 @@ class MonthlyPipeline:
             print("\n  [NO-GO] Council abortó por preflight. Generando reportes con defaults...")
             self.council_result = None
 
+        # ---- FASE 4.5: Council Deliberation Report (Acta) ----
+        if self.council_result:
+            try:
+                from council_deliberation_renderer import render_deliberation_report
+                acta_path = render_deliberation_report(
+                    self.council_result,
+                    branding={'company_name': getattr(self, '_company_name', 'Greybark Research')},
+                    verbose=True,
+                )
+                if acta_path:
+                    self._print(f"  [OK] Acta del Comité: {acta_path}")
+            except Exception as e:
+                self._print(f"  [WARN] Acta no generada: {e}")
+
         # ---- FASE 5: Ensamblar Reportes (charts ya pre-generados) ----
         equity_data = self.data.get('equity')
         if isinstance(equity_data, dict) and 'error' in equity_data:
