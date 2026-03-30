@@ -333,7 +333,7 @@
 |---|-------------|---------|-----------|-----|
 | 134 | LatAm tabla: inflación Brasil/México/Colombia muestra "N/D" | `macro_content_generator.py:2051` | `_build_latam_table()` solo llamaba `get_latam_rates()` (policy rates) — no buscaba inflación | Agregar fetch de `BCChSeries.IPC_INTL_BRASIL/MEXICO/COLOMBIA` via `self.data.get_series()` |
 | 135 | China inmobiliario: Precios Vivienda muestra "—" | `macro_content_generator.py:1518` | Buscaba en `get_china_latest()` (ChartDataProvider) pero property data está en `akshare_china` (quant_data) | Buscar primero en `self._q('akshare_china').get('property', {})`, fallback a `cn` |
-| 136 | Chile IPC Subyacente: hardcoded "N/D" | `macro_content_generator.py:1809` | No existe serie BCCh de IPC Core Chile en config.py | Sin fix — requiere agregar serie BCCh (pendiente investigar código de serie) |
+| 136 | Chile IPC Subyacente: hardcoded "N/D" | `macro_content_generator.py:1809` + `greybark/config.py` | Serie BCCh `F074.IPCSAE.V12.Z.2018.C.M` no estaba en config | Agregar `IPC_SAE_V12` a BCChSeries + fetch en `_generate_chile_inflation()` → **4.1% a/a** (dato real) |
 
 **Patrón recurrente: datos disponibles en una fuente pero no conectados al consumer.** Las APIs tienen los datos (BCCh inflación LatAm, AKShare property China) pero el content generator busca en la fuente equivocada o no busca en absoluto.
 

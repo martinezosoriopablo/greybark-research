@@ -1798,8 +1798,20 @@ class MacroContentGenerator:
         ipc_yoy_str = (self._fmt(ipc_yoy) + ' a/a') if ipc_yoy is not None else 'N/D'
         ipc_mom_str = f"+{self._fmt(ipc_mom)}" if ipc_mom is not None else 'N/D'
 
+        # IPC SAE (subyacente) from BCCh
+        ipc_sae_str = 'N/D'
+        if self.data:
+            try:
+                from greybark.config import BCChSeries
+                sae = self.data.get_series(BCChSeries.IPC_SAE_V12, resample='M')
+                sae_val = self._sf(sae)
+                if sae_val is not None:
+                    ipc_sae_str = f"{sae_val:.1f}% a/a"
+            except Exception:
+                pass
+
         narrativa = (
-            f"IPC Chile headline: {ipc_yoy_str}, variacion mensual: {ipc_mom_str}. "
+            f"IPC Chile headline: {ipc_yoy_str}, IPC SAE (subyacente): {ipc_sae_str}. "
             f"Meta BCCh: 3.0%."
         )
 
@@ -1808,7 +1820,7 @@ class MacroContentGenerator:
             'narrativa': narrativa,
             'datos': [
                 {'indicador': 'IPC Headline', 'valor': ipc_yoy_str, 'anterior': self._fmt(cl.get('ipc_yoy_prev')), 'mom': ipc_mom_str},
-                {'indicador': 'IPC Subyacente (SAE)', 'valor': 'N/D', 'anterior': 'N/D', 'mom': 'N/D'},
+                {'indicador': 'IPC Subyacente (SAE)', 'valor': ipc_sae_str, 'anterior': '-', 'mom': '-'},
             ],
             'expectativas': self._build_eee_expectations()
         }

@@ -223,6 +223,7 @@ class BCChSeries:
 
     # Precios
     IPC_VAR = "F074.IPC.VAR.Z.Z.C.M"          # IPC variacion mensual
+    IPC_SAE_V12 = "F074.IPCSAE.V12.Z.2018.C.M"  # IPC SAE (subyacente) variacion anual
     IPC_EXP = "F089.IPC.VAR.11.M"              # IPC expectativa EEE
 
     # EEE Forecasts (Encuesta de Expectativas Económicas)
