@@ -324,8 +324,18 @@
 **Causa raíz:** Mismo patrón que Sprint 22 (`_build_latam_table`) — `ChartDataProvider` devuelve Series completas pero el content generator asume escalares. El `_sf()` helper resuelve esto globalmente para cualquier método que use datos del provider.
 
 **Validación:**
-- `generate_all_content()` produce 11/11 secciones OK (metadata, resumen, pronóstico, USA, Europa, China, Chile, temas, escenarios, conclusiones)
-- Pipeline completo pendiente de run final
+- `generate_all_content()` produce 11/11 secciones OK
+- Pipeline macro: OK (405.9s, 27 charts)
+
+#### Tablas Vacías en Macro Report (datos disponibles no mapeados)
+
+| # | Tabla vacía | Archivo | Causa raíz | Fix |
+|---|-------------|---------|-----------|-----|
+| 134 | LatAm tabla: inflación Brasil/México/Colombia muestra "N/D" | `macro_content_generator.py:2051` | `_build_latam_table()` solo llamaba `get_latam_rates()` (policy rates) — no buscaba inflación | Agregar fetch de `BCChSeries.IPC_INTL_BRASIL/MEXICO/COLOMBIA` via `self.data.get_series()` |
+| 135 | China inmobiliario: Precios Vivienda muestra "—" | `macro_content_generator.py:1518` | Buscaba en `get_china_latest()` (ChartDataProvider) pero property data está en `akshare_china` (quant_data) | Buscar primero en `self._q('akshare_china').get('property', {})`, fallback a `cn` |
+| 136 | Chile IPC Subyacente: hardcoded "N/D" | `macro_content_generator.py:1809` | No existe serie BCCh de IPC Core Chile en config.py | Sin fix — requiere agregar serie BCCh (pendiente investigar código de serie) |
+
+**Patrón recurrente: datos disponibles en una fuente pero no conectados al consumer.** Las APIs tienen los datos (BCCh inflación LatAm, AKShare property China) pero el content generator busca en la fuente equivocada o no busca en absoluto.
 
 ### Patrones Recurrentes Nuevos
 
@@ -344,6 +354,7 @@
 | **Council output con keys variables** | 1 (impacto vs severidad, hedge vs mitigacion) | Los renderers deben usar `.get()` con alias alternativos para keys que el LLM puede nombrar distinto. Nunca `r['key']` directo en datos generados por council. |
 | **Reportes no copiados en error parcial** | 1 (RF fail → 3 reportes OK no copiados) | `_copy_reports_to_client()` solo corre si pipeline exit code=0. Cambiar a copiar reportes individuales que sí se generaron. |
 | **dotenv no cargado en módulos standalone** | 1 (narrative_engine) | Si un módulo usa `os.environ.get('KEY')` pero `dotenv` solo se carga en otro módulo (config.py), la key no existe cuando se importa de forma independiente. Cada módulo que necesite env vars debe cargar `dotenv` por sí mismo. |
+| **Datos disponibles pero no conectados al consumer** | 3 (LatAm inflación, China property, Chile IPC core) | Content generator busca datos en fuente A (ChartDataProvider) pero los datos están en fuente B (quant_data/AKShare, BCCh series internacionales). Auditar cada tabla vacía: ¿la API tiene el dato? → conectar. ¿No existe? → documentar como pendiente. |
 
 ### Inconsistencias Detectadas en Audit
 

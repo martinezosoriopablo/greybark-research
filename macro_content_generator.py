@@ -1514,11 +1514,13 @@ class MacroContentGenerator:
         prop_sales = self._bbg_val('china_property_sales_yoy')
         prop_prev = self._bbg_prev('china_property_sales_yoy')
 
-        # Home Prices: AKShare (NBS 70-city data)
-        hp_tier1 = self._fmt(cn.get('home_price_yoy_tier1'))
-        hp_tier1_prev = self._fmt(cn.get('home_price_yoy_tier1_prev'))
-        hp_bj = self._fmt(cn.get('home_price_yoy_bj'))
-        hp_sh = self._fmt(cn.get('home_price_yoy_sh'))
+        # Home Prices: AKShare (NBS 70-city data) — check quant_data first
+        ak = self._q('akshare_china') or self._q('akshare') or {}
+        ak_property = ak.get('property', {}) if isinstance(ak, dict) else {}
+        hp_tier1 = self._fmt(ak_property.get('home_price_yoy_tier1') or cn.get('home_price_yoy_tier1'))
+        hp_tier1_prev = self._fmt(ak_property.get('home_price_yoy_tier1_prev') or cn.get('home_price_yoy_tier1_prev'))
+        hp_bj = self._fmt(ak_property.get('home_price_yoy_bj') or cn.get('home_price_yoy_bj'))
+        hp_sh = self._fmt(ak_property.get('home_price_yoy_sh') or cn.get('home_price_yoy_sh'))
 
         has_data = prop_sales != 'N/D' or hp_tier1 != 'N/D'
         if has_data:
@@ -2049,15 +2051,34 @@ class MacroContentGenerator:
         }
 
     def _build_latam_table(self) -> List[Dict]:
-        """Build LatAm macro table from BCCh data (get_latam_rates returns pd.Series per rate)."""
+        """Build LatAm macro table from BCCh data (rates + inflation)."""
         if not self.data:
             return [{'pais': p, 'gdp': 'N/D', 'inflación': 'N/D', 'tasa': 'N/D', 'outlook': '-', 'riesgo_principal': '-'}
                     for p in ['Brasil', 'Mexico', 'Colombia']]
+        import pandas as pd
+        from greybark.config import BCChSeries
+
+        # Fetch policy rates
         try:
-            latam = self.data.get_latam_rates()
+            latam_rates = self.data.get_latam_rates()
         except Exception:
-            latam = {}
-        # Map country names to series keys returned by get_latam_rates()
+            latam_rates = {}
+
+        # Fetch inflation from BCCh international series
+        inflation_series = {}
+        inflation_map = {
+            'Brasil': BCChSeries.IPC_INTL_BRASIL,
+            'Mexico': BCChSeries.IPC_INTL_MEXICO,
+            'Colombia': BCChSeries.IPC_INTL_COLOMBIA,
+        }
+        for country, series_code in inflation_map.items():
+            try:
+                s = self.data.get_series(series_code, resample='M')
+                if isinstance(s, pd.Series) and not s.empty:
+                    inflation_series[country] = float(s.iloc[-1])
+            except Exception:
+                pass
+
         rate_map = {
             'Brasil': ('Selic (Brasil)', 'Selic'),
             'Mexico': ('Banxico (Mexico)', 'Banxico'),
@@ -2065,18 +2086,14 @@ class MacroContentGenerator:
             'Chile': ('BCCh TPM (Chile)', 'BCCh'),
         }
         result = []
-        import pandas as pd
         for country, (series_key, rate_name) in rate_map.items():
-            series = latam.get(series_key)
-            tasa = None
-            if isinstance(series, pd.Series) and not series.empty:
-                tasa = float(series.iloc[-1])
-            elif isinstance(series, (int, float)):
-                tasa = float(series)
+            series = latam_rates.get(series_key)
+            tasa = self._sf(series)
+            infl = inflation_series.get(country)
             result.append({
                 'pais': country,
                 'gdp': 'N/D',
-                'inflación': 'N/D',
+                'inflación': f"{infl:.1f}%" if infl is not None else 'N/D',
                 'tasa': f"{tasa:.2f}% ({rate_name})" if tasa is not None else 'N/D',
                 'outlook': '-',
                 'riesgo_principal': '-',
