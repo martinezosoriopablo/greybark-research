@@ -164,44 +164,44 @@ class RFReportRenderer:
         }
 
         # 1. RESUMEN EJECUTIVO
-        resumen = content['resumen_ejecutivo']
-        postura = resumen['postura_global']
+        resumen = content.get('resumen_ejecutivo', {})
+        postura = resumen.get('postura_global', {})
 
-        replacements['{{postura_global}}'] = postura['view']
-        replacements['{{duration_stance}}'] = postura['duration_stance']
-        replacements['{{credit_stance}}'] = postura['credit_stance']
-        replacements['{{postura_narrativa}}'] = _md_to_html(postura['narrativa'])
+        replacements['{{postura_global}}'] = postura.get('view', 'Neutral')
+        replacements['{{duration_stance}}'] = postura.get('duration_stance', '')
+        replacements['{{credit_stance}}'] = postura.get('credit_stance', '')
+        replacements['{{postura_narrativa}}'] = _md_to_html(postura.get('narrativa', ''))
 
         # Stance spectrum - highlight active postura
-        active_view = postura['view'].upper()
+        active_view = postura.get('view', 'Neutral').upper()
         for stance in ['cauteloso', 'neutral', 'constructivo', 'agresivo']:
             replacements[f'{{{{spectrum_active_{stance}}}}}'] = 'spectrum-active' if stance.upper() == active_view else ''
 
         # Summary table
         summary_rows = ''
-        for r in resumen['tabla_resumen']:
-            view_class = self._get_view_class(r['view'])
+        for r in resumen.get('tabla_resumen', []):
+            view_class = self._get_view_class(r.get('view', 'N'))
             summary_rows += f'''<tr>
-                <td><strong>{r['segmento']}</strong></td>
-                <td class="center"><span class="view-badge {view_class}">{r['view']}</span></td>
-                <td class="center">{r['duration']}</td>
-                <td class="center yield-high">{r['yield']}</td>
-                <td class="center">{r['spread']}</td>
-                <td>{_md_to_html(r['driver'])}</td>
+                <td><strong>{r.get('segmento', '')}</strong></td>
+                <td class="center"><span class="view-badge {view_class}">{r.get('view', 'N')}</span></td>
+                <td class="center">{r.get('duration', '')}</td>
+                <td class="center yield-high">{r.get('yield', '')}</td>
+                <td class="center">{r.get('spread', '')}</td>
+                <td>{_md_to_html(r.get('driver', ''))}</td>
             </tr>'''
         replacements['{{summary_table_rows}}'] = summary_rows
 
-        key_calls = ''.join([f'<li>{_md_to_html(kc)}</li>' for kc in resumen['key_calls']])
+        key_calls = ''.join([f'<li>{_md_to_html(kc)}</li>' for kc in resumen.get('key_calls', [])])
         replacements['{{key_calls_html}}'] = key_calls
 
         # 2. AMBIENTE DE TASAS
-        tasas = content['ambiente_tasas']
-        replacements['{{rates_narrative}}'] = _md_to_html(tasas['narrativa'])
+        tasas = content.get('ambiente_tasas', {})
+        replacements['{{rates_narrative}}'] = _md_to_html(tasas.get('narrativa', ''))
 
         yields_rows = ''
-        for y in tasas['yields_globales']:
+        for y in tasas.get('yields_globales', []):
             yields_rows += f'''<tr>
-                <td><strong>{y['mercado']}</strong></td>
+                <td><strong>{y.get('mercado', '')}</strong></td>
                 <td class="center">{y.get('y2', '-')}</td>
                 <td class="center">{y.get('y5', '-')}</td>
                 <td class="center yield-high">{y.get('y10', '-')}</td>
@@ -212,16 +212,17 @@ class RFReportRenderer:
         replacements['{{yields_table_rows}}'] = yields_rows
 
         real_rows = ''
-        for r in tasas['tasas_reales']['datos']:
+        tasas_reales = tasas.get('tasas_reales', {})
+        for r in tasas_reales.get('datos', []):
             # Skip rows where all numeric values are N/D
-            if r['yield_real'] == 'N/D' and r['breakeven'] == 'N/D' and r['nominal'] == 'N/D':
+            if r.get('yield_real', 'N/D') == 'N/D' and r.get('breakeven', 'N/D') == 'N/D' and r.get('nominal', 'N/D') == 'N/D':
                 continue
             real_rows += f'''<tr>
-                <td>{r['mercado']}</td>
-                <td class="center yield-high">{r['yield_real']}</td>
-                <td class="center">{r['breakeven']}</td>
-                <td class="center">{r['nominal']}</td>
-                <td>{r['vs_historia']}</td>
+                <td>{r.get('mercado', '')}</td>
+                <td class="center yield-high">{r.get('yield_real', 'N/D')}</td>
+                <td class="center">{r.get('breakeven', 'N/D')}</td>
+                <td class="center">{r.get('nominal', 'N/D')}</td>
+                <td>{r.get('vs_historia', '')}</td>
             </tr>'''
         replacements['{{real_rates_rows}}'] = real_rows
 
@@ -229,7 +230,7 @@ class RFReportRenderer:
         neutral = tasas.get('neutral_rate')
         if neutral and neutral.get('rows'):
             nr_html = f'''
-            <h3 style="margin-top: 25px;">{neutral['titulo']}</h3>
+            <h3 style="margin-top: 25px;">{neutral.get('titulo', '')}</h3>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -240,13 +241,13 @@ class RFReportRenderer:
                     </tr>
                 </thead>
                 <tbody>'''
-            for nr in neutral['rows']:
+            for nr in neutral.get('rows', []):
                 nr_html += f'''
                     <tr>
-                        <td>{nr['fuente']}</td>
-                        <td class="center">{nr['r_star_real']}</td>
-                        <td class="center">{nr['i_star_nominal']}</td>
-                        <td>{nr['nota']}</td>
+                        <td>{nr.get('fuente', '')}</td>
+                        <td class="center">{nr.get('r_star_real', '')}</td>
+                        <td class="center">{nr.get('i_star_nominal', '')}</td>
+                        <td>{nr.get('nota', '')}</td>
                     </tr>'''
             nr_html += '''
                 </tbody>
@@ -256,76 +257,77 @@ class RFReportRenderer:
             replacements['{{neutral_rate_section}}'] = ''
 
         # 3. DURATION
-        duration = content['duration']
-        replacements['{{duration_narrative}}'] = _md_to_html(duration['view_global']['rationale'])
+        duration = content.get('duration', {})
+        replacements['{{duration_narrative}}'] = _md_to_html(duration.get('view_global', {}).get('rationale', ''))
 
         dur_rows = ''
-        for d in duration['por_mercado']:
-            dur_class = 'badge-long' if 'Larga' in d['duration_view'] else 'badge-short' if 'Corta' in d['duration_view'] else 'badge-neutral'
+        for d in duration.get('por_mercado', []):
+            d_view = d.get('duration_view', '')
+            dur_class = 'badge-long' if 'Larga' in d_view else 'badge-short' if 'Corta' in d_view else 'badge-neutral'
             dur_rows += f'''<tr>
-                <td><strong>{d['mercado']}</strong></td>
-                <td class="center"><span class="view-badge {dur_class}">{d['duration_view']}</span></td>
-                <td class="center">{d['benchmark']}</td>
-                <td class="center">{d['recomendacion']}</td>
-                <td>{d['posicion_curva']}</td>
-                <td>{_md_to_html(d['rationale'])}</td>
+                <td><strong>{d.get('mercado', '')}</strong></td>
+                <td class="center"><span class="view-badge {dur_class}">{d_view}</span></td>
+                <td class="center">{d.get('benchmark', '')}</td>
+                <td class="center">{d.get('recomendacion', '')}</td>
+                <td>{d.get('posicion_curva', '')}</td>
+                <td>{_md_to_html(d.get('rationale', ''))}</td>
             </tr>'''
         replacements['{{duration_table_rows}}'] = dur_rows
 
         # Duration trades
         dur_trades = ''
-        for t in duration['trades_recomendados']:
+        for t in duration.get('trades_recomendados', []):
             dur_trades += f'''
             <div class="trade-card">
                 <div class="trade-header">
-                    <span class="trade-name">{_md_to_html(t['trade'])}</span>
+                    <span class="trade-name">{_md_to_html(t.get('trade', 'N/D'))}</span>
                 </div>
-                <p style="color: var(--text-medium); margin-bottom: 10px;">{_md_to_html(t['rationale'])}</p>
+                <p style="color: var(--text-medium); margin-bottom: 10px;">{_md_to_html(t.get('rationale', ''))}</p>
                 <div class="trade-metrics">
                     <div class="trade-metric">
                         <div class="label">Instrumento</div>
-                        <div class="value">{t['instrumento']}</div>
+                        <div class="value">{t.get('instrumento', 'N/D')}</div>
                     </div>
                     <div class="trade-metric">
                         <div class="label">Carry (3M)</div>
-                        <div class="value">{t['carry']}</div>
+                        <div class="value">{t.get('carry', 'N/D')}</div>
                     </div>
                     <div class="trade-metric">
                         <div class="label">Objetivo</div>
-                        <div class="value">{t['target']}</div>
+                        <div class="value">{t.get('target', 'N/D')}</div>
                     </div>
                     <div class="trade-metric">
                         <div class="label">Stop-loss</div>
-                        <div class="value">{t['stop']}</div>
+                        <div class="value">{t.get('stop', 'N/D')}</div>
                     </div>
                 </div>
             </div>'''
         replacements['{{duration_trades_html}}'] = dur_trades
 
         # 4. CREDITO
-        credito = content['credito']
-        replacements['{{credit_narrative}}'] = _md_to_html(credito['narrativa'])
+        credito = content.get('credito', {})
+        replacements['{{credit_narrative}}'] = _md_to_html(credito.get('narrativa', ''))
 
-        ig = credito['investment_grade']
-        replacements['{{ig_view}}'] = ig['view']
-        replacements['{{ig_badge_class}}'] = self._get_view_class(ig['view'])
-        replacements['{{ig_spread}}'] = ig['spread_actual']
-        replacements['{{ig_yield}}'] = ig['yield_total']
-        replacements['{{ig_vs_historia}}'] = ig['spread_vs_historia']
+        ig = credito.get('investment_grade', {})
+        replacements['{{ig_view}}'] = ig.get('view', 'N')
+        replacements['{{ig_badge_class}}'] = self._get_view_class(ig.get('view', 'N'))
+        replacements['{{ig_spread}}'] = ig.get('spread_actual', '')
+        replacements['{{ig_yield}}'] = ig.get('yield_total', '')
+        replacements['{{ig_vs_historia}}'] = ig.get('spread_vs_historia', '')
 
-        hy = credito['high_yield']
-        replacements['{{hy_view}}'] = hy['view']
-        replacements['{{hy_badge_class}}'] = self._get_view_class(hy['view'])
-        replacements['{{hy_spread}}'] = hy['spread_actual']
-        replacements['{{hy_yield}}'] = hy['yield_total']
-        replacements['{{hy_vs_historia}}'] = hy['spread_vs_historia']
+        hy = credito.get('high_yield', {})
+        replacements['{{hy_view}}'] = hy.get('view', 'N')
+        replacements['{{hy_badge_class}}'] = self._get_view_class(hy.get('view', 'N'))
+        replacements['{{hy_spread}}'] = hy.get('spread_actual', '')
+        replacements['{{hy_yield}}'] = hy.get('yield_total', '')
+        replacements['{{hy_vs_historia}}'] = hy.get('spread_vs_historia', '')
 
         # IG/HY por rating (real data from FRED)
         ig_rating_rows = ''
         for r in ig.get('por_rating_real', []):
             ig_rating_rows += f'''<tr>
-                <td>{r['rating']}</td>
-                <td class="center">{r['spread']}</td>
+                <td>{r.get('rating', '')}</td>
+                <td class="center">{r.get('spread', '')}</td>
                 <td class="center">{r.get('percentil', '-')}</td>
                 <td>{_md_to_html(r.get('señal', ''))}</td>
             </tr>'''
@@ -334,84 +336,86 @@ class RFReportRenderer:
         hy_rating_rows = ''
         for r in hy.get('por_rating', []):
             hy_rating_rows += f'''<tr>
-                <td>{r['rating']}</td>
-                <td class="center">{r['spread']}</td>
+                <td>{r.get('rating', '')}</td>
+                <td class="center">{r.get('spread', '')}</td>
                 <td>{_md_to_html(r.get('comentario', ''))}</td>
             </tr>'''
         replacements['{{hy_rating_rows}}'] = hy_rating_rows
 
         # 5. EM DEBT
-        em = content['em_debt']
-        replacements['{{em_narrative}}'] = _md_to_html(em['narrativa'])
+        em = content.get('em_debt', {})
+        replacements['{{em_narrative}}'] = _md_to_html(em.get('narrativa', ''))
 
-        hc = em['hard_currency']
-        replacements['{{em_hc_view}}'] = hc['view']
-        replacements['{{em_hc_class}}'] = self._get_view_class(hc['view'])
-        replacements['{{em_hc_spread}}'] = hc['spread']
-        replacements['{{em_hc_yield}}'] = hc['yield']
+        hc = em.get('hard_currency', {})
+        replacements['{{em_hc_view}}'] = hc.get('view', 'N')
+        replacements['{{em_hc_class}}'] = self._get_view_class(hc.get('view', 'N'))
+        replacements['{{em_hc_spread}}'] = hc.get('spread', '')
+        replacements['{{em_hc_yield}}'] = hc.get('yield', '')
 
-        lc = em['local_currency']
-        replacements['{{em_lc_view}}'] = lc['view']
-        replacements['{{em_lc_class}}'] = self._get_view_class(lc['view'])
+        lc = em.get('local_currency', {})
+        replacements['{{em_lc_view}}'] = lc.get('view', 'N')
+        replacements['{{em_lc_class}}'] = self._get_view_class(lc.get('view', 'N'))
 
         country_rows = ''
-        for c in em['por_pais']:
-            hc_class = self._get_view_class(c['hc_view'])
-            lc_class = self._get_view_class(c['lc_view'])
+        for c in em.get('por_pais', []):
+            hc_class = self._get_view_class(c.get('hc_view', 'N'))
+            lc_class = self._get_view_class(c.get('lc_view', 'N'))
             country_rows += f'''<tr>
-                <td><strong>{c['pais']}</strong></td>
-                <td class="center"><span class="view-badge {hc_class}">{c['hc_view']}</span></td>
-                <td class="center"><span class="view-badge {lc_class}">{c['lc_view']}</span></td>
-                <td class="center yield-high">{c['yield_hc']}</td>
-                <td class="center">{c['spread']}</td>
-                <td class="center">{c['rating']}</td>
-                <td>{_md_to_html(c['driver'])}</td>
+                <td><strong>{c.get('pais', '')}</strong></td>
+                <td class="center"><span class="view-badge {hc_class}">{c.get('hc_view', 'N')}</span></td>
+                <td class="center"><span class="view-badge {lc_class}">{c.get('lc_view', 'N')}</span></td>
+                <td class="center yield-high">{c.get('yield_hc', '')}</td>
+                <td class="center">{c.get('spread', '')}</td>
+                <td class="center">{c.get('rating', '')}</td>
+                <td>{_md_to_html(c.get('driver', ''))}</td>
             </tr>'''
         replacements['{{em_country_rows}}'] = country_rows
 
         # 6. CHILE
-        chile = content['chile']
-        sov = chile['soberanos']
-        replacements['{{chile_sovereign_narrative}}'] = _md_to_html(sov['narrativa'])
+        chile = content.get('chile', {})
+        sov = chile.get('soberanos', {})
+        replacements['{{chile_sovereign_narrative}}'] = _md_to_html(sov.get('narrativa', ''))
 
         bcp_rows = ''
-        for b in sov['curva_bcp']:
-            view_class = 'badge-ow' if 'OW' in b['view'] else 'badge-neutral'
+        for b in sov.get('curva_bcp', []):
+            b_view = b.get('view', 'N')
+            view_class = 'badge-ow' if 'OW' in b_view else 'badge-neutral'
             bcp_rows += f'''<tr>
-                <td>{b['plazo']}</td>
-                <td>{b['yield']}</td>
-                <td>{b['vs_1m']}</td>
-                <td><span class="view-badge {view_class}">{b['view']}</span></td>
+                <td>{b.get('plazo', '')}</td>
+                <td>{b.get('yield', '')}</td>
+                <td>{b.get('vs_1m', '')}</td>
+                <td><span class="view-badge {view_class}">{b_view}</span></td>
             </tr>'''
         replacements['{{chile_bcp_rows}}'] = bcp_rows
 
         bcu_rows = ''
-        for b in sov['curva_bcu']:
-            view_class = 'badge-ow' if 'OW' in b['view'] else 'badge-neutral'
+        for b in sov.get('curva_bcu', []):
+            b_view = b.get('view', 'N')
+            view_class = 'badge-ow' if 'OW' in b_view else 'badge-neutral'
             bcu_rows += f'''<tr>
-                <td>{b['plazo']}</td>
-                <td>{b['yield']}</td>
-                <td>{b['vs_1m']}</td>
-                <td><span class="view-badge {view_class}">{b['view']}</span></td>
+                <td>{b.get('plazo', '')}</td>
+                <td>{b.get('yield', '')}</td>
+                <td>{b.get('vs_1m', '')}</td>
+                <td><span class="view-badge {view_class}">{b_view}</span></td>
             </tr>'''
         replacements['{{chile_bcu_rows}}'] = bcu_rows
 
-        corp = chile['corporativos']
-        replacements['{{chile_corp_narrative}}'] = _md_to_html(corp['narrativa'])
+        corp = chile.get('corporativos', {})
+        replacements['{{chile_corp_narrative}}'] = _md_to_html(corp.get('narrativa', ''))
 
-        mm = chile['money_market']
+        mm = chile.get('money_market', {})
         mm_rows = ''
-        for m in mm['alternativas']:
+        for m in mm.get('alternativas', []):
             mm_rows += f'''<tr>
-                <td>{m['instrumento']}</td>
-                <td class="center yield-high">{m['tasa']}</td>
-                <td class="center">{m['liquidez']}</td>
-                <td>{m['view']}</td>
+                <td>{m.get('instrumento', '')}</td>
+                <td class="center yield-high">{m.get('tasa', '')}</td>
+                <td class="center">{m.get('liquidez', '')}</td>
+                <td>{m.get('view', '')}</td>
             </tr>'''
         replacements['{{chile_mm_rows}}'] = mm_rows
 
         # 7. RIESGOS Y OPORTUNIDADES
-        risks = content['riesgos_oportunidades']
+        risks = content.get('riesgos_oportunidades', {})
 
         risks_html = ''
         for r in risks.get('top_risks', []):
@@ -457,11 +461,11 @@ class RFReportRenderer:
         replacements['{{trades_html}}'] = trades_html
 
         # 8. RESUMEN
-        summary = content['resumen_posicionamiento']
+        summary = content.get('resumen_posicionamiento', {})
 
         replacements['{{summary_rows}}'] = build_summary_rows(
-            summary['tabla_final'], key_field='dimension', value_field='recomendacion')
-        replacements['{{mensaje_clave}}'] = summary['mensaje_clave']
+            summary.get('tabla_final', []), key_field='dimension', value_field='recomendacion')
+        replacements['{{mensaje_clave}}'] = summary.get('mensaje_clave', '')
 
         # Convert {{key}} → key for Jinja2 context
         context = {}
@@ -485,6 +489,8 @@ class RFReportRenderer:
 
     def _get_view_class(self, view: str) -> str:
         """Retorna clase CSS segun view."""
+        if not view or not isinstance(view, str):
+            return 'badge-neutral'
         view_upper = view.upper().strip()
         if any(kw in view_upper for kw in ['OW', 'OVERWEIGHT', 'SOBREPONDERAR', 'SOBREPONDER']):
             return 'badge-ow'

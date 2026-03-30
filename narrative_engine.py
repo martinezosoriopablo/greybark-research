@@ -12,7 +12,17 @@ AI-generated numbers against verified API data and corrects discrepancies.
 import os
 import re
 import logging
+from pathlib import Path
 from typing import Optional, Dict, List, Tuple
+
+# Ensure .env is loaded (may not be if greybark.config wasn't imported first)
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parents[2] / '.env'
+    if _env_path.exists():
+        load_dotenv(_env_path)
+except ImportError:
+    pass
 
 logger = logging.getLogger(__name__)
 

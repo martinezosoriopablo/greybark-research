@@ -174,53 +174,54 @@ class RVReportRenderer:
         }
 
         # 1. RESUMEN EJECUTIVO
-        resumen = content['resumen_ejecutivo']
-        postura = resumen['postura_global']
+        resumen = content.get('resumen_ejecutivo', {})
+        postura = resumen.get('postura_global', {})
 
-        replacements['{{postura_global}}'] = postura['view']
-        replacements['{{stance_class}}'] = postura['view'].lower()
-        replacements['{{postura_narrativa}}'] = postura['narrativa']
+        view_str = postura.get('view', 'NEUTRAL')
+        replacements['{{postura_global}}'] = view_str
+        replacements['{{stance_class}}'] = view_str.lower() if isinstance(view_str, str) else 'neutral'
+        replacements['{{postura_narrativa}}'] = postura.get('narrativa', '')
 
         # Stance spectrum - highlight active postura
-        active_view = postura['view'].upper()
+        active_view = view_str.upper() if isinstance(view_str, str) else 'NEUTRAL'
         for stance in ['cauteloso', 'neutral', 'constructivo', 'agresivo']:
             replacements[f'{{{{spectrum_active_{stance}}}}}'] = 'spectrum-active' if stance.upper() == active_view else ''
 
         # Summary table
         summary_rows = ''
-        for r in resumen['tabla_resumen']:
-            view_class = self._get_view_class(r['view'])
+        for r in resumen.get('tabla_resumen', []):
+            view_class = self._get_view_class(r.get('view'))
             summary_rows += f'''<tr>
-                <td>{r['mercado']}</td>
-                <td>{r['indice']}</td>
-                <td class="center"><span class="view-badge {view_class}">{r['view']}</span></td>
-                <td class="center">{r['cambio']}</td>
-                <td>{r['driver']}</td>
+                <td>{r.get('mercado', '')}</td>
+                <td>{r.get('indice', '')}</td>
+                <td class="center"><span class="view-badge {view_class}">{r.get('view', 'N')}</span></td>
+                <td class="center">{r.get('cambio', '-')}</td>
+                <td>{r.get('driver', '')}</td>
             </tr>'''
         replacements['{{summary_table_rows}}'] = summary_rows
 
         # Key calls
-        key_calls = ''.join([f'<li>{kc}</li>' for kc in resumen['key_calls']])
+        key_calls = ''.join([f'<li>{kc}</li>' for kc in resumen.get('key_calls', [])])
         replacements['{{key_calls_html}}'] = key_calls
 
         # 2. VALORIZACIONES
-        val = content['valorizaciones']
-        replacements['{{valuation_narrative}}'] = val['narrativa']
+        val = content.get('valorizaciones', {})
+        replacements['{{valuation_narrative}}'] = val.get('narrativa', '')
 
         # Multiples table — hide EV/EBITDA column if all N/D
-        has_ev = any(m.get('ev_ebitda') not in (None, 'N/D', '') for m in val['multiples_region'])
+        has_ev = any(m.get('ev_ebitda') not in (None, 'N/D', '') for m in val.get('multiples_region', []))
         mult_rows = ''
-        for m in val['multiples_region']:
-            val_class = self._get_valuation_class(m['vs_10y_avg'])
-            ev_col = f'<td class="center">{m["ev_ebitda"]}</td>' if has_ev else ''
+        for m in val.get('multiples_region', []):
+            val_class = self._get_valuation_class(m.get('vs_10y_avg', ''))
+            ev_col = f'<td class="center">{m.get("ev_ebitda", "N/D")}</td>' if has_ev else ''
             mult_rows += f'''<tr>
-                <td><strong>{m['mercado']}</strong></td>
-                <td class="center">{m['pe_fwd']}</td>
-                <td class="center {val_class}">{m['vs_10y_avg']}</td>
+                <td><strong>{m.get('mercado', '')}</strong></td>
+                <td class="center">{m.get('pe_fwd', 'N/D')}</td>
+                <td class="center {val_class}">{m.get('vs_10y_avg', 'N/D')}</td>
                 {ev_col}
-                <td class="center">{m['pb']}</td>
-                <td class="center">{m['div_yield']}</td>
-                <td>{m['comentario']}</td>
+                <td class="center">{m.get('pb', 'N/D')}</td>
+                <td class="center">{m.get('div_yield', 'N/D')}</td>
+                <td>{m.get('comentario', '')}</td>
             </tr>'''
         replacements['{{multiples_table_rows}}'] = mult_rows
         # Hide EV/EBITDA header if column hidden
@@ -233,55 +234,56 @@ class RVReportRenderer:
         pe_targets = val.get('pe_targets', [])
         pe_target_rows = ''
         for t in pe_targets:
-            signal_class = 'val-cheap' if t['signal'] == 'BARATO' else 'val-expensive' if t['signal'] == 'CARO' else 'val-fair'
+            t_signal = t.get('signal', 'JUSTO')
+            signal_class = 'val-cheap' if t_signal == 'BARATO' else 'val-expensive' if t_signal == 'CARO' else 'val-fair'
             pe_target_rows += f'''<tr>
-                <td><strong>{t['mercado']}</strong></td>
-                <td class="center">{t['pe_actual']}</td>
-                <td class="center">{t['pe_fair']}</td>
-                <td class="center {signal_class}"><strong>{t['signal']}</strong></td>
-                <td class="center">{t['upside']}</td>
-                <td class="center" style="font-size:8pt;">{t['fed_model']}</td>
-                <td class="center" style="font-size:8pt;">{t['mean_rev']}</td>
+                <td><strong>{t.get('mercado', '')}</strong></td>
+                <td class="center">{t.get('pe_actual', 'N/D')}</td>
+                <td class="center">{t.get('pe_fair', 'N/D')}</td>
+                <td class="center {signal_class}"><strong>{t_signal}</strong></td>
+                <td class="center">{t.get('upside', 'N/D')}</td>
+                <td class="center" style="font-size:8pt;">{t.get('fed_model', 'N/D')}</td>
+                <td class="center" style="font-size:8pt;">{t.get('mean_rev', 'N/D')}</td>
             </tr>'''
         replacements['{{pe_target_rows}}'] = pe_target_rows
         replacements['{{has_pe_targets}}'] = 'true' if pe_targets else 'false'
 
         # ERP
-        erp = val['equity_risk_premium']
-        replacements['{{erp_narrative}}'] = erp['narrativa']
+        erp = val.get('equity_risk_premium', {})
+        replacements['{{erp_narrative}}'] = erp.get('narrativa', '')
 
         erp_rows = ''
-        for e in erp['datos']:
+        for e in erp.get('datos', []):
             erp_rows += f'''<tr>
-                <td>{e['mercado']}</td>
-                <td class="center">{e['earning_yield']}</td>
-                <td class="center">{e['tasa_real']}</td>
-                <td class="center"><strong>{e['erp']}</strong></td>
-                <td>{e['vs_historia']}</td>
+                <td>{e.get('mercado', '')}</td>
+                <td class="center">{e.get('earning_yield', 'N/D')}</td>
+                <td class="center">{e.get('tasa_real', 'N/D')}</td>
+                <td class="center"><strong>{e.get('erp', 'N/D')}</strong></td>
+                <td>{e.get('vs_historia', '')}</td>
             </tr>'''
         replacements['{{erp_table_rows}}'] = erp_rows
 
         # 3. EARNINGS
-        earn = content['earnings']
-        replacements['{{earnings_narrative}}'] = earn['narrativa']
+        earn = content.get('earnings', {})
+        replacements['{{earnings_narrative}}'] = earn.get('narrativa', '')
 
         # Earnings growth
         earn_rows = ''
-        for e in earn['earnings_growth']:
+        for e in earn.get('earnings_growth', []):
             rev_str = str(e.get('revision_3m', 'N/D'))
             rev_class = 'val-cheap' if rev_str.startswith('+') else 'val-expensive' if rev_str.startswith('-') else ''
             # Support both old format (eps_2025/eps_2026f) and new format (beat_rate/pe_trailing/pe_forward)
             if 'eps_2025' in e:
                 earn_rows += f'''<tr>
-                <td>{e['region']}</td>
-                <td class="center">{e['eps_2025']}</td>
-                <td class="center">{e['eps_2026f']}</td>
-                <td class="center"><strong>{e['growth']}</strong></td>
+                <td>{e.get('region', '')}</td>
+                <td class="center">{e.get('eps_2025', 'N/D')}</td>
+                <td class="center">{e.get('eps_2026f', 'N/D')}</td>
+                <td class="center"><strong>{e.get('growth', 'N/D')}</strong></td>
                 <td class="center {rev_class}">{rev_str}</td>
             </tr>'''
             else:
                 earn_rows += f'''<tr>
-                <td>{e['region']}</td>
+                <td>{e.get('region', '')}</td>
                 <td class="center">{e.get('beat_rate', 'N/D')}</td>
                 <td class="center">{e.get('pe_forward', e.get('pe_trailing', 'N/D'))}</td>
                 <td class="center"><strong>{e.get('growth', 'N/D')}</strong></td>
@@ -290,50 +292,51 @@ class RVReportRenderer:
         replacements['{{earnings_table_rows}}'] = earn_rows
 
         # Revisions
-        rev = earn['revision_trends']
+        rev = earn.get('revision_trends', {})
         rev_rows = ''
-        for r in rev['por_region']:
-            trend_class = 'val-cheap' if 'Fuerte' in r['tendencia'] or 'Mejorando' in r['tendencia'] else 'val-expensive' if 'Deteriorando' in r['tendencia'] else ''
+        for r in rev.get('por_region', []):
+            r_tendencia = r.get('tendencia', '')
+            trend_class = 'val-cheap' if 'Fuerte' in r_tendencia or 'Mejorando' in r_tendencia else 'val-expensive' if 'Deteriorando' in r_tendencia else ''
             rev_rows += f'''<tr>
-                <td>{r['region']}</td>
-                <td class="center">{r['upgrades']}</td>
-                <td class="center">{r['downgrades']}</td>
-                <td class="center"><strong>{r['net']}</strong></td>
-                <td class="{trend_class}">{r['tendencia']}</td>
+                <td>{r.get('region', '')}</td>
+                <td class="center">{r.get('upgrades', 'N/D')}</td>
+                <td class="center">{r.get('downgrades', 'N/D')}</td>
+                <td class="center"><strong>{r.get('net', 'N/D')}</strong></td>
+                <td class="{trend_class}">{r_tendencia}</td>
             </tr>'''
         replacements['{{revisions_table_rows}}'] = rev_rows
 
         # 4. SECTORES
-        sect = content['sectores']
-        replacements['{{sector_narrative}}'] = sect['narrativa']
+        sect = content.get('sectores', {})
+        replacements['{{sector_narrative}}'] = sect.get('narrativa', '')
 
         # Sector matrix
         matrix_rows = ''
-        for s in sect['matriz_sectorial']:
-            view_class = self._get_view_class(s['view'])
+        for s in sect.get('matriz_sectorial', []):
+            view_class = self._get_view_class(s.get('view', 'N'))
             matrix_rows += f'''<tr>
-                <td class="sector-name">{s['sector']}</td>
-                <td><span class="view-badge {view_class}">{s['view']}</span></td>
-                <td>{s['valuacion']}</td>
-                <td>{s['momentum']}</td>
-                <td>{s['earnings']}</td>
-                <td style="text-align:left; font-size:8pt;">{s['catalizador']}</td>
+                <td class="sector-name">{s.get('sector', '')}</td>
+                <td><span class="view-badge {view_class}">{s.get('view', 'N')}</span></td>
+                <td>{s.get('valuacion', '')}</td>
+                <td>{s.get('momentum', '')}</td>
+                <td>{s.get('earnings', '')}</td>
+                <td style="text-align:left; font-size:8pt;">{s.get('catalizador', '')}</td>
             </tr>'''
         replacements['{{sector_matrix_rows}}'] = matrix_rows
 
         # Preferred sectors
         pref_html = ''
-        for s in sect['sectores_preferidos']:
+        for s in sect.get('sectores_preferidos', []):
             subsectors = ''.join([f'<span class="sector-tag preferred">{sub}</span>' for sub in s.get('subsectores', [])])
             avoid = ''.join([f'<span class="sector-tag avoid">{a}</span>' for a in s.get('evitar', [])])
             pref_html += f'''
             <div class="sector-card ow">
                 <div class="sector-card-header">
-                    <h4>{s['sector']}</h4>
-                    <span class="view-badge badge-ow">{s['view']} | Upside: {s['upside']}</span>
+                    <h4>{s.get('sector', '')}</h4>
+                    <span class="view-badge badge-ow">{s.get('view', 'OW')} | Upside: {s.get('upside', 'N/D')}</span>
                 </div>
                 <div class="sector-card-body">
-                    <p>{s['tesis']}</p>
+                    <p>{s.get('tesis', '')}</p>
                     <div class="sector-tags">
                         <strong style="font-size:8pt;">Preferidos:</strong> {subsectors}
                     </div>
@@ -346,28 +349,28 @@ class RVReportRenderer:
 
         # Avoid sectors
         avoid_html = ''
-        for s in sect['sectores_evitar']:
+        for s in sect.get('sectores_evitar', []):
             avoid_html += f'''
             <div class="sector-card uw">
                 <div class="sector-card-header">
-                    <h4>{s['sector']}</h4>
-                    <span class="view-badge badge-uw">{s['view']}</span>
+                    <h4>{s.get('sector', '')}</h4>
+                    <span class="view-badge badge-uw">{s.get('view', 'UW')}</span>
                 </div>
                 <div class="sector-card-body">
-                    <p>{s['razon']}</p>
-                    <p style="font-size:9pt; color: var(--text-light);"><strong>¿Qué cambiaría?</strong> {s['que_cambiaria']}</p>
+                    <p>{s.get('razon', '')}</p>
+                    <p style="font-size:9pt; color: var(--text-light);"><strong>¿Qué cambiaría?</strong> {s.get('que_cambiaria', '')}</p>
                 </div>
             </div>'''
         replacements['{{avoid_sectors_html}}'] = avoid_html
 
         # 5. STYLE & FACTORS
-        style = content['style_factors']
-        gv = style['growth_vs_value']
-        replacements['{{growth_value_narrative}}'] = gv['narrativa']
-        replacements['{{style_recommendation}}'] = style['recomendacion_style']['recomendacion']
+        style = content.get('style_factors', {})
+        gv = style.get('growth_vs_value', {})
+        replacements['{{growth_value_narrative}}'] = gv.get('narrativa', '')
+        replacements['{{style_recommendation}}'] = style.get('recomendacion_style', {}).get('recomendacion', '')
 
         # Factor table — handle both list (legacy) and dict (new) format
-        fp = style['factor_performance']
+        fp = style.get('factor_performance', [])
         if isinstance(fp, dict):
             factor_list = fp.get('factors', [])
             has_scores = fp.get('has_scores', False)
@@ -378,62 +381,62 @@ class RVReportRenderer:
 
         factor_rows = ''
         for f in factor_list:
-            view_class = self._get_view_class(f['view'])
+            view_class = self._get_view_class(f.get('view', 'N'))
             if has_scores:
                 factor_rows += f'''<tr>
-                <td>{f['factor']}</td>
-                <td class="center">{f['score']}</td>
-                <td class="center">{f['ytd']}</td>
-                <td class="center"><span class="view-badge {view_class}">{f['view']}</span></td>
+                <td>{f.get('factor', '')}</td>
+                <td class="center">{f.get('score', 'N/D')}</td>
+                <td class="center">{f.get('ytd', 'N/D')}</td>
+                <td class="center"><span class="view-badge {view_class}">{f.get('view', 'N')}</span></td>
             </tr>'''
             else:
                 factor_rows += f'''<tr>
-                <td>{f['factor']}</td>
-                <td class="center">{f['ytd']}</td>
-                <td class="center"><span class="view-badge {view_class}">{f['view']}</span></td>
+                <td>{f.get('factor', '')}</td>
+                <td class="center">{f.get('ytd', 'N/D')}</td>
+                <td class="center"><span class="view-badge {view_class}">{f.get('view', 'N')}</span></td>
             </tr>'''
         replacements['{{factor_table_rows}}'] = factor_rows
         replacements['{{factor_has_scores}}'] = 'true' if has_scores else 'false'
 
         # 6. REGIONAL VIEWS
-        regions = content['regiones']
+        regions = content.get('regiones', {})
         regional_html = ''
 
         for key in ['us', 'europe', 'em', 'japan']:
-            r = regions[key]
-            view_class = self._get_view_class(r['view'])
+            r = regions.get(key, {})
+            view_class = self._get_view_class(r.get('view', 'N'))
             regional_html += f'''
             <div class="region-card">
                 <div class="region-card-header">
-                    <span class="region-name">{r['mercado']} ({r['indice']})</span>
-                    <span class="region-view">{r['view']}</span>
+                    <span class="region-name">{r.get('mercado', '')} ({r.get('indice', '')})</span>
+                    <span class="region-view">{r.get('view', 'N')}</span>
                 </div>
                 <div class="region-card-body">
                     <div class="region-metrics">
                         <div class="metric-box">
                             <div class="metric-label">P/E Forward</div>
-                            <div class="metric-value">{r['pe_actual']}</div>
+                            <div class="metric-value">{r.get('pe_actual', 'N/D')}</div>
                         </div>
                         <div class="metric-box">
                             <div class="metric-label">Retorno Esp. 12M</div>
-                            <div class="metric-value" style="color: var(--success);">{r['upside']}</div>
+                            <div class="metric-value" style="color: var(--success);">{r.get('upside', 'N/D')}</div>
                         </div>
                         <div class="metric-box">
                             <div class="metric-label">Cambio</div>
-                            <div class="metric-value">{r['cambio']}</div>
+                            <div class="metric-value">{r.get('cambio', '')}</div>
                         </div>
                     </div>
-                    <p style="color: var(--text-medium);">{r['narrativa']}</p>
+                    <p style="color: var(--text-medium);">{r.get('narrativa', '')}</p>
                 </div>
             </div>'''
         replacements['{{regional_views_html}}'] = regional_html
 
         # Chile highlight
-        chile = regions['chile']
-        replacements['{{chile_narrative}}'] = chile['narrativa']
-        replacements['{{chile_pe}}'] = chile['pe_actual']
-        replacements['{{chile_target}}'] = chile['target_12m']
-        replacements['{{chile_upside}}'] = chile['upside']
+        chile = regions.get('chile', {})
+        replacements['{{chile_narrative}}'] = chile.get('narrativa', '')
+        replacements['{{chile_pe}}'] = chile.get('pe_actual', 'N/D')
+        replacements['{{chile_target}}'] = chile.get('target_12m', 'N/D')
+        replacements['{{chile_upside}}'] = chile.get('upside', 'N/D')
         # Dynamic dividend yield from chile picks or ECH ETF
         chile_dy = chile.get('top_picks', [{}])[0].get('div_yield', 'N/D') if chile.get('top_picks') else 'N/D'
         if chile_dy == 'N/D':
@@ -443,70 +446,71 @@ class RVReportRenderer:
         replacements['{{chile_div_yield}}'] = chile_dy
 
         chile_picks = ''
-        for p in chile['top_picks']:
+        for p in chile.get('top_picks', []):
             chile_picks += f'''<tr>
-                <td><strong>{p['empresa']}</strong></td>
-                <td>{p['ticker']}</td>
-                <td>{p['pe']}</td>
-                <td>{p['div_yield']}</td>
-                <td>{p['rationale']}</td>
+                <td><strong>{p.get('empresa', '')}</strong></td>
+                <td>{p.get('ticker', '')}</td>
+                <td>{p.get('pe', 'N/D')}</td>
+                <td>{p.get('div_yield', 'N/D')}</td>
+                <td>{p.get('rationale', '')}</td>
             </tr>'''
         replacements['{{chile_picks_rows}}'] = chile_picks
 
         # 7. FLUJOS Y POSICIONAMIENTO
-        flows = content['flujos_posicionamiento']
-        replacements['{{flows_narrative}}'] = flows['flujos_regionales']['narrativa']
+        flows = content.get('flujos_posicionamiento', {})
+        flujos_reg = flows.get('flujos_regionales', {})
+        replacements['{{flows_narrative}}'] = flujos_reg.get('narrativa', '')
 
         flows_rows = ''
-        for f in flows['flujos_regionales']['datos']:
+        for f in flujos_reg.get('datos', []):
             ytd_val = f.get('flujo_ytd') or f.get('retorno_ytd', 'N/D')
             m1_val = f.get('flujo_1m') or f.get('retorno_1m', 'N/D')
             flows_rows += f'''<tr>
-                <td>{f['region']}</td>
+                <td>{f.get('region', '')}</td>
                 <td class="center">{ytd_val}</td>
                 <td class="center">{m1_val}</td>
             </tr>'''
         replacements['{{flows_table_rows}}'] = flows_rows
 
         pos_rows = ''
-        for p in flows['posicionamiento']['indicadores']:
+        for p in flows.get('posicionamiento', {}).get('indicadores', []):
             pos_rows += f'''<tr>
-                <td>{p['indicador']}</td>
-                <td class="center"><strong>{p['valor']}</strong></td>
-                <td>{p['comentario']}</td>
+                <td>{p.get('indicador', '')}</td>
+                <td class="center"><strong>{p.get('valor', 'N/D')}</strong></td>
+                <td>{p.get('comentario', '')}</td>
             </tr>'''
         replacements['{{positioning_table_rows}}'] = pos_rows
 
         # 8. RIESGOS Y CATALIZADORES
-        risks = content['riesgos_catalizadores']
+        risks = content.get('riesgos_catalizadores', {})
 
         risks_html = ''
-        for r in risks['top_risks']:
+        for r in risks.get('top_risks', []):
             risks_html += f'''
             <div class="risk-card">
                 <div class="risk-header">
-                    <span class="risk-name">{r['riesgo']}</span>
+                    <span class="risk-name">{r.get('riesgo', '')}</span>
                     <span class="risk-metrics">
-                        <span>Prob: <strong>{r['probabilidad']}</strong></span>
-                        <span>Impacto: <strong>{r['impacto']}</strong></span>
+                        <span>Prob: <strong>{r.get('probabilidad', 'N/D')}</strong></span>
+                        <span>Impacto: <strong>{r.get('impacto', 'N/D')}</strong></span>
                     </span>
                 </div>
-                <p style="margin: 10px 0; color: var(--text-medium);">{r['descripcion']}</p>
-                <p style="font-size: 9pt; color: var(--text-light);"><strong>Hedge:</strong> {r['hedge']}</p>
+                <p style="margin: 10px 0; color: var(--text-medium);">{r.get('descripcion', '')}</p>
+                <p style="font-size: 9pt; color: var(--text-light);"><strong>Hedge:</strong> {r.get('hedge', '')}</p>
             </div>'''
         replacements['{{risks_html}}'] = risks_html
 
-        catalysts = ''.join([f'<li>{c}</li>' for c in risks['catalizadores_positivos']])
+        catalysts = ''.join([f'<li>{c}</li>' for c in risks.get('catalizadores_positivos', [])])
         replacements['{{catalysts_html}}'] = catalysts
 
-        replacements['{{calendar_rows}}'] = build_calendar_rows(risks['calendario'])
+        replacements['{{calendar_rows}}'] = build_calendar_rows(risks.get('calendario', []))
 
         # 9. RESUMEN POSICIONAMIENTO
-        summary = content['resumen_posicionamiento']
+        summary = content.get('resumen_posicionamiento', {})
 
         replacements['{{summary_positioning_rows}}'] = build_summary_rows(
-            summary['tabla_final'], key_field='categoria', value_field='recomendacion')
-        replacements['{{mensaje_clave}}'] = summary['mensaje_clave']
+            summary.get('tabla_final', []), key_field='categoria', value_field='recomendacion')
+        replacements['{{mensaje_clave}}'] = summary.get('mensaje_clave', '')
 
         # Convert {{key}} → key for Jinja2 context
         context = {}
@@ -530,6 +534,8 @@ class RVReportRenderer:
 
     def _get_view_class(self, view: str) -> str:
         """Retorna clase CSS segun view."""
+        if not view or not isinstance(view, str):
+            return 'badge-neutral'
         view_upper = view.upper().strip()
         if any(kw in view_upper for kw in ['OW', 'OVERWEIGHT', 'SOBREPONDERAR', 'SOBREPONDER']):
             return 'badge-ow'
@@ -539,10 +545,15 @@ class RVReportRenderer:
 
     def _get_valuation_class(self, vs_avg: str) -> str:
         """Retorna clase CSS segun valuacion vs promedio."""
-        if vs_avg.startswith('+') and int(vs_avg.replace('%', '').replace('+', '')) > 10:
-            return 'val-expensive'
-        elif vs_avg.startswith('-'):
-            return 'val-cheap'
+        if not vs_avg or not isinstance(vs_avg, str):
+            return 'val-fair'
+        try:
+            if vs_avg.startswith('+') and float(vs_avg.replace('%', '').replace('+', '')) > 10:
+                return 'val-expensive'
+            elif vs_avg.startswith('-'):
+                return 'val-cheap'
+        except (ValueError, TypeError):
+            pass
         return 'val-fair'
 
 

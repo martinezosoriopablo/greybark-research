@@ -204,88 +204,89 @@ class MacroReportRenderer:
         }
 
         # 1. RESUMEN EJECUTIVO
-        resumen = content['resumen_ejecutivo']
-        replacements['{{parrafo_intro}}'] = resumen['parrafo_intro']
+        resumen = content.get('resumen_ejecutivo', {})
+        replacements['{{parrafo_intro}}'] = resumen.get('parrafo_intro', '')
 
         # Stance spectrum - highlight active postura
         postura = resumen.get('postura', {'view': 'NEUTRAL'})
-        active_view = postura['view'].upper()
+        active_view = postura.get('view', 'NEUTRAL').upper()
         for stance in ['cauteloso', 'neutral', 'constructivo', 'agresivo']:
             replacements[f'{{{{spectrum_active_{stance}}}}}'] = 'spectrum-active' if stance.upper() == active_view else ''
 
         # Key takeaways
-        kt_html = ''.join([f'<li>{kt}</li>' for kt in resumen['key_takeaways']])
+        kt_html = ''.join([f'<li>{kt}</li>' for kt in resumen.get('key_takeaways', [])])
         replacements['{{key_takeaways_html}}'] = kt_html
 
         # Forecasts tables
-        forecasts = resumen['forecasts_table']
+        forecasts = resumen.get('forecasts_table', {})
 
         # GDP, Inflation, Rates — all use the same forecast row pattern
         replacements['{{gdp_forecasts_rows}}'] = build_forecast_rows(
-            forecasts['gdp_growth'], vs_class_fn=self._get_vs_class)
+            forecasts.get('gdp_growth', []), vs_class_fn=self._get_vs_class)
         replacements['{{inflation_forecasts_rows}}'] = build_forecast_rows(
-            forecasts['inflation_core'], vs_class_fn=self._get_vs_class)
+            forecasts.get('inflation_core', []), vs_class_fn=self._get_vs_class)
         replacements['{{rates_forecasts_rows}}'] = build_forecast_rows(
-            forecasts['policy_rates'], vs_class_fn=self._get_vs_class)
+            forecasts.get('policy_rates', []), vs_class_fn=self._get_vs_class)
 
         # Econometric Projections Table
         replacements['{{econometric_projections_table}}'] = self._generate_econometric_projections_table()
 
         # Probability-Weighted Forecasts
-        ponderado = content['pronóstico_ponderado']
+        ponderado = content.get('pronóstico_ponderado', {})
         replacements['{{weighted_metodologia}}'] = ponderado.get('metodologia', 'N/D')
 
         weighted_rows = ''
-        for esc in ponderado['escenarios']:
+        for esc in ponderado.get('escenarios', []):
             weighted_rows += f'''<tr>
-                <td>{esc['nombre']}</td>
-                <td style="text-align:center">{esc['probabilidad']}</td>
-                <td style="text-align:center">{esc['gdp_us']}</td>
+                <td>{esc.get('nombre', 'N/D')}</td>
+                <td style="text-align:center">{esc.get('probabilidad', 'N/D')}</td>
+                <td style="text-align:center">{esc.get('gdp_us', 'N/D')}</td>
                 <td style="text-align:center">{esc.get('gdp_world', 'N/D')}</td>
-                <td style="text-align:center">{esc['sp500']}</td>
+                <td style="text-align:center">{esc.get('sp500', 'N/D')}</td>
             </tr>'''
         replacements['{{weighted_scenarios_rows}}'] = weighted_rows
 
-        replacements['{{weighted_gdp_us}}'] = ponderado['weighted_forecasts'].get('gdp_us', 'N/D')
-        replacements['{{weighted_gdp_world}}'] = ponderado['weighted_forecasts'].get('gdp_world', 'N/D')
-        replacements['{{weighted_sp500}}'] = ponderado['weighted_forecasts'].get('sp500', 'N/D')
-        replacements['{{weighted_implicancia}}'] = ponderado['implicancia']
+        weighted_fc = ponderado.get('weighted_forecasts', {})
+        replacements['{{weighted_gdp_us}}'] = weighted_fc.get('gdp_us', 'N/D')
+        replacements['{{weighted_gdp_world}}'] = weighted_fc.get('gdp_world', 'N/D')
+        replacements['{{weighted_sp500}}'] = weighted_fc.get('sp500', 'N/D')
+        replacements['{{weighted_implicancia}}'] = ponderado.get('implicancia', '')
 
         # Vs Previous Forecast
-        vs_prev = content['vs_pronóstico_anterior']
-        replacements['{{previous_fecha}}'] = vs_prev['fecha_anterior']
+        vs_prev = content.get('vs_pronóstico_anterior', {})
+        replacements['{{previous_fecha}}'] = vs_prev.get('fecha_anterior', 'N/D')
 
         vs_prev_rows = ''
-        for cambio in vs_prev['cambios']:
+        for cambio in vs_prev.get('cambios', []):
             vs_prev_rows += f'''<tr>
-                <td>{cambio['variable']}</td>
-                <td style="text-align:center">{cambio['anterior']}</td>
-                <td style="text-align:center">{cambio['actual']}</td>
-                <td style="text-align:center"><strong>{cambio['cambio']}</strong></td>
-                <td style="font-size: 8pt;">{cambio['razon']}</td>
+                <td>{cambio.get('variable', 'N/D')}</td>
+                <td style="text-align:center">{cambio.get('anterior', 'N/D')}</td>
+                <td style="text-align:center">{cambio.get('actual', 'N/D')}</td>
+                <td style="text-align:center"><strong>{cambio.get('cambio', 'N/D')}</strong></td>
+                <td style="font-size: 8pt;">{cambio.get('razon', '')}</td>
             </tr>'''
         replacements['{{vs_previous_rows}}'] = vs_prev_rows
 
-        track = vs_prev['track_record']
+        track = vs_prev.get('track_record', {})
         replacements['{{track_record_aciertos}}'] = ''.join(
-            f'<li>{a}</li>' for a in track['aciertos']
+            f'<li>{a}</li>' for a in track.get('aciertos', [])
         )
         replacements['{{track_record_errores}}'] = ''.join(
-            f'<li>{e}</li>' for e in track['errores']
+            f'<li>{e}</li>' for e in track.get('errores', [])
         )
 
         # 2. ESTADOS UNIDOS
-        usa = content['estados_unidos']
+        usa = content.get('estados_unidos', {})
 
         # Growth
-        growth = usa['crecimiento']
-        replacements['{{usa_growth_narrative}}'] = growth['narrativa']
+        growth = usa.get('crecimiento', {})
+        replacements['{{usa_growth_narrative}}'] = growth.get('narrativa', '')
 
         # Labor
-        labor = usa['mercado_laboral']
-        replacements['{{usa_labor_narrative}}'] = labor['narrativa']
+        labor = usa.get('mercado_laboral', {})
+        replacements['{{usa_labor_narrative}}'] = labor.get('narrativa', '')
 
-        replacements['{{usa_labor_rows}}'] = build_indicator_rows(labor['datos'])
+        replacements['{{usa_labor_rows}}'] = build_indicator_rows(labor.get('datos', []))
 
         # JOLTS
         replacements['{{usa_jolts_narrative}}'] = labor.get('narrativa_jolts', '')
@@ -296,168 +297,171 @@ class MacroReportRenderer:
         replacements['{{usa_wages_rows}}'] = build_indicator_rows(labor.get('salarios', []))
 
         # Inflation
-        inflation = usa['inflación']
-        replacements['{{usa_inflation_narrative}}'] = inflation['narrativa']
+        inflation = usa.get('inflación', {})
+        replacements['{{usa_inflation_narrative}}'] = inflation.get('narrativa', '')
 
         inf_rows = ''
-        for d in inflation['datos']:
+        for d in inflation.get('datos', []):
             inf_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['mom']}</td>
+                <td>{d.get('indicador', 'N/D')}</td>
+                <td>{d.get('valor', 'N/D')}</td>
+                <td>{d.get('mom', 'N/D')}</td>
             </tr>'''
         replacements['{{usa_inflation_rows}}'] = inf_rows
 
         comp_rows = ''
-        for c in inflation['componentes']:
-            trend_class = self._get_trend_class(c['tendencia'])
+        for c in inflation.get('componentes', []):
+            trend_class = self._get_trend_class(c.get('tendencia', ''))
             comp_rows += f'''<tr>
-                <td>{c['componente']}</td>
-                <td>{c['valor']}</td>
-                <td class="{trend_class}">{c['tendencia']}</td>
+                <td>{c.get('componente', 'N/D')}</td>
+                <td>{c.get('valor', 'N/D')}</td>
+                <td class="{trend_class}">{c.get('tendencia', 'N/D')}</td>
             </tr>'''
         replacements['{{usa_inflation_components}}'] = comp_rows
 
         # Fed
-        fed = usa['política_monetaria']
-        replacements['{{fed_narrative}}'] = fed['narrativa']
-        replacements['{{fed_actual}}'] = fed['tasas']['actual']
-        replacements['{{fed_neutral}}'] = fed['tasas']['neutral_estimada']
-        replacements['{{fed_proyección}}'] = fed['tasas']['proyección_2026']
+        fed = usa.get('política_monetaria', {})
+        replacements['{{fed_narrative}}'] = fed.get('narrativa', '')
+        fed_tasas = fed.get('tasas', {})
+        replacements['{{fed_actual}}'] = fed_tasas.get('actual', 'N/D')
+        replacements['{{fed_neutral}}'] = fed_tasas.get('neutral_estimada', 'N/D')
+        replacements['{{fed_proyección}}'] = fed_tasas.get('proyección_2026', 'N/D')
 
         fed_meetings = ''
-        for m in fed['proximas_reuniones']:
+        for m in fed.get('proximas_reuniones', []):
             fed_meetings += f'''<tr>
-                <td>{m['fecha']}</td>
-                <td>{m['expectativa']}</td>
-                <td>{m['probabilidad']}</td>
+                <td>{m.get('fecha', 'N/D')}</td>
+                <td>{m.get('expectativa', 'N/D')}</td>
+                <td>{m.get('probabilidad', 'N/D')}</td>
             </tr>'''
         replacements['{{fed_meetings_rows}}'] = fed_meetings
 
         # Fiscal
-        fiscal = usa['política_fiscal']
-        replacements['{{usa_fiscal_narrative}}'] = fiscal['narrativa']
+        fiscal = usa.get('política_fiscal', {})
+        replacements['{{usa_fiscal_narrative}}'] = fiscal.get('narrativa', '')
 
         fiscal_rows = ''
-        for d in fiscal['datos']:
+        for d in fiscal.get('datos', []):
             fiscal_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
+                <td>{d.get('indicador', 'N/D')}</td>
+                <td>{d.get('valor', 'N/D')}</td>
                 <td>{d.get('anterior', d.get('comentario', ''))}</td>
             </tr>'''
         replacements['{{usa_fiscal_rows}}'] = fiscal_rows
 
         # 3. EUROPA
-        europe = content['europa']
+        europe = content.get('europa', {})
 
         # Growth
-        eu_growth = europe['crecimiento']
-        replacements['{{europe_growth_narrative}}'] = eu_growth['narrativa']
+        eu_growth = europe.get('crecimiento', {})
+        replacements['{{europe_growth_narrative}}'] = eu_growth.get('narrativa', '')
 
         eu_gdp_rows = ''
-        for p in eu_growth['por_pais']:
+        for p in eu_growth.get('por_pais', []):
             eu_gdp_rows += f'''<tr>
-                <td>{p['pais']}</td>
-                <td>{p['gdp_2025']}</td>
-                <td><strong>{p['gdp_2026f']}</strong></td>
-                <td>{p['consenso']}</td>
+                <td>{p.get('pais', 'N/D')}</td>
+                <td>{p.get('gdp_2025', 'N/D')}</td>
+                <td><strong>{p.get('gdp_2026f', 'N/D')}</strong></td>
+                <td>{p.get('consenso', 'N/D')}</td>
             </tr>'''
         replacements['{{europe_gdp_rows}}'] = eu_gdp_rows
 
         # Inflation
-        eu_inf = europe['inflación']
-        replacements['{{europe_inflation_narrative}}'] = eu_inf['narrativa']
+        eu_inf = europe.get('inflación', {})
+        replacements['{{europe_inflation_narrative}}'] = eu_inf.get('narrativa', '')
 
         eu_inf_rows = ''
-        for d in eu_inf['datos']:
+        for d in eu_inf.get('datos', []):
             eu_inf_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['anterior']}</td>
+                <td>{d.get('indicador', 'N/D')}</td>
+                <td>{d.get('valor', 'N/D')}</td>
+                <td>{d.get('anterior', 'N/D')}</td>
             </tr>'''
         replacements['{{europe_inflation_rows}}'] = eu_inf_rows
 
         # ECB
-        ecb = europe['política_monetaria']
-        replacements['{{ecb_narrative}}'] = ecb['narrativa']
-        replacements['{{ecb_actual}}'] = ecb['tasas']['deposito_actual']
-        replacements['{{ecb_proyección}}'] = ecb['tasas']['proyección_2026']
-        replacements['{{ecb_neutral}}'] = ecb['tasas']['neutral_estimada']
+        ecb = europe.get('política_monetaria', {})
+        replacements['{{ecb_narrative}}'] = ecb.get('narrativa', '')
+        ecb_tasas = ecb.get('tasas', {})
+        replacements['{{ecb_actual}}'] = ecb_tasas.get('deposito_actual', 'N/D')
+        replacements['{{ecb_proyección}}'] = ecb_tasas.get('proyección_2026', 'N/D')
+        replacements['{{ecb_neutral}}'] = ecb_tasas.get('neutral_estimada', 'N/D')
 
         # 4. CHINA
-        china = content['china']
+        china = content.get('china', {})
 
         # Growth
-        ch_growth = china['crecimiento']
-        replacements['{{china_growth_narrative}}'] = ch_growth['narrativa']
+        ch_growth = china.get('crecimiento', {})
+        replacements['{{china_growth_narrative}}'] = ch_growth.get('narrativa', '')
 
         ch_growth_rows = ''
-        for d in ch_growth['datos']:
+        for d in ch_growth.get('datos', []):
             ch_growth_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
+                <td>{d.get('indicador', 'N/D')}</td>
+                <td>{d.get('valor', 'N/D')}</td>
                 <td>{d.get('target', d.get('anterior', ''))}</td>
             </tr>'''
         replacements['{{china_growth_rows}}'] = ch_growth_rows
 
         # Property
-        property = china['sector_inmobiliario']
-        replacements['{{china_property_narrative}}'] = property['narrativa']
+        property = china.get('sector_inmobiliario', {})
+        replacements['{{china_property_narrative}}'] = property.get('narrativa', '')
 
         property_rows = ''
-        for d in property['datos']:
+        for d in property.get('datos', []):
             property_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['anterior']}</td>
+                <td>{d.get('indicador', 'N/D')}</td>
+                <td>{d.get('valor', 'N/D')}</td>
+                <td>{d.get('anterior', 'N/D')}</td>
             </tr>'''
         replacements['{{china_property_rows}}'] = property_rows
 
         # Credit
-        replacements['{{china_credit_narrative}}'] = china['impulso_crediticio']['narrativa']
+        replacements['{{china_credit_narrative}}'] = china.get('impulso_crediticio', {}).get('narrativa', '')
 
         # Trade
-        replacements['{{china_trade_narrative}}'] = china['comercio_exterior']['narrativa']
+        replacements['{{china_trade_narrative}}'] = china.get('comercio_exterior', {}).get('narrativa', '')
 
         # 5. CHILE Y LATAM
-        chile = content['chile_latam']
+        chile = content.get('chile_latam', {})
 
         # Chile Growth
-        ch_growth = chile['chile_crecimiento']
-        replacements['{{chile_growth_narrative}}'] = ch_growth['narrativa']
+        ch_growth = chile.get('chile_crecimiento', {})
+        replacements['{{chile_growth_narrative}}'] = ch_growth.get('narrativa', '')
 
-        replacements['{{chile_growth_rows}}'] = build_indicator_rows(ch_growth['datos'])
+        replacements['{{chile_growth_rows}}'] = build_indicator_rows(ch_growth.get('datos', []))
 
         # Chile Inflation
-        ch_inf = chile['chile_inflación']
-        replacements['{{chile_inflation_narrative}}'] = ch_inf['narrativa']
+        ch_inf = chile.get('chile_inflación', {})
+        replacements['{{chile_inflation_narrative}}'] = ch_inf.get('narrativa', '')
 
         chile_inf_rows = ''
-        for d in ch_inf['datos']:
+        for d in ch_inf.get('datos', []):
             chile_inf_rows += f'''<tr>
-                <td>{d['indicador']}</td>
-                <td>{d['valor']}</td>
-                <td>{d['anterior']}</td>
+                <td>{d.get('indicador', 'N/D')}</td>
+                <td>{d.get('valor', 'N/D')}</td>
+                <td>{d.get('anterior', 'N/D')}</td>
             </tr>'''
         replacements['{{chile_inflation_rows}}'] = chile_inf_rows
 
         # BCCh
-        bcch = chile['chile_política_monetaria']
-        replacements['{{bcch_narrative}}'] = bcch['narrativa']
-        replacements['{{tpm_actual}}'] = bcch['tasas']['tpm_actual']
-        replacements['{{tpm_neutral}}'] = bcch['tasas']['tpm_neutral']
-        replacements['{{tpm_proyección}}'] = bcch['tasas']['proyección_2026']
+        bcch = chile.get('chile_política_monetaria', {})
+        replacements['{{bcch_narrative}}'] = bcch.get('narrativa', '')
+        bcch_tasas = bcch.get('tasas', {})
+        replacements['{{tpm_actual}}'] = bcch_tasas.get('tpm_actual', 'N/D')
+        replacements['{{tpm_neutral}}'] = bcch_tasas.get('tpm_neutral', 'N/D')
+        replacements['{{tpm_proyección}}'] = bcch_tasas.get('proyección_2026', 'N/D')
 
         # Commodities
-        comm = chile['commodities_relevantes']
+        comm = chile.get('commodities_relevantes', {})
         comm_rows = ''
-        for c in comm['commodities']:
+        for c in comm.get('commodities', []):
             comm_rows += f'''<tr>
-                <td><strong>{c['nombre']}</strong></td>
-                <td>{c['precio_actual']}</td>
-                <td>{c['cambio']}</td>
-                <td>{c['outlook']}</td>
-                <td style="font-size: 8pt;">{c['drivers']}</td>
+                <td><strong>{c.get('nombre', 'N/D')}</strong></td>
+                <td>{c.get('precio_actual', 'N/D')}</td>
+                <td>{c.get('cambio', 'N/D')}</td>
+                <td>{c.get('outlook', 'N/D')}</td>
+                <td style="font-size: 8pt;">{c.get('drivers', '')}</td>
             </tr>'''
         replacements['{{commodities_rows}}'] = comm_rows
 
@@ -475,23 +479,23 @@ class MacroReportRenderer:
         replacements['{{commodities_performance_table}}'] = comm_perf_table
 
         # LatAm
-        latam = chile['latam_context']
+        latam = chile.get('latam_context', {})
         latam_rows = ''
-        for p in latam['paises']:
+        for p in latam.get('paises', []):
             latam_rows += f'''<tr>
-                <td><strong>{p['pais']}</strong></td>
-                <td>{p['gdp']}</td>
-                <td>{p['inflación']}</td>
-                <td>{p['tasa']}</td>
-                <td style="font-size: 8pt;">{p['riesgo_principal']}</td>
+                <td><strong>{p.get('pais', 'N/D')}</strong></td>
+                <td>{p.get('gdp', 'N/D')}</td>
+                <td>{p.get('inflación', 'N/D')}</td>
+                <td>{p.get('tasa', 'N/D')}</td>
+                <td style="font-size: 8pt;">{p.get('riesgo_principal', '')}</td>
             </tr>'''
         replacements['{{latam_rows}}'] = latam_rows
 
         # 6. TEMAS MACRO
-        temas = content['temas_macro']
+        temas = content.get('temas_macro', {})
 
         themes_html = ''
-        for t in temas['temas']:
+        for t in temas.get('temas', []):
             themes_html += f'''
             <div class="region-card">
                 <div class="region-card-header">{t.get('titulo', 'N/D')}</div>
@@ -502,10 +506,10 @@ class MacroReportRenderer:
         replacements['{{macro_themes_html}}'] = themes_html
 
         # Calendar
-        replacements['{{calendar_rows}}'] = build_calendar_rows(temas['calendario_eventos'])
+        replacements['{{calendar_rows}}'] = build_calendar_rows(temas.get('calendario_eventos', []))
 
         # 7. ESCENARIOS Y RIESGOS
-        esc = content['escenarios_riesgos']
+        esc = content.get('escenarios_riesgos', {})
 
         # Scenarios — handle both old dict format and new list format
         scenarios_raw = esc.get('escenarios', {})
@@ -588,11 +592,11 @@ class MacroReportRenderer:
             vistas_html += f'''
             <div style="margin-bottom: 18px; padding: 12px 15px; border: 1px solid #e2e8f0; border-radius: 6px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h4 style="color: var(--primary-blue); margin: 0; font-size: 11pt;">{v['tema']}</h4>
-                    <span style="background: {vs_color}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 8pt; font-weight: 600;">{v['vs_consenso']}</span>
+                    <h4 style="color: var(--primary-blue); margin: 0; font-size: 11pt;">{v.get('tema', 'N/D')}</h4>
+                    <span style="background: {vs_color}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 8pt; font-weight: 600;">{v.get('vs_consenso', '')}</span>
                 </div>
-                <p style="margin-bottom: 8px;">{v['vista_grb']}</p>
-                <p style="font-size: 9pt; color: #718096; margin: 0;"><strong>vs Consenso:</strong> {v['vs_detalle']}</p>
+                <p style="margin-bottom: 8px;">{v.get('vista_grb', '')}</p>
+                <p style="font-size: 9pt; color: #718096; margin: 0;"><strong>vs Consenso:</strong> {v.get('vs_detalle', '')}</p>
             </div>'''
         replacements['{{conclusiones_vistas_html}}'] = vistas_html
 
@@ -641,11 +645,11 @@ class MacroReportRenderer:
 
             # Log chart data source summary
             summary = macro_charts.get_chart_source_summary()
-            self._print(f"  [CHARTS] {summary['real_api']} real | {summary['partial_real']} partial | "
-                        f"{summary['fallback_estimated']} fallback | {summary['content_generated']} generated "
-                        f"({summary['real_pct']}% real)")
-            if summary['details']['fallback']:
-                self._print(f"  [CHARTS] Fallback: {', '.join(summary['details']['fallback'])}")
+            self._print(f"  [CHARTS] {summary.get('real_api', 0)} real | {summary.get('partial_real', 0)} partial | "
+                        f"{summary.get('fallback_estimated', 0)} fallback | {summary.get('content_generated', 0)} generated "
+                        f"({summary.get('real_pct', 0)}% real)")
+            if summary.get('details', {}).get('fallback'):
+                self._print(f"  [CHARTS] Fallback: {', '.join(summary.get('details', {}).get('fallback', []))}")
         except Exception as e:
             self._print(f"  [WARN] Charts no generados: {e}")
             for placeholder in chart_map:
@@ -665,6 +669,8 @@ class MacroReportRenderer:
 
     def _get_vs_class(self, vs: str) -> str:
         """Retorna clase CSS segun cambio vs anterior."""
+        if not vs or not isinstance(vs, str):
+            return 'vs-neutral'
         if vs.startswith('+'):
             return 'vs-positive'
         elif vs.startswith('-'):
@@ -673,6 +679,8 @@ class MacroReportRenderer:
 
     def _get_trend_class(self, trend: str) -> str:
         """Retorna clase CSS segun tendencia."""
+        if not trend or not isinstance(trend, str):
+            return 'trend-neutral'
         trend_lower = trend.lower()
         if any(word in trend_lower for word in ['recuperando', 'solido', 'expansión', 'firme']):
             return 'trend-up'

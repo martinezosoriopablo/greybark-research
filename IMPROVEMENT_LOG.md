@@ -262,6 +262,59 @@
 - Manual cubre las 8 secciones del portal + FAQ
 - Commit `dc10077` desplegado en producción
 
+### Sprint 25 — Renderer Hardening + Council Deliberation Report
+
+**Trigger:** Auditoría pre-demo encontró 28 crash points teóricos en renderers (dict['key'] directo). Además, se solicitó un reporte con la deliberación completa del AI Council.
+
+#### Renderer Hardening (28 crash points → 0)
+
+| # | Archivo | Cambios |
+|---|---------|---------|
+| 127 | `rv_report_renderer.py` | `_get_view_class` + `_get_valuation_class` null-safe, 9 secciones protegidas con `.get()` |
+| 128 | `rf_report_renderer.py` | `_get_view_class` null-safe, 8 secciones protegidas con `.get()` |
+| 129 | `macro_report_renderer.py` | `_get_vs_class` + `_get_trend_class` null-safe, 10 secciones protegidas con `.get()` |
+| 130 | `asset_allocation_renderer.py` | 8 secciones protegidas con `.get()`, `.upper()` guarded, bounds check en portfolios |
+
+**Pattern aplicado:**
+- `content['key']` → `content.get('key', {})` (dicts)
+- `section['field']` → `section.get('field', '')` (strings) / `.get('field', [])` (lists)
+- `_get_view_class(None)` → retorna `'badge-neutral'` sin crash
+- `_get_valuation_class('N/D')` → try/except float parse, retorna `'val-fair'`
+- Deep chains: `a['b']['c']` → `a.get('b', {}).get('c', '')`
+
+#### Council Deliberation Report (nuevo)
+
+| # | Cambio | Detalle |
+|---|--------|---------|
+| 131 | `council_deliberation_renderer.py` | Nuevo renderer que genera "Acta del Comité de Inversiones" desde council_result JSON |
+
+**Contenido del acta:**
+- Capa 1: 5 cards de panelistas con análisis completo (Macro, RV, RF, Riesgo, Geo)
+- Capa 2: 3 cards de síntesis (CIO, Contrarian, Refinador)
+- Metadata: duración, modelos usados, módulos OK, daily reports count
+- Bloques `[BLOQUE: X]` resaltados visualmente
+- Word count por agente
+- Print-ready (page-break-inside: avoid)
+- Ejecutable standalone: `python council_deliberation_renderer.py [council_result.json]`
+
+**Validación:**
+- 4 renderers compilan OK (`py_compile`)
+- Pipeline local RV+RF+AA: 3/3 OK con renderers blindados (0 errores)
+- Acta generada: 68KB, 8 agent cards, 16 bloque tags, 0 encoding issues
+
+#### Narrative Engine dotenv Fix
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 132 | Narrativas vacías en reportes locales — `narrative_engine.py` usaba `os.environ.get('ANTHROPIC_API_KEY')` pero `dotenv` solo se cargaba en `greybark/config.py` | `narrative_engine.py:12-18` | Agregar `load_dotenv()` al inicio del módulo para cargar `.env` independientemente |
+
+**Causa raíz:** `narrative_engine.py` dependía de que `greybark.config` se importara primero para que `dotenv` cargara las env vars. En el pipeline (`run_monthly.py`) esto funcionaba porque config se importaba temprano, pero en tests aislados o imports lazy la key no estaba disponible → todas las narrativas caían a fallback genérico de 1 línea.
+
+**Validación:**
+- RV report con narrativa completa: 3 párrafos, ~900 chars, datos reales (nóminas -92K, breadth 18.2%, P/E 25.7x)
+- Pipeline local RV: OK (88.3s) con narrativas ricas
+- Antes: *"Nuestra postura en renta variable global es cauteloso para Marzo 2026."* (70 chars fallback)
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
@@ -278,6 +331,7 @@
 | **Datos efímeros en container Docker** | 3 (output, input, directivas) | TODO path que el pipeline escribe (output/, input/) debe ser volumen Docker. Si no, se pierde en rebuild. Auditar `docker run` antes de cada deploy. |
 | **Council output con keys variables** | 1 (impacto vs severidad, hedge vs mitigacion) | Los renderers deben usar `.get()` con alias alternativos para keys que el LLM puede nombrar distinto. Nunca `r['key']` directo en datos generados por council. |
 | **Reportes no copiados en error parcial** | 1 (RF fail → 3 reportes OK no copiados) | `_copy_reports_to_client()` solo corre si pipeline exit code=0. Cambiar a copiar reportes individuales que sí se generaron. |
+| **dotenv no cargado en módulos standalone** | 1 (narrative_engine) | Si un módulo usa `os.environ.get('KEY')` pero `dotenv` solo se carga en otro módulo (config.py), la key no existe cuando se importa de forma independiente. Cada módulo que necesite env vars debe cargar `dotenv` por sí mismo. |
 
 ### Inconsistencias Detectadas en Audit
 

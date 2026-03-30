@@ -184,28 +184,29 @@ class AssetAllocationRenderer:
         }
 
         # 1. RESUMEN EJECUTIVO
-        resumen = content['resumen_ejecutivo']
-        postura = resumen['postura']
+        resumen = content.get('resumen_ejecutivo', {})
+        postura = resumen.get('postura', {})
 
-        replacements['{{intro_paragraph}}'] = resumen['parrafo_intro']
-        replacements['{{postura_view}}'] = postura['view']
-        replacements['{{postura_sesgo}}'] = postura['sesgo']
-        replacements['{{postura_class}}'] = postura['view'].lower()
-        replacements['{{conviccion_text}}'] = postura['conviccion']
+        replacements['{{intro_paragraph}}'] = resumen.get('parrafo_intro', '')
+        postura_view = postura.get('view', 'Neutral')
+        replacements['{{postura_view}}'] = postura_view
+        replacements['{{postura_sesgo}}'] = postura.get('sesgo', '')
+        replacements['{{postura_class}}'] = (postura_view or 'neutral').lower()
+        replacements['{{conviccion_text}}'] = postura.get('conviccion', '')
 
         # Stance spectrum - highlight active postura
-        active_view = postura['view'].upper()
+        active_view = (postura_view or '').upper()
         for stance in ['cauteloso', 'neutral', 'constructivo', 'agresivo']:
             replacements[f'{{{{spectrum_active_{stance}}}}}'] = 'spectrum-active' if stance.upper() == active_view else ''
 
         # Conviccion porcentaje
         conv_map = {'ALTA': 85, 'MEDIA-ALTA': 75, 'MEDIA': 60, 'BAJA': 40}
-        replacements['{{conviccion_pct}}'] = str(conv_map.get(postura['conviccion'], 60))
+        replacements['{{conviccion_pct}}'] = str(conv_map.get(postura.get('conviccion', ''), 60))
 
         # Key points
-        kp_html = ''.join([f'<li>{kp}</li>' for kp in resumen['key_points']])
+        kp_html = ''.join([f'<li>{kp}</li>' for kp in resumen.get('key_points', [])])
         replacements['{{key_points_html}}'] = kp_html
-        replacements['{{catalizador}}'] = resumen['catalizador'].strip(' |')
+        replacements['{{catalizador}}'] = (resumen.get('catalizador', '') or '').strip(' |')
 
         # 2. DASHBOARD DE POSICIONAMIENTO
         dashboard = content.get('dashboard', {})
@@ -214,80 +215,85 @@ class AssetAllocationRenderer:
                                   ('commodities_fx', 'dashboard_comm_rows')]:
             rows_html = ''
             for item in dashboard.get(key, []):
-                view_class = f"dash-{self._sanitize_css_class(item['view'])}"
+                item_view = item.get('view', 'N')
+                item_cambio = item.get('cambio', '→')
+                view_class = f"dash-{self._sanitize_css_class(item_view)}"
                 arrow_map = {'↑': 'dash-arrow-up', '↓': 'dash-arrow-down',
                              '→': 'dash-arrow-flat', 'NEW': 'dash-arrow-up'}
-                arrow_class = arrow_map.get(item['cambio'], 'dash-arrow-flat')
+                arrow_class = arrow_map.get(item_cambio, 'dash-arrow-flat')
                 rows_html += f'''<div class="dashboard-row">
-                    <span class="dashboard-asset">{item['asset']}</span>
-                    <span class="{view_class}">{item['view']}</span>
-                    <span class="dash-arrow {arrow_class}">{item['cambio']}</span>
-                    <span class="dash-conviction">{item['conviccion']}</span>
+                    <span class="dashboard-asset">{item.get('asset', '')}</span>
+                    <span class="{view_class}">{item_view}</span>
+                    <span class="dash-arrow {arrow_class}">{item_cambio}</span>
+                    <span class="dash-conviction">{item.get('conviccion', '')}</span>
                 </div>'''
             replacements[f'{{{{{placeholder}}}}}'] = rows_html
 
         # 3. MES EN REVISION
-        mes = content['mes_en_revision']
+        mes = content.get('mes_en_revision', {})
 
         # Economia Global
-        eco = mes['economia_global']
-        replacements['{{economia_global_narrativa}}'] = eco['narrativa']
+        eco = mes.get('economia_global', {})
+        replacements['{{economia_global_narrativa}}'] = eco.get('narrativa', '')
         eco_rows = ''.join([
-            f"<tr><td>{d['indicador']}</td><td>{d['actual']}</td><td>{d['anterior']}</td><td>{d['sorpresa']}</td></tr>"
-            for d in eco['datos']
+            f"<tr><td>{d.get('indicador', '')}</td><td>{d.get('actual', '')}</td><td>{d.get('anterior', '')}</td><td>{d.get('sorpresa', '')}</td></tr>"
+            for d in eco.get('datos', [])
         ])
         replacements['{{economia_global_tabla}}'] = eco_rows
 
         # Mercados
-        merc = mes['mercados']
-        replacements['{{mercados_narrativa}}'] = merc['narrativa']
+        merc = mes.get('mercados', {})
+        replacements['{{mercados_narrativa}}'] = merc.get('narrativa', '')
         merc_rows = ''.join([
-            f"<tr><td>{d['asset']}</td><td>{d['retorno']}</td><td>{d.get('ytd', d.get('cambio', ''))}</td></tr>"
-            for d in merc['performance']
+            f"<tr><td>{d.get('asset', '')}</td><td>{d.get('retorno', '')}</td><td>{d.get('ytd', d.get('cambio', ''))}</td></tr>"
+            for d in merc.get('performance', [])
         ])
         replacements['{{mercados_tabla}}'] = merc_rows
 
         # Geopolitica
-        geo = mes['politica_geopolitica']
-        replacements['{{geopolitica_narrativa}}'] = geo['narrativa']
+        geo = mes.get('politica_geopolitica', {})
+        replacements['{{geopolitica_narrativa}}'] = geo.get('narrativa', '')
         geo_rows = ''.join([
-            f"<tr><td>{d['evento']}</td><td>{d['impacto']}</td><td>{d['probabilidad']}</td></tr>"
-            for d in geo['eventos']
+            f"<tr><td>{d.get('evento', '')}</td><td>{d.get('impacto', '')}</td><td>{d.get('probabilidad', '')}</td></tr>"
+            for d in geo.get('eventos', [])
         ])
         replacements['{{geopolitica_tabla}}'] = geo_rows
 
         # Chile
-        chile = mes['chile']
-        replacements['{{chile_narrativa}}'] = chile['narrativa']
+        chile = mes.get('chile', {})
+        replacements['{{chile_narrativa}}'] = chile.get('narrativa', '')
         chile_rows = ''.join([
-            f"<tr><td>{d['indicador']}</td><td>{d['valor']}</td><td>{d['tendencia']}</td></tr>"
-            for d in chile['datos']
+            f"<tr><td>{d.get('indicador', '')}</td><td>{d.get('valor', '')}</td><td>{d.get('tendencia', '')}</td></tr>"
+            for d in chile.get('datos', [])
         ])
         replacements['{{chile_tabla}}'] = chile_rows
 
         # 3. ESCENARIOS
-        esc = content['escenarios']
-        replacements['{{escenario_base}}'] = esc['escenario_base']
-        replacements['{{escenario_base_desc}}'] = esc['descripcion_base']
+        esc = content.get('escenarios', {})
+        escenario_base = esc.get('escenario_base', '')
+        replacements['{{escenario_base}}'] = escenario_base
+        replacements['{{escenario_base_desc}}'] = esc.get('descripcion_base', '')
 
         # Find base scenario probability
         base_prob = 50
-        for e in esc['escenarios']:
-            if e['nombre'].upper() == esc['escenario_base'].upper().replace('_', ' '):
-                base_prob = e['probabilidad']
+        for e in esc.get('escenarios', []):
+            e_nombre = e.get('nombre', '')
+            if (e_nombre or '').upper() == (escenario_base or '').upper().replace('_', ' '):
+                base_prob = e.get('probabilidad', 50)
                 break
         replacements['{{escenario_base_prob}}'] = str(base_prob)
 
         # Scenario cards
         scenario_html = ''
-        for e in esc['escenarios']:
-            is_base = 'base' if e['nombre'].upper().replace(' ', '_') == esc['escenario_base'].upper().replace(' ', '_') else ''
+        for e in esc.get('escenarios', []):
+            e_nombre = e.get('nombre', '')
+            is_base = 'base' if (e_nombre or '').upper().replace(' ', '_') == (escenario_base or '').upper().replace(' ', '_') else ''
             scenario_html += f'''
             <div class="scenario-card {is_base}">
-                <div class="scenario-name">{e['nombre']}</div>
-                <div class="scenario-prob">{e['probabilidad']}%</div>
-                <div class="scenario-desc">{e['descripcion']}</div>
-                <div style="font-size: 9pt; color: #718096;"><strong>Qué comprar:</strong> {e['que_comprar']}</div>
+                <div class="scenario-name">{e_nombre}</div>
+                <div class="scenario-prob">{e.get('probabilidad', '')}%</div>
+                <div class="scenario-desc">{e.get('descripcion', '')}</div>
+                <div style="font-size: 9pt; color: #718096;"><strong>Qué comprar:</strong> {e.get('que_comprar', '')}</div>
             </div>
             '''
         replacements['{{scenarios_html}}'] = scenario_html
@@ -295,15 +301,15 @@ class AssetAllocationRenderer:
         # Scenarios table
         impl_map = {'UP': '+', 'DOWN': '-', 'SIDEWAYS': '=', 'MIXED': '+/-'}
         esc_table = ''
-        for e in esc['escenarios']:
-            impl = e['implicancias']
+        for e in esc.get('escenarios', []):
+            impl = e.get('implicancias', {})
             eq_val = impl.get('equities', 'N/D')
             bd_val = impl.get('bonds', 'N/D')
             usd_val = impl.get('usd', 'N/D')
             cm_val = impl.get('commodities', 'N/D')
             esc_table += f'''<tr>
-                <td>{e['nombre']}</td>
-                <td><strong>{e['probabilidad']}%</strong></td>
+                <td>{e.get('nombre', '')}</td>
+                <td><strong>{e.get('probabilidad', '')}%</strong></td>
                 <td>{impl_map.get(eq_val, eq_val)}</td>
                 <td>{impl_map.get(bd_val, bd_val)}</td>
                 <td>{impl_map.get(usd_val, usd_val)}</td>
@@ -313,28 +319,29 @@ class AssetAllocationRenderer:
 
         # 4. REGIONAL VIEWS
         regional_html = ''
-        for view in content['views_regionales']:
-            view_class = self._sanitize_css_class(view['view'])
+        for view in content.get('views_regionales', []):
+            view_val = view.get('view', 'N')
+            view_class = self._sanitize_css_class(view_val)
             badge_class = f"badge-{view_class}"
 
             # Arguments
             args_favor = ''.join([
-                f"<li>{a['punto']}<span class='argument-dato'>{a['dato']}</span></li>"
-                for a in view['argumentos_favor']
+                f"<li>{a.get('punto', '')}<span class='argument-dato'>{a.get('dato', '')}</span></li>"
+                for a in view.get('argumentos_favor', [])
             ])
             args_contra = ''.join([
-                f"<li>{a['punto']}<span class='argument-dato'>{a['dato']}</span></li>"
-                for a in view['argumentos_contra']
+                f"<li>{a.get('punto', '')}<span class='argument-dato'>{a.get('dato', '')}</span></li>"
+                for a in view.get('argumentos_contra', [])
             ])
 
             regional_html += f'''
             <div class="view-card">
                 <div class="view-header">
-                    <span class="view-region">{view['region']}</span>
-                    <span class="view-badge {badge_class}">{view['view']} | Conviccion: {view['conviccion']}</span>
+                    <span class="view-region">{view.get('region', '')}</span>
+                    <span class="view-badge {badge_class}">{view_val} | Conviccion: {view.get('conviccion', '')}</span>
                 </div>
                 <div class="view-body">
-                    <div class="view-tesis">{view['tesis']}</div>
+                    <div class="view-tesis">{view.get('tesis', '')}</div>
                     <div class="arguments-grid">
                         <div class="arguments-column pro">
                             <h4>Argumentos a Favor</h4>
@@ -347,7 +354,7 @@ class AssetAllocationRenderer:
                     </div>
                     <div class="trigger-box">
                         <strong>Trigger para cambiar de opinión:</strong><br>
-                        {view['trigger_cambio']}
+                        {view.get('trigger_cambio', '')}
                     </div>
                 </div>
             </div>
@@ -355,74 +362,74 @@ class AssetAllocationRenderer:
         replacements['{{regional_views_html}}'] = regional_html
 
         # 5. ASSET CLASSES
-        ac = content['asset_classes']
+        ac = content.get('asset_classes', {})
 
         # Equity
-        eq = ac['renta_variable']
-        replacements['{{equity_view_global}}'] = eq['view_global']
+        eq = ac.get('renta_variable', {})
+        replacements['{{equity_view_global}}'] = eq.get('view_global', '')
         eq_rows = ''.join([
-            f"<tr><td>{r['region']}</td><td><span class='view-badge badge-{self._sanitize_css_class(r['view'])}'>{r['view']}</span></td><td>{r['rationale']}</td></tr>"
-            for r in eq['por_region']
+            f"<tr><td>{r.get('region', '')}</td><td><span class='view-badge badge-{self._sanitize_css_class(r.get('view', 'N'))}'>{r.get('view', 'N')}</span></td><td>{r.get('rationale', '')}</td></tr>"
+            for r in eq.get('por_region', [])
         ])
         replacements['{{equity_regions_table}}'] = eq_rows
-        replacements['{{sectores_preferidos}}'] = ', '.join(eq['sectores_preferidos'])
-        replacements['{{sectores_evitar}}'] = ', '.join(eq['sectores_evitar'])
-        replacements['{{factor_tilt}}'] = eq['factor_tilt']
+        replacements['{{sectores_preferidos}}'] = ', '.join(eq.get('sectores_preferidos', []))
+        replacements['{{sectores_evitar}}'] = ', '.join(eq.get('sectores_evitar', []))
+        replacements['{{factor_tilt}}'] = eq.get('factor_tilt', '')
 
         # Fixed Income
-        rf = ac['renta_fija']
-        replacements['{{rf_view_tasas}}'] = rf['view_tasas']
-        replacements['{{rf_view_duration}}'] = rf['view_duration']
-        replacements['{{rf_view_credito}}'] = rf['view_credito']
+        rf = ac.get('renta_fija', {})
+        replacements['{{rf_view_tasas}}'] = rf.get('view_tasas', '')
+        replacements['{{rf_view_duration}}'] = rf.get('view_duration', '')
+        replacements['{{rf_view_credito}}'] = rf.get('view_credito', '')
         rf_rows = ''.join([
-            f"<tr><td>{c['tramo']}</td><td><span class='view-badge badge-{self._sanitize_css_class(c['view'])}'>{c['view']}</span></td><td>{c['rationale']}</td></tr>"
-            for c in rf['curva']
+            f"<tr><td>{c.get('tramo', '')}</td><td><span class='view-badge badge-{self._sanitize_css_class(c.get('view', 'N'))}'>{c.get('view', 'N')}</span></td><td>{c.get('rationale', '')}</td></tr>"
+            for c in rf.get('curva', [])
         ])
         replacements['{{rf_curva_table}}'] = rf_rows
 
-        chile_rf = rf['chile_especifico']
-        replacements['{{chile_tpm_path}}'] = chile_rf['tpm_path']
-        replacements['{{chile_carry_trade}}'] = chile_rf['carry_trade']
-        replacements['{{chile_rf_recomendacion}}'] = chile_rf['recomendacion']
+        chile_rf = rf.get('chile_especifico', {})
+        replacements['{{chile_tpm_path}}'] = chile_rf.get('tpm_path', '')
+        replacements['{{chile_carry_trade}}'] = chile_rf.get('carry_trade', '')
+        replacements['{{chile_rf_recomendacion}}'] = chile_rf.get('recomendacion', '')
 
         # FX
-        fx = ac['monedas']
-        replacements['{{fx_view_usd}}'] = fx['view_usd']
+        fx = ac.get('monedas', {})
+        replacements['{{fx_view_usd}}'] = fx.get('view_usd', '')
         fx_rows = ''.join([
-            f"<tr><td>{p['par']}</td><td>{p['view']}</td><td>{p['target_3m']}</td><td>{p['target_12m']}</td><td>{p['rationale']}</td></tr>"
-            for p in fx['pares']
+            f"<tr><td>{p.get('par', '')}</td><td>{p.get('view', '')}</td><td>{p.get('target_3m', '')}</td><td>{p.get('target_12m', '')}</td><td>{p.get('rationale', '')}</td></tr>"
+            for p in fx.get('pares', [])
         ])
         replacements['{{fx_table}}'] = fx_rows
 
         # Commodities
-        comm = ac['commodities']
+        comm = ac.get('commodities', {})
         comm_rows = ''.join([
-            f"<tr><td>{c['nombre']}</td><td>{c['view']}</td><td>{c['target']}</td><td>{c['rationale']}</td></tr>"
-            for c in comm['commodities']
+            f"<tr><td>{c.get('nombre', '')}</td><td>{c.get('view', '')}</td><td>{c.get('target', '')}</td><td>{c.get('rationale', '')}</td></tr>"
+            for c in comm.get('commodities', [])
         ])
         replacements['{{commodities_table}}'] = comm_rows
 
         # 6. RISKS
-        risks = content['riesgos']
+        risks = content.get('riesgos', {})
 
         # Risk cards
         risks_html = ''
-        for r in risks['top_risks']:
+        for r in risks.get('top_risks', []):
             risks_html += f'''
             <div class="risk-card">
                 <div class="risk-header">
-                    <span class="risk-name">{r['nombre']}</span>
+                    <span class="risk-name">{r.get('nombre', '')}</span>
                     <span class="risk-metrics">
-                        <span>Prob: <strong>{r['probabilidad']}%</strong></span>
-                        <span>Impacto: <strong>{r['impacto']}</strong></span>
+                        <span>Prob: <strong>{r.get('probabilidad', '')}%</strong></span>
+                        <span>Impacto: <strong>{r.get('impacto', '')}</strong></span>
                     </span>
                 </div>
                 <div class="risk-body">
-                    <p>{r['descripcion']}</p>
-                    <p style="font-size: 9pt; color: #718096;"><strong>Señal temprana:</strong> {r['senal_temprana']}</p>
+                    <p>{r.get('descripcion', '')}</p>
+                    <p style="font-size: 9pt; color: #718096;"><strong>Señal temprana:</strong> {r.get('senal_temprana', '')}</p>
                     <div class="risk-hedge">
                         <strong>Hedge recomendado:</strong><br>
-                        {r['hedge']}
+                        {r.get('hedge', '')}
                     </div>
                 </div>
             </div>
@@ -430,10 +437,10 @@ class AssetAllocationRenderer:
         replacements['{{risks_html}}'] = risks_html
 
         # Calendar
-        replacements['{{calendar_table}}'] = build_calendar_rows(risks['calendario_eventos'])
+        replacements['{{calendar_table}}'] = build_calendar_rows(risks.get('calendario_eventos', []))
 
         # Triggers
-        triggers_html = ''.join([f'<li>{t}</li>' for t in risks['triggers_reconvocatoria']])
+        triggers_html = ''.join([f'<li>{t}</li>' for t in risks.get('triggers_reconvocatoria', [])])
         replacements['{{triggers_html}}'] = triggers_html
 
         # 8. PORTAFOLIOS MODELO
@@ -442,29 +449,32 @@ class AssetAllocationRenderer:
             # Header: profile names
             header_html = ''
             for p in portfolios:
-                header_html += f'<th>{p["perfil"]}<br><span class="port-risk-score">Riesgo: {p["risk_score"]}</span></th>'
+                header_html += f'<th>{p.get("perfil", "")}<br><span class="port-risk-score">Riesgo: {p.get("risk_score", "")}</span></th>'
             replacements['{{portfolios_header_html}}'] = header_html
 
             # Body: asset classes as rows, profiles as columns
-            asset_names = [a['asset'] for a in portfolios[0]['allocations']]
+            first_allocs = portfolios[0].get('allocations', [])
+            asset_names = [a.get('asset', '') for a in first_allocs]
             body_html = ''
             for i, asset in enumerate(asset_names):
                 body_html += '<tr>'
                 body_html += f'<td>{asset}</td>'
                 for p in portfolios:
-                    alloc = p['allocations'][i]
+                    p_allocs = p.get('allocations', [])
+                    alloc = p_allocs[i] if i < len(p_allocs) else {}
+                    alloc_cambio = alloc.get('cambio', '→')
                     cambio_map = {'↑': 'pct-change-up', '↓': 'pct-change-down', '→': 'pct-change-flat'}
-                    cambio_class = cambio_map.get(alloc['cambio'], 'pct-change-flat')
+                    cambio_class = cambio_map.get(alloc_cambio, 'pct-change-flat')
                     arrow_map = {'↑': '&#9650;', '↓': '&#9660;', '→': ''}
-                    arrow_html = arrow_map.get(alloc['cambio'], '')
+                    arrow_html = arrow_map.get(alloc_cambio, '')
                     arrow_span = f' <span class="{cambio_class}">{arrow_html}</span>' if arrow_html else ''
-                    body_html += f'<td>{alloc["pct"]}%{arrow_span}</td>'
+                    body_html += f'<td>{alloc.get("pct", 0)}%{arrow_span}</td>'
                 body_html += '</tr>'
             # Total row
             body_html += '<tr class="total-row">'
             body_html += '<td>Total</td>'
             for p in portfolios:
-                total = sum(a['pct'] for a in p['allocations'])
+                total = sum(a.get('pct', 0) for a in p.get('allocations', []))
                 body_html += f'<td>{total}%</td>'
             body_html += '</tr>'
             replacements['{{portfolios_body_html}}'] = body_html
@@ -497,12 +507,13 @@ class AssetAllocationRenderer:
                     </thead>
                     <tbody>'''
             for item in items:
-                badge_class = f"badge-{self._sanitize_css_class(item['view'])}"
+                item_view = item.get('view', 'N')
+                badge_class = f"badge-{self._sanitize_css_class(item_view)}"
                 focus_html += f'''<tr>
-                    <td><span class="focus-ticker">{item['ticker']}</span></td>
-                    <td><span class="focus-name">{item['nombre']}</span></td>
-                    <td><span class="view-badge {badge_class}">{item['view']}</span></td>
-                    <td>{item['rationale']}</td>
+                    <td><span class="focus-ticker">{item.get('ticker', '')}</span></td>
+                    <td><span class="focus-name">{item.get('nombre', '')}</span></td>
+                    <td><span class="view-badge {badge_class}">{item_view}</span></td>
+                    <td>{item.get('rationale', '')}</td>
                 </tr>'''
             focus_html += '''</tbody>
                 </table>
