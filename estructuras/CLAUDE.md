@@ -122,7 +122,13 @@ python run_monthly.py --dry-run
 - Panel composition: `ai_council_runner.py`
 - Output structure: `council_parser.py` (block extraction patterns)
 
-## Recent Bug Fixes (2026-03-27)
+## Recent Bug Fixes (2026-03-30)
+1. Renderer hardening: 28 crash points → 0 (all `dict['key']` → `.get('key', default)`)
+2. Narrative engine dotenv: `load_dotenv()` added to `narrative_engine.py` — fixes empty narratives
+3. Council deliberation report: new `council_deliberation_renderer.py` — "Acta del Comité"
+4. Helper methods null-safe: `_get_view_class`, `_get_valuation_class`, `_get_vs_class`, `_get_trend_class`
+
+### Previous (2026-03-27)
 1. RF report KeyError `'impacto'` -> `.get()` with alias fallbacks (severidad/mitigacion)
 2. Macro crash `Series.__format__` -> `_build_latam_table()` extracts `.iloc[-1]` from pd.Series
 3. Briefing numpy/dict raw display -> unwrap dict values + convert np.float64 to float
