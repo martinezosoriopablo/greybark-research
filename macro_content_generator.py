@@ -48,6 +48,30 @@ class MacroContentGenerator:
         self.bloomberg = None  # Injected externally
         self._parser = None  # Lazy council parser
 
+    @staticmethod
+    def _sf(val):
+        """Safe float: convert pd.Series, numpy, dict to plain float. Returns None if not numeric."""
+        if val is None:
+            return None
+        try:
+            import pandas as pd
+            if isinstance(val, pd.Series):
+                return float(val.iloc[-1]) if not val.empty else None
+        except (ImportError, TypeError, IndexError):
+            pass
+        if isinstance(val, dict):
+            val = val.get('value', val.get('current', val.get('latest')))
+        try:
+            import numpy as np
+            if isinstance(val, (np.integer, np.floating)):
+                return float(val)
+        except (ImportError, TypeError):
+            pass
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return None
+
     @property
     def parser(self):
         """Lazy-init council parser."""
@@ -905,7 +929,7 @@ class MacroContentGenerator:
         ]
         result = []
         for label, key in mapping:
-            val = comp.get(key)
+            val = self._sf(comp.get(key))
             val_str = f"{val:.1f}% a/a" if val is not None else 'N/D'
             result.append({'componente': label, 'valor': val_str, 'tendencia': '-'})
         return result

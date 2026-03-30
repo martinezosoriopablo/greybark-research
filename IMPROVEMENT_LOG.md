@@ -315,6 +315,18 @@
 - Pipeline local RV: OK (88.3s) con narrativas ricas
 - Antes: *"Nuestra postura en renta variable global es cauteloso para Marzo 2026."* (70 chars fallback)
 
+#### Macro CPI Components Series.__format__ (segundo crash)
+
+| # | Bug | Archivo | Fix |
+|---|-----|---------|-----|
+| 133 | Macro crash `Series.__format__` en `_build_cpi_components()` — `get_usa_cpi_breakdown()` devuelve pd.Series, no floats | `macro_content_generator.py:933` | Agregar `_sf()` helper estático que convierte pd.Series/dict/numpy a float; aplicar en `_build_cpi_components()` |
+
+**Causa raíz:** Mismo patrón que Sprint 22 (`_build_latam_table`) — `ChartDataProvider` devuelve Series completas pero el content generator asume escalares. El `_sf()` helper resuelve esto globalmente para cualquier método que use datos del provider.
+
+**Validación:**
+- `generate_all_content()` produce 11/11 secciones OK (metadata, resumen, pronóstico, USA, Europa, China, Chile, temas, escenarios, conclusiones)
+- Pipeline completo pendiente de run final
+
 ### Patrones Recurrentes Nuevos
 
 | Patrón | Frecuencia | Lección |
