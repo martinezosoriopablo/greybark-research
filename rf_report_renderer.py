@@ -556,8 +556,8 @@ def main():
     )
     output_path = renderer.render(output_filename=args.output)
 
-    import subprocess
-    subprocess.run(['start', '', output_path], shell=True)
+    import webbrowser
+    webbrowser.open(str(output_path))
 
 
 if __name__ == "__main__":

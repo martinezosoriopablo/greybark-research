@@ -18,8 +18,22 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
 import json
+import math
 
 from data_resilience import resilient_fetch, get_cache
+
+
+def _clean_float(val, decimals=2, default=None):
+    """Convert to float safely, rejecting NaN/inf. Returns rounded value or default."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return default
+        return round(f, decimals)
+    except (ValueError, TypeError):
+        return default
 
 # Agregar greybark al path
 GREYBARK_PATH = Path(__file__).parent
@@ -105,7 +119,9 @@ class CouncilDataCollector:
                 from greybark.data_sources.fred_client import FREDClient
                 jolts_s = FREDClient().get_series('JTSJOL')
                 if jolts_s is not None and len(jolts_s) > 0:
-                    data['macro_usa']['jolts'] = round(float(jolts_s.iloc[-1]) / 1000, 1)  # Millions
+                    jolts_val = _clean_float(jolts_s.iloc[-1], decimals=1)
+                    if jolts_val is not None:
+                        data['macro_usa']['jolts'] = round(jolts_val / 1000, 1)  # Millions
                     self._print(f"    [OK] JOLTS: {data['macro_usa']['jolts']}M")
         except Exception as e:
             self._print(f"    [WARN] JOLTS: {e}")

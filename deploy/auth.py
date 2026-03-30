@@ -15,7 +15,11 @@ from jose import JWTError, jwt
 
 # ── Config ────────────────────────────────────────────────
 
-SECRET_KEY = os.environ.get("JWT_SECRET", "change-me-in-production-use-openssl-rand-hex-32")
+SECRET_KEY = os.environ.get("JWT_SECRET")
+if not SECRET_KEY:
+    import warnings
+    warnings.warn("JWT_SECRET env var not set — using insecure default. Set it in production!", stacklevel=2)
+    SECRET_KEY = "change-me-in-production-use-openssl-rand-hex-32"
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_MINUTES = int(os.environ.get("TOKEN_EXPIRE_MINUTES", "480"))  # 8 hours
 COOKIE_NAME = "gb_session"

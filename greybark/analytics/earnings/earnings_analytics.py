@@ -10,6 +10,7 @@ Features:
 - Valuation Analysis
 """
 
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -20,8 +21,8 @@ import requests
 try:
     from ...config import config
     ALPHAVANTAGE_API_KEY = config.alphavantage.api_key
-except:
-    ALPHAVANTAGE_API_KEY = 'TU_API_KEY_AQUI'  # Reemplazar con tu key
+except (ImportError, AttributeError):
+    ALPHAVANTAGE_API_KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '')
 
 
 class EarningsAnalytics:

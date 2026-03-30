@@ -327,12 +327,15 @@ class RFDataCollector:
                 try:
                     data = client.get_series(code, days_back=90)
                     if data is not None and len(data) > 0:
-                        latest = float(data.dropna().iloc[-1])
-                        prev_month = float(data.dropna().iloc[-22]) if len(data.dropna()) > 22 else None
+                        clean = data.dropna()
+                        if len(clean) == 0:
+                            continue
+                        latest = float(clean.iloc[-1])
+                        prev_month = float(clean.iloc[-22]) if len(clean) > 22 else None
                         result[country] = {
                             'yield_10y': round(latest, 2),
                             'vs_1m': round(latest - prev_month, 2) if prev_month else None,
-                            'as_of': str(data.dropna().index[-1].date()),
+                            'as_of': str(clean.index[-1].date()),
                         }
                 except Exception:
                     pass
@@ -512,7 +515,7 @@ class RFDataCollector:
 
             # Chile IPC YoY (from monthly variation series)
             try:
-                ipc_series = bcch.get_series('F074.IPC.VAR.Z.Z.C.M', lookback_months=14)
+                ipc_series = bcch.get_series('F074.IPC.VAR.Z.Z.C.M', days_back=420)
                 if ipc_series is not None and len(ipc_series) >= 13:
                     # Compute YoY from monthly variations: (1+m1/100)*(1+m2/100)*...*(1+m12/100)-1)*100
                     monthly = ipc_series.tail(12).values

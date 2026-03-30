@@ -54,7 +54,10 @@ def main():
             if seed_src.exists():
                 shutil.copy2(str(seed_src), str(LAYOUT_DIR / "seed_test_clients.py"))
                 os.environ["GREYBARK_DB"] = str(dst)
-                exec(open(str(LAYOUT_DIR / "seed_test_clients.py")).read())
+                import importlib.util
+                _spec = importlib.util.spec_from_file_location("seed_test_clients", str(LAYOUT_DIR / "seed_test_clients.py"))
+                _mod = importlib.util.module_from_spec(_spec)
+                _spec.loader.exec_module(_mod)
                 print(f"  [+] greybark.db (seeded)")
         except Exception as e:
             print(f"  [WARN] Could not seed DB: {e}")

@@ -18,7 +18,15 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
+from html import escape as _html_escape
 from jinja2 import Environment, FileSystemLoader, Undefined
+
+
+def _esc(val, default='') -> str:
+    """HTML-escape a value for safe injection into templates."""
+    if val is None:
+        return default
+    return _html_escape(str(val))
 
 
 def _md_to_html_inline(text: str) -> str:
@@ -192,11 +200,11 @@ class RVReportRenderer:
         for r in resumen.get('tabla_resumen', []):
             view_class = self._get_view_class(r.get('view'))
             summary_rows += f'''<tr>
-                <td>{r.get('mercado', '')}</td>
-                <td>{r.get('indice', '')}</td>
-                <td class="center"><span class="view-badge {view_class}">{r.get('view', 'N')}</span></td>
-                <td class="center">{r.get('cambio', '-')}</td>
-                <td>{r.get('driver', '')}</td>
+                <td>{_esc(r.get('mercado', ''))}</td>
+                <td>{_esc(r.get('indice', ''))}</td>
+                <td class="center"><span class="view-badge {view_class}">{_esc(r.get('view', 'N'))}</span></td>
+                <td class="center">{_esc(r.get('cambio', '-'))}</td>
+                <td>{_esc(r.get('driver', ''))}</td>
             </tr>'''
         replacements['{{summary_table_rows}}'] = summary_rows
 
@@ -315,28 +323,28 @@ class RVReportRenderer:
         for s in sect.get('matriz_sectorial', []):
             view_class = self._get_view_class(s.get('view', 'N'))
             matrix_rows += f'''<tr>
-                <td class="sector-name">{s.get('sector', '')}</td>
-                <td><span class="view-badge {view_class}">{s.get('view', 'N')}</span></td>
-                <td>{s.get('valuacion', '')}</td>
-                <td>{s.get('momentum', '')}</td>
-                <td>{s.get('earnings', '')}</td>
-                <td style="text-align:left; font-size:8pt;">{s.get('catalizador', '')}</td>
+                <td class="sector-name">{_esc(s.get('sector', ''))}</td>
+                <td><span class="view-badge {view_class}">{_esc(s.get('view', 'N'))}</span></td>
+                <td>{_esc(s.get('valuacion', ''))}</td>
+                <td>{_esc(s.get('momentum', ''))}</td>
+                <td>{_esc(s.get('earnings', ''))}</td>
+                <td style="text-align:left; font-size:8pt;">{_esc(s.get('catalizador', ''))}</td>
             </tr>'''
         replacements['{{sector_matrix_rows}}'] = matrix_rows
 
         # Preferred sectors
         pref_html = ''
         for s in sect.get('sectores_preferidos', []):
-            subsectors = ''.join([f'<span class="sector-tag preferred">{sub}</span>' for sub in s.get('subsectores', [])])
-            avoid = ''.join([f'<span class="sector-tag avoid">{a}</span>' for a in s.get('evitar', [])])
+            subsectors = ''.join([f'<span class="sector-tag preferred">{_esc(sub)}</span>' for sub in s.get('subsectores', [])])
+            avoid = ''.join([f'<span class="sector-tag avoid">{_esc(a)}</span>' for a in s.get('evitar', [])])
             pref_html += f'''
             <div class="sector-card ow">
                 <div class="sector-card-header">
-                    <h4>{s.get('sector', '')}</h4>
-                    <span class="view-badge badge-ow">{s.get('view', 'OW')} | Upside: {s.get('upside', 'N/D')}</span>
+                    <h4>{_esc(s.get('sector', ''))}</h4>
+                    <span class="view-badge badge-ow">{_esc(s.get('view', 'OW'))} | Upside: {_esc(s.get('upside', 'N/D'))}</span>
                 </div>
                 <div class="sector-card-body">
-                    <p>{s.get('tesis', '')}</p>
+                    <p>{_esc(s.get('tesis', ''))}</p>
                     <div class="sector-tags">
                         <strong style="font-size:8pt;">Preferidos:</strong> {subsectors}
                     </div>
@@ -353,12 +361,12 @@ class RVReportRenderer:
             avoid_html += f'''
             <div class="sector-card uw">
                 <div class="sector-card-header">
-                    <h4>{s.get('sector', '')}</h4>
-                    <span class="view-badge badge-uw">{s.get('view', 'UW')}</span>
+                    <h4>{_esc(s.get('sector', ''))}</h4>
+                    <span class="view-badge badge-uw">{_esc(s.get('view', 'UW'))}</span>
                 </div>
                 <div class="sector-card-body">
-                    <p>{s.get('razon', '')}</p>
-                    <p style="font-size:9pt; color: var(--text-light);"><strong>¿Qué cambiaría?</strong> {s.get('que_cambiaria', '')}</p>
+                    <p>{_esc(s.get('razon', ''))}</p>
+                    <p style="font-size:9pt; color: var(--text-light);"><strong>¿Qué cambiaría?</strong> {_esc(s.get('que_cambiaria', ''))}</p>
                 </div>
             </div>'''
         replacements['{{avoid_sectors_html}}'] = avoid_html
@@ -408,7 +416,7 @@ class RVReportRenderer:
             regional_html += f'''
             <div class="region-card">
                 <div class="region-card-header">
-                    <span class="region-name">{r.get('mercado', '')} ({r.get('indice', '')})</span>
+                    <span class="region-name">{_esc(r.get('mercado', ''))} ({_esc(r.get('indice', ''))})</span>
                     <span class="region-view">{r.get('view', 'N')}</span>
                 </div>
                 <div class="region-card-body">
@@ -426,7 +434,7 @@ class RVReportRenderer:
                             <div class="metric-value">{r.get('cambio', '')}</div>
                         </div>
                     </div>
-                    <p style="color: var(--text-medium);">{r.get('narrativa', '')}</p>
+                    <p style="color: var(--text-medium);">{_esc(r.get('narrativa', ''))}</p>
                 </div>
             </div>'''
         replacements['{{regional_views_html}}'] = regional_html
@@ -448,11 +456,11 @@ class RVReportRenderer:
         chile_picks = ''
         for p in chile.get('top_picks', []):
             chile_picks += f'''<tr>
-                <td><strong>{p.get('empresa', '')}</strong></td>
-                <td>{p.get('ticker', '')}</td>
-                <td>{p.get('pe', 'N/D')}</td>
-                <td>{p.get('div_yield', 'N/D')}</td>
-                <td>{p.get('rationale', '')}</td>
+                <td><strong>{_esc(p.get('empresa', ''))}</strong></td>
+                <td>{_esc(p.get('ticker', ''))}</td>
+                <td>{_esc(p.get('pe', 'N/D'))}</td>
+                <td>{_esc(p.get('div_yield', 'N/D'))}</td>
+                <td>{_esc(p.get('rationale', ''))}</td>
             </tr>'''
         replacements['{{chile_picks_rows}}'] = chile_picks
 
@@ -466,18 +474,18 @@ class RVReportRenderer:
             ytd_val = f.get('flujo_ytd') or f.get('retorno_ytd', 'N/D')
             m1_val = f.get('flujo_1m') or f.get('retorno_1m', 'N/D')
             flows_rows += f'''<tr>
-                <td>{f.get('region', '')}</td>
-                <td class="center">{ytd_val}</td>
-                <td class="center">{m1_val}</td>
+                <td>{_esc(f.get('region', ''))}</td>
+                <td class="center">{_esc(ytd_val)}</td>
+                <td class="center">{_esc(m1_val)}</td>
             </tr>'''
         replacements['{{flows_table_rows}}'] = flows_rows
 
         pos_rows = ''
         for p in flows.get('posicionamiento', {}).get('indicadores', []):
             pos_rows += f'''<tr>
-                <td>{p.get('indicador', '')}</td>
-                <td class="center"><strong>{p.get('valor', 'N/D')}</strong></td>
-                <td>{p.get('comentario', '')}</td>
+                <td>{_esc(p.get('indicador', ''))}</td>
+                <td class="center"><strong>{_esc(p.get('valor', 'N/D'))}</strong></td>
+                <td>{_esc(p.get('comentario', ''))}</td>
             </tr>'''
         replacements['{{positioning_table_rows}}'] = pos_rows
 
@@ -489,14 +497,14 @@ class RVReportRenderer:
             risks_html += f'''
             <div class="risk-card">
                 <div class="risk-header">
-                    <span class="risk-name">{r.get('riesgo', '')}</span>
+                    <span class="risk-name">{_esc(r.get('riesgo', ''))}</span>
                     <span class="risk-metrics">
-                        <span>Prob: <strong>{r.get('probabilidad', 'N/D')}</strong></span>
-                        <span>Impacto: <strong>{r.get('impacto', 'N/D')}</strong></span>
+                        <span>Prob: <strong>{_esc(r.get('probabilidad', 'N/D'))}</strong></span>
+                        <span>Impacto: <strong>{_esc(r.get('impacto', 'N/D'))}</strong></span>
                     </span>
                 </div>
-                <p style="margin: 10px 0; color: var(--text-medium);">{r.get('descripcion', '')}</p>
-                <p style="font-size: 9pt; color: var(--text-light);"><strong>Hedge:</strong> {r.get('hedge', '')}</p>
+                <p style="margin: 10px 0; color: var(--text-medium);">{_esc(r.get('descripcion', ''))}</p>
+                <p style="font-size: 9pt; color: var(--text-light);"><strong>Hedge:</strong> {_esc(r.get('hedge', ''))}</p>
             </div>'''
         replacements['{{risks_html}}'] = risks_html
 
@@ -614,8 +622,8 @@ def main():
     output_path = renderer.render(output_filename=args.output)
 
     # Abrir en navegador
-    import subprocess
-    subprocess.run(['start', '', output_path], shell=True)
+    import webbrowser
+    webbrowser.open(str(output_path))
 
 
 if __name__ == "__main__":

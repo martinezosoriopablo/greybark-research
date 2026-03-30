@@ -34,10 +34,20 @@ class FREDClient:
         dots = client.get_fed_dots()
     """
     
-    def __init__(self, api_key: str = None):
-        """Initialize FRED client"""
+    def __init__(self, api_key: str = None, timeout: int = 30):
+        """Initialize FRED client with request timeout."""
         self.api_key = api_key or config.fred.api_key
         self._client = Fred(api_key=self.api_key)
+        # Patch fredapi's internal session to enforce timeout
+        import requests as _req
+        _session = _req.Session()
+        _original_get = _session.get
+        def _get_with_timeout(*args, **kwargs):
+            kwargs.setdefault('timeout', timeout)
+            return _original_get(*args, **kwargs)
+        _session.get = _get_with_timeout
+        if hasattr(self._client, 'session'):
+            self._client.session = _session
     
     def get_series(self, 
                    series_id: str, 

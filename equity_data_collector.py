@@ -143,7 +143,7 @@ class EquityDataCollector:
                 info = stock.info
 
                 # Precio y retornos
-                hist = stock.history(period='1y')
+                hist = stock.history(period='1y', timeout=30)
                 if hist.empty:
                     results[region_key] = {'error': f'No data for {ticker}'}
                     continue

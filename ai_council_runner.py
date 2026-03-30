@@ -27,6 +27,7 @@ import os
 import sys
 import json
 import asyncio
+import time as _time
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -180,44 +181,47 @@ class AICouncilRunner:
     # LLAMADAS A LLM
     # =========================================================================
 
-    async def _call_llm_async(self, system_prompt: str, user_prompt: str,
-                              model: str = None, max_tokens: int = None) -> str:
-        """Llama a Claude API de forma asíncrona."""
+    def _call_llm_with_retry(self, system_prompt: str, user_prompt: str,
+                             model: str = None, max_tokens: int = None,
+                             max_retries: int = 3) -> str:
+        """Llama a Claude API con retry y backoff para rate limits."""
         use_model = model or self.model
         use_tokens = max_tokens or MAX_TOKENS
-        try:
-            # Anthropic SDK es sincrónico, lo envolvemos
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: self.client.messages.create(
+        for attempt in range(max_retries):
+            try:
+                response = self.client.messages.create(
                     model=use_model,
                     max_tokens=use_tokens,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
                 )
-            )
-            return response.content[0].text
-        except Exception as e:
-            self._print(f"[ERR] LLM call failed: {e}")
-            return f"Error: {str(e)}"
+                return response.content[0].text
+            except Exception as e:
+                err_name = type(e).__name__
+                is_rate_limit = 'RateLimit' in err_name or 'rate' in str(e).lower() or '429' in str(e)
+                is_overloaded = 'Overloaded' in err_name or '529' in str(e) or 'overloaded' in str(e).lower()
+                if (is_rate_limit or is_overloaded) and attempt < max_retries - 1:
+                    wait = 2 ** (attempt + 1)  # 2s, 4s, 8s
+                    self._print(f"  [RETRY] {err_name} — esperando {wait}s (intento {attempt + 1}/{max_retries})")
+                    _time.sleep(wait)
+                    continue
+                self._print(f"[ERR] LLM call failed ({err_name}): {e}")
+                return f"Error: {str(e)}"
+        return "Error: max retries exceeded"
+
+    async def _call_llm_async(self, system_prompt: str, user_prompt: str,
+                              model: str = None, max_tokens: int = None) -> str:
+        """Llama a Claude API de forma asíncrona con retry."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._call_llm_with_retry(system_prompt, user_prompt, model, max_tokens)
+        )
 
     def _call_llm_sync(self, system_prompt: str, user_prompt: str,
                        model: str = None, max_tokens: int = None) -> str:
-        """Llama a Claude API de forma sincrónica."""
-        use_model = model or self.model
-        use_tokens = max_tokens or MAX_TOKENS
-        try:
-            response = self.client.messages.create(
-                model=use_model,
-                max_tokens=use_tokens,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}]
-            )
-            return response.content[0].text
-        except Exception as e:
-            self._print(f"[ERR] LLM call failed: {e}")
-            return f"Error: {str(e)}"
+        """Llama a Claude API de forma sincrónica con retry."""
+        return self._call_llm_with_retry(system_prompt, user_prompt, model, max_tokens)
 
     # =========================================================================
     # CAPA 1: PANEL HORIZONTAL
@@ -732,6 +736,19 @@ Desafía la síntesis del CIO. Encuentra las fallas. Propón mejoras.
 {module_outputs}
 """
 
+        # Coherence warnings from panel analysis
+        cw = council_input.get('coherence_warnings', [])
+        if cw:
+            warnings_text = '\n'.join(f"- {w}" for w in cw[:10])
+            prompt += f"""
+## ALERTAS DE COHERENCIA (IMPORTANTE)
+El análisis del panel detectó discrepancias en datos compartidos.
+Al redactar el documento, usa SIEMPRE el dato de fuente verificada (quant data).
+Si dos analistas citan cifras distintas para el mismo indicador, prioriza el dato
+que aparece en los módulos cuantitativos.
+{warnings_text}
+"""
+
         if user_directives:
             prompt += f"""
 ## DIRECTIVAS DEL COMITÉ (IMPORTANTE)
@@ -856,6 +873,8 @@ El output debe ser profesional y listo para el cliente.
             self._print(f"\n  [COHERENCE] {len(coherence_warnings)} data conflicts detected:")
             for w in coherence_warnings[:5]:
                 self._print(f"    - {w}")
+            # Pass warnings to refinador so it can reconcile conflicts
+            council_input['coherence_warnings'] = coherence_warnings
 
         # Capa 2: Síntesis vertical
         self.synthesis_outputs = await self._run_synthesis_async(self.panel_outputs, council_input)

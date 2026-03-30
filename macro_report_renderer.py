@@ -19,7 +19,15 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
+from html import escape as _html_escape
 from jinja2 import Environment, FileSystemLoader, Undefined
+
+
+def _esc(val, default='') -> str:
+    """HTML-escape a value for safe injection into templates."""
+    if val is None:
+        return default
+    return _html_escape(str(val))
 
 
 def _md_to_html_inline(text: str) -> str:
@@ -259,11 +267,11 @@ class MacroReportRenderer:
         vs_prev_rows = ''
         for cambio in vs_prev.get('cambios', []):
             vs_prev_rows += f'''<tr>
-                <td>{cambio.get('variable', 'N/D')}</td>
-                <td style="text-align:center">{cambio.get('anterior', 'N/D')}</td>
-                <td style="text-align:center">{cambio.get('actual', 'N/D')}</td>
-                <td style="text-align:center"><strong>{cambio.get('cambio', 'N/D')}</strong></td>
-                <td style="font-size: 8pt;">{cambio.get('razon', '')}</td>
+                <td>{_esc(cambio.get('variable', 'N/D'))}</td>
+                <td style="text-align:center">{_esc(cambio.get('anterior', 'N/D'))}</td>
+                <td style="text-align:center">{_esc(cambio.get('actual', 'N/D'))}</td>
+                <td style="text-align:center"><strong>{_esc(cambio.get('cambio', 'N/D'))}</strong></td>
+                <td style="font-size: 8pt;">{_esc(cambio.get('razon', ''))}</td>
             </tr>'''
         replacements['{{vs_previous_rows}}'] = vs_prev_rows
 
@@ -457,11 +465,11 @@ class MacroReportRenderer:
         comm_rows = ''
         for c in comm.get('commodities', []):
             comm_rows += f'''<tr>
-                <td><strong>{c.get('nombre', 'N/D')}</strong></td>
-                <td>{c.get('precio_actual', 'N/D')}</td>
-                <td>{c.get('cambio', 'N/D')}</td>
-                <td>{c.get('outlook', 'N/D')}</td>
-                <td style="font-size: 8pt;">{c.get('drivers', '')}</td>
+                <td><strong>{_esc(c.get('nombre', 'N/D'))}</strong></td>
+                <td>{_esc(c.get('precio_actual', 'N/D'))}</td>
+                <td>{_esc(c.get('cambio', 'N/D'))}</td>
+                <td>{_esc(c.get('outlook', 'N/D'))}</td>
+                <td style="font-size: 8pt;">{_esc(c.get('drivers', ''))}</td>
             </tr>'''
         replacements['{{commodities_rows}}'] = comm_rows
 
@@ -487,7 +495,7 @@ class MacroReportRenderer:
                 <td>{p.get('gdp', 'N/D')}</td>
                 <td>{p.get('inflación', 'N/D')}</td>
                 <td>{p.get('tasa', 'N/D')}</td>
-                <td style="font-size: 8pt;">{p.get('riesgo_principal', '')}</td>
+                <td style="font-size: 8pt;">{_esc(p.get('riesgo_principal', ''))}</td>
             </tr>'''
         replacements['{{latam_rows}}'] = latam_rows
 
@@ -498,9 +506,9 @@ class MacroReportRenderer:
         for t in temas.get('temas', []):
             themes_html += f'''
             <div class="region-card">
-                <div class="region-card-header">{t.get('titulo', 'N/D')}</div>
+                <div class="region-card-header">{_esc(t.get('titulo', 'N/D'))}</div>
                 <div class="region-card-body">
-                    <p>{t.get('descripcion', '')}</p>
+                    <p>{_esc(t.get('descripcion', ''))}</p>
                 </div>
             </div>'''
         replacements['{{macro_themes_html}}'] = themes_html
@@ -592,11 +600,11 @@ class MacroReportRenderer:
             vistas_html += f'''
             <div style="margin-bottom: 18px; padding: 12px 15px; border: 1px solid #e2e8f0; border-radius: 6px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h4 style="color: var(--primary-blue); margin: 0; font-size: 11pt;">{v.get('tema', 'N/D')}</h4>
-                    <span style="background: {vs_color}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 8pt; font-weight: 600;">{v.get('vs_consenso', '')}</span>
+                    <h4 style="color: var(--primary-blue); margin: 0; font-size: 11pt;">{_esc(v.get('tema', 'N/D'))}</h4>
+                    <span style="background: {vs_color}; color: white; padding: 2px 10px; border-radius: 12px; font-size: 8pt; font-weight: 600;">{_esc(v.get('vs_consenso', ''))}</span>
                 </div>
-                <p style="margin-bottom: 8px;">{v.get('vista_grb', '')}</p>
-                <p style="font-size: 9pt; color: #718096; margin: 0;"><strong>vs Consenso:</strong> {v.get('vs_detalle', '')}</p>
+                <p style="margin-bottom: 8px;">{_esc(v.get('vista_grb', ''))}</p>
+                <p style="font-size: 9pt; color: #718096; margin: 0;"><strong>vs Consenso:</strong> {_esc(v.get('vs_detalle', ''))}</p>
             </div>'''
         replacements['{{conclusiones_vistas_html}}'] = vistas_html
 
@@ -866,8 +874,8 @@ def main():
     output_path = renderer.render(output_filename=args.output)
 
     # Abrir en navegador
-    import subprocess
-    subprocess.run(['start', '', output_path], shell=True)
+    import webbrowser
+    webbrowser.open(str(output_path))
 
 
 if __name__ == "__main__":

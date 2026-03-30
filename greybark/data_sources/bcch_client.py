@@ -74,7 +74,7 @@ class BCChClient:
         }
         
         try:
-            response = requests.get(self.base_url, params=params, timeout=15)
+            response = requests.get(self.base_url, params=params, timeout=30)
             
             if response.status_code != 200:
                 print(f"[BCCh] ERR: HTTP error {response.status_code} for {series_id}")

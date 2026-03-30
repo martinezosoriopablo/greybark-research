@@ -10,6 +10,7 @@ APIs Used:
 - EARNINGS_CALENDAR: Upcoming earnings dates
 """
 
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -21,8 +22,8 @@ import time
 try:
     from ...config import config
     ALPHAVANTAGE_API_KEY = config.alphavantage.api_key
-except:
-    ALPHAVANTAGE_API_KEY = 'C4OH1WYEIX3P11BU'
+except (ImportError, AttributeError):
+    ALPHAVANTAGE_API_KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '')
 
 BASE_URL = "https://www.alphavantage.co/query"
 

@@ -57,9 +57,11 @@ class CouncilParser:
             for match in re.finditer(pattern, text, re.DOTALL):
                 block_name = match.group(1).strip().upper()
                 block_content = match.group(2).strip()
-                # Don't overwrite — first occurrence (refinador/final) takes priority
+                # First occurrence (refinador/final) takes priority; log conflicts
                 if block_name not in self._blocks_cache:
                     self._blocks_cache[block_name] = block_content
+                else:
+                    print(f"  [WARN] council_parser: bloque duplicado '{block_name}' — se usa primera ocurrencia, descartando {len(block_content)} chars")
 
     def _get_block(self, name: str) -> Optional[str]:
         """Get raw content of a named block."""

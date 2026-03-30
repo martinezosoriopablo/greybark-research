@@ -367,9 +367,10 @@ def _is_significant_discrepancy(narrative_val: float, verified_val: float,
     # A rate of 4.05% vs 4.3% is ~6% relative but only 0.25pp —
     # we want to catch this since it's a meaningful difference for rates.
     if unit == '%' or unit == '':
-        # For values < 10 (typical rates, yields, CPI): trigger if >0.05 absolute AND >1.5% relative
+        # For values < 10 (typical rates, yields, CPI): trigger if >0.02 absolute AND >1.5% relative
+        # 2bp threshold catches material rate errors for duration calculations
         if abs(verified_val) < 10:
-            return abs_diff > 0.05 and rel_diff > 0.015
+            return abs_diff > 0.02 and rel_diff > 0.015
         # For larger values (index levels, prices): use standard relative threshold
         return rel_diff > threshold
 

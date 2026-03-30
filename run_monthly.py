@@ -62,7 +62,7 @@ FORECAST_DIR = OUTPUT_DIR / "forecasts"
 
 VALID_REPORTS = ['macro', 'rv', 'rf', 'aa']
 
-WSJ_DATA_PATH = Path(os.environ.get('WSJ_DATA_PATH', str(Path.home() / "OneDrive/Documentos/proyectos/wsj_data")))
+WSJ_DATA_PATH = Path(os.environ.get('WSJ_DATA_PATH', str(Path.home() / "onedrive/documentos/proyectos/wsj_data")))
 
 
 # =========================================================================
@@ -528,7 +528,8 @@ class MonthlyPipeline:
                 self._print_step("Forecast data inyectada al Council input")
 
             print()
-            result = runner.run_session_sync(report_type='macro')
+            report_type = self.reports[0] if self.reports else 'macro'
+            result = runner.run_session_sync(report_type=report_type)
 
             # Guardar resultado
             council_file = COUNCIL_DIR / f"council_result_{self.timestamp}.json"
@@ -946,7 +947,10 @@ class MonthlyPipeline:
         # ---- FASE 6: Resumen ----
         self.print_summary(self.report_results)
 
-        has_errors = any(r['status'] == 'ERROR' for r in self.report_results)
+        has_errors = (
+            any(r['status'] == 'ERROR' for r in self.report_results)
+            or len(getattr(self, 'errors', [])) > 0
+        )
         return 1 if has_errors else 0
 
 
