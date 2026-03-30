@@ -127,6 +127,10 @@ python run_monthly.py --dry-run
 2. Narrative engine dotenv: `load_dotenv()` added to `narrative_engine.py` — fixes empty narratives
 3. Council deliberation report: new `council_deliberation_renderer.py` — "Acta del Comité"
 4. Helper methods null-safe: `_get_view_class`, `_get_valuation_class`, `_get_vs_class`, `_get_trend_class`
+5. Macro CPI components crash: `_sf()` helper for Series-safe formatting in `_build_cpi_components()`
+6. LatAm inflation table: fetch BCCh IPC_INTL series (Brasil/Mexico/Colombia) — was hardcoded N/D
+7. China property table: search AKShare quant_data first, fallback to ChartDataProvider
+8. Chile IPC SAE: add BCCh series `F074.IPCSAE.V12.Z.2018.C.M` → 4.1% a/a (was hardcoded N/D)
 
 ### Previous (2026-03-27)
 1. RF report KeyError `'impacto'` -> `.get()` with alias fallbacks (severidad/mitigacion)
