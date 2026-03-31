@@ -115,13 +115,13 @@ Cada agente recibe datos cuantitativos filtrados por su expertise + directivas d
 
 | Agente | Input | Output |
 |--------|-------|--------|
-| **CIO** | 5 outputs del panel + datos originales | Síntesis integrada + `ALLOCATION`, `FX_VIEWS` |
-| **Contrarian** | Síntesis CIO + panel | Desafío a la tesis, supuesto más peligroso, ajustes recomendados |
-| **Refinador** | CIO + Contrarian + panel + datos | Documento final (8K palabras) con todos los bloques preservados |
+| **CIO** | 5 outputs del panel + datos originales + coherence warnings | Síntesis integrada + `ALLOCATION`, `FX_VIEWS`, `CAUSAL_TREE` |
+| **Contrarian** | Síntesis CIO + panel | Desafío a la tesis, supuesto más peligroso, desafío a raíz del árbol causal, ajustes recomendados |
+| **Refinador** | CIO + Contrarian + panel + datos | Documento final (8K palabras) con todos los bloques + CAUSAL_TREE preservados |
 
 ### Capa 3 — Parser Estructurado (council_parser.py)
 
-Extrae 12 bloques tipados del output del council:
+Extrae 12 bloques tipados `[BLOQUE: X]` + 1 bloque especial del output del council:
 
 | Bloque | Contenido | Usado por |
 |--------|-----------|-----------|
@@ -137,6 +137,7 @@ Extrae 12 bloques tipados del output del council:
 | `ALLOCATION` | Pesos regionales vs benchmark | AA |
 | `FX_VIEWS` | Pares: ALCISTA/BAJISTA/NEUTRAL | AA |
 | `CORRELACIONES` | Métricas correlación actual/1Y/5Y | (prosa al CIO) |
+| `CAUSAL_TREE` | JSON: root → L1 (canales) → L2 (efectos) → 5 outcomes con probabilidades. Delimitadores: `[CAUSAL_TREE_START]...[CAUSAL_TREE_END]` | AA (sección 10, visualización HTML) |
 
 ---
 
