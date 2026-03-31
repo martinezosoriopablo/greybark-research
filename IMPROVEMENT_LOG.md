@@ -171,6 +171,26 @@ Los siguientes items fueron verificados como **funcionales y correctamente conec
 - Template condicional: si no hay árbol, la sección no aparece (backward compatible)
 - Sin árbol: reportes existentes no se afectan
 
+### Sprint 34 — Auditoría de Verificación del IMPROVEMENT_LOG
+
+**Trigger:** Auditoría completa cruzando cada fix documentado (#137-160) contra el código real. Se verificaron los 24 items.
+
+**Resultado:** 23/24 verificados correctamente. 1 gap encontrado:
+
+| # | Hallazgo | Fix aplicado |
+|---|----------|-------------|
+| 161 | **HTML escaping incompleto en `_md_to_html()` / `_md_to_html_inline()`** — Sprint 30 documentó "RF ya usaba `_md_to_html()` (safe)" pero `_md_to_html()` en RF y `_md_to_html_inline()` en RV/Macro/AA convertían markdown a HTML **sin escapar el contenido base**. Texto como `<script>` pasaba directo. | **FIXEADO:** Agregado `_html_escape(text)` después de extraer style blocks y antes de convertir markdown en los 4 renderers. RF además recibe `_esc()` helper (no lo tenía). Orden: extract styles → escape HTML → convert markdown → restore styles |
+
+**Archivos corregidos:**
+- `rf_report_renderer.py`: +`_esc()` helper, +`_html_escape()` en `_md_to_html()`
+- `rv_report_renderer.py`: +`_html_escape()` en `_md_to_html_inline()`
+- `macro_report_renderer.py`: +`_html_escape()` en `_md_to_html_inline()`
+- `asset_allocation_renderer.py`: +`_html_escape()` en `_md_to_html_inline()`
+
+**Validación:** 4/4 renderers compilan OK (`py_compile`)
+
+**Estado final del IMPROVEMENT_LOG:** Todos los fixes #137-161 verificados en código. 0 discrepancias.
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy

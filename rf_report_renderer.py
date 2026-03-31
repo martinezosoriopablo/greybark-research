@@ -18,6 +18,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
 
+from html import escape as _html_escape
 from jinja2 import Environment, FileSystemLoader, Undefined
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -29,10 +30,19 @@ from table_builder import (
 )
 
 
+def _esc(val, default='') -> str:
+    """HTML-escape a value for safe injection into templates."""
+    if val is None:
+        return default
+    return _html_escape(str(val))
+
+
 def _md_to_html(text: str) -> str:
-    """Convert basic markdown (bold, headings) to HTML inline."""
+    """Convert basic markdown (bold, headings) to HTML inline, escaping HTML first."""
     if not text:
         return text
+    # Escape HTML entities first to prevent injection
+    text = _html_escape(str(text))
     # Remove markdown headings (## RENTA FIJA → nothing, it's a section title)
     text = re.sub(r'^#{1,4}\s+.*$', '', text, flags=re.MULTILINE)
     # Bold **text** → <strong>text</strong>

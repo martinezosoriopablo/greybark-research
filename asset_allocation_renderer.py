@@ -38,6 +38,7 @@ def _md_to_html_inline(text: str) -> str:
         styles.append(m.group(0))
         return f'__STYLE_BLOCK_{len(styles)-1}__'
     text = re.sub(r'<style[^>]*>.*?</style>', _save_style, text, flags=re.DOTALL)
+    text = _html_escape(text)
     text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
     text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
     for i, style in enumerate(styles):
