@@ -545,102 +545,14 @@ class AssetAllocationRenderer:
 
 
     def _render_causal_tree(self) -> str:
-        """Render CAUSAL_TREE JSON as HTML flow diagram."""
+        """Render CAUSAL_TREE JSON as SVG flow diagram."""
         from council_parser import CouncilParser
+        from causal_tree_renderer import render_causal_tree_html
         parser = CouncilParser(self.council_result)
         tree = parser.get_causal_tree()
         if not tree:
             return ''
-
-        COLOR_MAP = {
-            'coral': '#e53e3e', 'amber': '#dd6b20', 'purple': '#805ad5',
-            'teal': '#319795', 'gray': '#a0aec0', 'green': '#276749',
-            'red': '#c53030',
-        }
-
-        def _c(name):
-            return COLOR_MAP.get(name, '#a0aec0')
-
-        def _node_html(node, size='normal'):
-            bg = _c(node.get('color', 'gray'))
-            pad = '12px 18px' if size == 'root' else '8px 14px'
-            fs = '11pt' if size == 'root' else '9pt'
-            fw = '700' if size == 'root' else '600'
-            return (
-                f'<div style="display:inline-block; background:{bg}; color:white; '
-                f'padding:{pad}; border-radius:8px; font-size:{fs}; font-weight:{fw}; '
-                f'text-align:center; max-width:200px; line-height:1.3;">'
-                f'{_esc(node.get("label", ""))}</div>'
-            )
-
-        def _arrow():
-            return '<div style="text-align:center; color:#a0aec0; font-size:16pt; line-height:1;">&#8595;</div>'
-
-        def _row(nodes, size='normal'):
-            cells = ''.join(
-                f'<td style="text-align:center; vertical-align:top; padding:4px 8px;">{_node_html(n, size)}</td>'
-                for n in nodes
-            )
-            return f'<tr>{cells}</tr>'
-
-        # Build outcome bars
-        def _outcome_html(outcome):
-            label = _esc(outcome.get('label', ''))
-            scenarios = outcome.get('scenarios', [])
-            bars = ''
-            for s in scenarios:
-                prob = s.get('prob', 0)
-                if prob <= 0:
-                    continue
-                bg = _c(s.get('color', 'gray'))
-                bars += (
-                    f'<div style="display:inline-block; width:{max(prob, 8)}%; background:{bg}; '
-                    f'color:white; font-size:7pt; padding:2px 4px; text-align:center; '
-                    f'white-space:nowrap; overflow:hidden;">'
-                    f'{_esc(s.get("label", ""))} {prob}%</div>'
-                )
-            if not bars:
-                bars = '<div style="color:#a0aec0; font-size:8pt;">Sin probabilidades</div>'
-            return (
-                f'<div style="margin-bottom:10px;">'
-                f'<div style="font-size:9pt; font-weight:600; margin-bottom:3px; color:#2d3748;">{label}</div>'
-                f'<div style="display:flex; width:100%; border-radius:4px; overflow:hidden; '
-                f'background:#edf2f7;">{bars}</div>'
-                f'</div>'
-            )
-
-        # Assemble
-        title = _esc(tree.get('title', 'Árbol Causal'))
-        root = tree.get('root', {})
-        layers = tree.get('layers', [])
-        outcomes = tree.get('outcomes', [])
-
-        html = f'''
-        <div style="page-break-inside:avoid; margin-top:20px;">
-            <h3 style="color:var(--accent); margin-bottom:15px;">{title}</h3>
-
-            <div style="text-align:center; margin-bottom:8px;">
-                {_node_html(root, 'root')}
-            </div>
-            {_arrow()}
-        '''
-
-        for layer in layers:
-            nodes = layer.get('nodes', [])
-            if nodes:
-                layer_label = _esc(layer.get('label', ''))
-                html += f'<div style="text-align:center; font-size:8pt; color:#718096; margin:4px 0;">{layer_label}</div>'
-                html += f'<table style="margin:0 auto; border-collapse:collapse;">{_row(nodes)}</table>'
-                html += _arrow()
-
-        # Outcomes
-        html += '<div style="margin-top:8px; padding:12px; background:#f7fafc; border-radius:8px; border:1px solid #e2e8f0;">'
-        html += '<div style="font-size:9pt; font-weight:700; color:#2d3748; margin-bottom:10px;">Distribución de Probabilidades por Outcome</div>'
-        for o in outcomes:
-            html += _outcome_html(o)
-        html += '</div></div>'
-
-        return html
+        return render_causal_tree_html(tree)
 
 
 def main():

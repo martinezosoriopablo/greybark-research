@@ -206,6 +206,20 @@ Los siguientes items fueron verificados como **funcionales y correctamente conec
 - Reporte AA regenerado: HTML limpio, sección 10 "Árbol Causal" renderiza correctamente con nodos de colores y barras de probabilidad
 - Árbol del council real: "Estanflación moderada por shock energético geopolítico" con root "Conflicto EE.UU.-Irán Hormuz", 5 outcomes con distribución de probabilidades
 
+### Sprint 36 — CAUSAL_TREE v2: SVG Renderer
+
+**Trigger:** Sugerencia de mejora visual — reemplazar HTML tables/pills por SVG puro con flechas reales.
+
+| # | Archivo | Cambio |
+|---|---------|--------|
+| 163 | `causal_tree_renderer.py` | **NUEVO:** Módulo dedicado con `render_causal_tree_html()`. SVG puro con: paleta suave (fill 50/stroke 600/text 800), flechas con marker SVG, layout engine `_layout()` que calcula posiciones, barras de probabilidad integradas bajo outcome nodes, layer labels como texto tenue. Colores: coral (geopolítico), amber (económico), purple (política monetaria), teal (outcomes) |
+| 164 | `asset_allocation_renderer.py` | `_render_causal_tree()` reducido a 5 líneas — delega a `causal_tree_renderer.render_causal_tree_html()`. Elimina ~80 líneas de HTML v1 |
+
+**Validación:**
+- 2/2 archivos compilan OK
+- Reporte AA regenerado con SVG: viewBox 900x528, flechas con markers, 5 outcomes con barras de probabilidad
+- Backward compatible: si no hay árbol, retorna ''
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy
