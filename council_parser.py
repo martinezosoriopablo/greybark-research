@@ -560,6 +560,33 @@ class CouncilParser:
         """Return all parsed blocks (for debugging)."""
         return dict(self._blocks_cache)
 
+    def get_causal_tree(self) -> Optional[Dict]:
+        """Extract CAUSAL_TREE JSON from council output.
+
+        Looks for [CAUSAL_TREE_START]...[CAUSAL_TREE_END] delimiters in
+        final_recommendation, then cio_synthesis.
+
+        Returns:
+            Parsed dict if found, None if not found or [CAUSAL_TREE_SKIP].
+        """
+        for text in [self._final, self._cio]:
+            if not text:
+                continue
+            if '[CAUSAL_TREE_SKIP' in text:
+                return None
+            match = re.search(
+                r'\[CAUSAL_TREE_START\]\s*(\{.*?\})\s*\[CAUSAL_TREE_END\]',
+                text, re.DOTALL
+            )
+            if match:
+                try:
+                    import json
+                    return json.loads(match.group(1))
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"  [WARN] council_parser: CAUSAL_TREE JSON inválido: {e}")
+                    return None
+        return None
+
     def get_panel_text(self, agent: str) -> str:
         """Get raw panel text for an agent.
 

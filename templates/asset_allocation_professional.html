@@ -1148,6 +1148,14 @@
         </p>
     </section>
 
+    <!-- 10. ÁRBOL CAUSAL -->
+    {% if causal_tree_html %}
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">10.</span> Árbol Causal del Escenario Dominante</h2>
+        {{ causal_tree_html }}
+    </section>
+    {% endif %}
+
     <!-- Glossary -->
     <section class="glossary-section">
         <div class="glossary-toggle" onclick="var c=this.nextElementSibling;c.classList.toggle('open');this.querySelector('.glossary-toggle-icon').textContent=c.classList.contains('open')?'\u25B2':'\u25BC';">

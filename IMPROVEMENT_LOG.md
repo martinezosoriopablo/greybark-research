@@ -154,6 +154,23 @@ Los siguientes items fueron verificados como **funcionales y correctamente conec
 - `asset_allocation_content_generator.py`: sum-to-100 logic existente es compatible
 - 0 archivos Python modificados — cambios solo en 5 archivos .txt de prompts
 
+### Sprint 33 — CAUSAL_TREE Renderer (parser + visualización HTML)
+
+**Trigger:** Los prompts del Sprint 32 generan `[CAUSAL_TREE_START]...[CAUSAL_TREE_END]` JSON. Faltaba el código que lo extrae y lo renderiza como visualización en el reporte AA.
+
+| # | Archivo | Cambio |
+|---|---------|--------|
+| 158 | `council_parser.py` | Nuevo método `get_causal_tree()`: extrae JSON entre delimitadores `[CAUSAL_TREE_START]...[CAUSAL_TREE_END]`, busca en `final_recommendation` → `cio_synthesis`. Retorna dict parseado o None si `[CAUSAL_TREE_SKIP]` o JSON inválido |
+| 159 | `asset_allocation_renderer.py` | Nuevo método `_render_causal_tree()`: convierte JSON del árbol en HTML puro con CSS inline. Root (pill grande) → L1 (pills canal transmisión) → L2 (pills efecto económico) → 5 barras de probabilidad (outcomes). Colores del design system (coral/amber/purple/teal). Print-ready con `page-break-inside:avoid` |
+| 160 | `templates/asset_allocation_professional.html` | Nueva sección 10 "Árbol Causal del Escenario Dominante" con `{% if causal_tree_html %}` guard — solo aparece si el CIO generó el árbol |
+
+**Validación:**
+- 2/2 archivos Python compilan OK (`py_compile`)
+- Test con JSON de ejemplo: parser extrae correctamente (5 outcomes, probs suman 100%)
+- Renderer genera 4KB HTML con nodos, flechas, barras de probabilidad por outcome
+- Template condicional: si no hay árbol, la sección no aparece (backward compatible)
+- Sin árbol: reportes existentes no se afectan
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy
