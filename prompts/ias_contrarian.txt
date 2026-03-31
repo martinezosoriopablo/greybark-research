@@ -66,6 +66,19 @@ Si falla: [impacto por asset class]. Señal temprana: [indicador > nivel]."
 - 3 principales formas, con probabilidades y MAGNITUD ESTIMADA del impacto
   Ej: "Prob 25%: Fed no corta en 2026 → 10Y a 5.2%, equity -12%, HY +200bps"
 
+### RAÍZ DEL ÁRBOL (OBLIGATORIO)
+¿Es el escenario raíz que el CIO eligió el driver correcto? Tres preguntas concretas:
+1. ¿Hay un driver más fundamental que el panel no identificó?
+   Ej: "El CIO eligió 'conflicto Irán-USA' como raíz, pero el driver real es
+   'déficit fiscal USA que impide respuesta de política' — el conflicto es el
+   detonante, no la causa estructural."
+2. ¿Están completos los canales de transmisión en L1? ¿Falta alguno relevante?
+3. ¿Las probabilidades de los outcomes son consistentes con el RISK_MATRIX?
+   Si no lo son, señala la inconsistencia con números.
+
+Si la raíz y los canales son correctos, confírmalo explícitamente.
+NO cuestiones el árbol por cuestionar — solo si tienes un argumento concreto.
+
 ### AJUSTES RECOMENDADOS
 - Cambios específicos y cuantificados a la recomendación
   Ej: "Reducir equity OW de 5pp a 2pp, agregar put spread SPY 5% OTM (costo 60bps)"

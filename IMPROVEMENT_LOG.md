@@ -135,6 +135,25 @@ Los siguientes items fueron verificados como **funcionales y correctamente conec
 
 **Resumen Final Ciclo 7:** 16/16 hallazgos fixeados (15 originales + 1 de auditoría de coherencia). 0 pendientes.
 
+### Sprint 32 — Prompt Enhancement: CAUSAL_TREE + Mejoras de Conectividad
+
+**Trigger:** Propuesta de mejora para agregar árbol causal estructurado al output del CIO y conectar mejor los prompts entre sí. Verificado contra pipeline — cambios son solo en prompts, no rompen código.
+
+| # | Archivo | Cambio | Impacto |
+|---|---------|--------|---------|
+| 153 | `ias_cio.txt` | +ÁRBOL CAUSAL obligatorio: JSON estructurado `[CAUSAL_TREE_START]...[CAUSAL_TREE_END]` con root (escenario base), L1 (canales transmisión), L2 (efectos económicos), 5 outcomes fijos (US Equities/Treasuries/Credit/FX/Chile) con probabilidades por escenario. +Validación de escenarios: probabilidades deben sumar 100% | AA renderer podrá generar visualización del árbol causal. Probabilidades coherentes con RISK_MATRIX y ESCENARIOS |
+| 154 | `ias_contrarian.txt` | +Sección RAÍZ DEL ÁRBOL obligatoria: 3 preguntas — ¿driver correcto?, ¿canales completos?, ¿probabilidades consistentes con RISK_MATRIX? | Contrarian ahora desafía la estructura causal, no solo la narrativa |
+| 155 | `refinador.txt` | +Instrucción CAUSAL_TREE pass-through: preservar JSON exacto sin modificar, colocar al final del documento, copiar CAUSAL_TREE_SKIP si aplica | Renderer recibe JSON limpio del CIO sin interferencia del refinador |
+| 156 | `ias_macro.txt` | +Nota en mecanismos de transmisión: ser específico en variable intermedia porque el CIO usa estos canales como nodos L1/L2 del árbol | Macro produce canales más granulares → árbol causal más preciso |
+| 157 | `ias_geo.txt` | +Formato preferido por canal: CANAL → MAGNITUD → ACTIVO → HORIZONTE. Nota: canales alimentan L1 del árbol causal | Geo produce canales cuantificados → árbol causal con magnitudes reales |
+
+**Verificación de compatibilidad:**
+- `council_parser.py`: `[CAUSAL_TREE_START]` no matchea patrón `[BLOQUE:]` → pasa sin ser parseado (safe)
+- `validate_narrative()`: solo corrige números, no toca estructura JSON (safe)
+- `coherence_validator.py`: no valida probabilidades de escenarios (safe)
+- `asset_allocation_content_generator.py`: sum-to-100 logic existente es compatible
+- 0 archivos Python modificados — cambios solo en 5 archivos .txt de prompts
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy

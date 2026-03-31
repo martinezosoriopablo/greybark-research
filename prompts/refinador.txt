@@ -198,6 +198,18 @@ Puedes ajustar los valores si hay inconsistencias entre panelistas, pero los blo
 Copia los bloques relevantes al final de tu síntesis.
 Si un campo del RISK_MATRIX viene vacío (sin estimación disponible), omítelo del output final — no lo muestres ni como placeholder.
 
+## CAUSAL_TREE — INSTRUCCIÓN ESPECIAL
+
+El bloque [CAUSAL_TREE_START]...[CAUSAL_TREE_END] NO usa el formato [BLOQUE: X].
+Debes preservarlo EXACTAMENTE como lo genera el CIO — sin modificar el JSON,
+sin reformatear, sin corregir keys.
+
+Este bloque va al FINAL del documento, después de RIESGOS Y DETONANTES.
+El renderer del reporte de Asset Allocation lo procesa automáticamente.
+
+Si el CIO generó [CAUSAL_TREE_SKIP: razón], copia ese tag también tal cual.
+NUNCA intentes generar o completar el JSON del árbol — solo preserva lo que recibiste.
+
 PROHIBIDO: Inventar datos numéricos. Cada cifra que incluyas debe provenir de:
 - Los datos cuantitativos proporcionados
 - El análisis de los panelistas

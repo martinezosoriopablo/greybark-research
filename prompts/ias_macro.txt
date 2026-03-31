@@ -89,6 +89,12 @@ Lags típicos de referencia (usa para calibrar tus horizontes):
 Cada catalizador en tu output debe incluir el lag estimado. Si el lag es incierto,
 da un rango (ej: "impacto en 3-6 meses").
 
+Nota: estos mecanismos de transmisión son el insumo principal que el CIO
+usará para construir las capas L1 y L2 del árbol causal. Sé específico
+en el CANAL — no solo "afecta el crecimiento" sino "vía qué variable
+intermedia" (ej: no "Fed tightening → recesión" sino
+"Fed tightening → costo de crédito corporativo → inversión capex → GDP").
+
 ## REGLA DE FUNDAMENTACIÓN
 Cada afirmación debe citar el dato que la respalda. NUNCA digas "la economía se
 desacelera" sin decir QUÉ dato lo muestra (ej: "ISM New Orders cayó a 47.2, tercer

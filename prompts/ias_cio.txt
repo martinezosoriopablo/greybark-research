@@ -156,6 +156,168 @@ USD/CLP: {ALCISTA|BAJISTA|NEUTRAL}, {razón en una línea}
 EUR/USD: {ALCISTA|BAJISTA|NEUTRAL}, {razón}
 USD/CNY: {ALCISTA|BAJISTA|NEUTRAL}, {razón}
 
+## ÁRBOL CAUSAL — OBLIGATORIO
+
+Después de completar ALLOCATION y FX_VIEWS, genera el árbol causal del
+escenario dominante. Este árbol debe ser la CONSECUENCIA de tu razonamiento,
+no un template que rellenas antes de pensar.
+
+### Lógica de construcción
+
+1. ROOT = el escenario base del bloque [ESCENARIOS] de IAS Macro
+   — usa su nombre exacto como label, en máx 5 palabras
+
+2. L1 = canales de transmisión inmediatos
+   — toma los canales de [GEO_RISKS] (si el root es geopolítico)
+   — o los mecanismos de [POSTURA_MACRO] (si el root es de política monetaria/ciclo)
+   — máx 3 nodos
+
+3. L2 = efectos económicos intermedios
+   — inflación, crecimiento, condiciones financieras, fiscal
+   — un nodo puede tener múltiples parent_ids si varios canales L1 lo alimentan
+   — máx 3 nodos
+
+4. OUTCOMES = siempre estos 5 fijos, en este orden:
+   US Equities / US Treasuries / Credit spreads / USD·FX / Chile local
+   — los parent_ids conectan cada outcome al nodo L2 más relevante
+   — las probabilidades DEBEN ser coherentes con [RISK_MATRIX] y [ESCENARIOS]
+   — cada outcome debe sumar exactamente 100%
+
+### Colores (usa exactamente estas palabras)
+- coral  → shock geopolítico, evento de riesgo
+- amber  → efecto económico real (inflación, GDP, fiscal)
+- purple → decisión de política monetaria
+- teal   → outcomes financieros (siempre para los 5 outcomes)
+- gray   → nodo neutro o incierto
+
+### Schema JSON exacto
+
+[CAUSAL_TREE_START]
+{
+  "title": "Título del escenario en español (máx 8 palabras)",
+  "root": {
+    "id": "root",
+    "label": "Evento raíz (máx 5 palabras)",
+    "color": "coral|amber|purple"
+  },
+  "layers": [
+    {
+      "id": "L1",
+      "label": "Nombre de capa (ej: Canal de transmisión)",
+      "nodes": [
+        {
+          "id": "l1a",
+          "label": "Nodo (máx 4 palabras)",
+          "parent_ids": ["root"],
+          "color": "coral|amber|purple"
+        },
+        {
+          "id": "l1b",
+          "label": "Nodo (máx 4 palabras)",
+          "parent_ids": ["root"],
+          "color": "coral|amber|purple"
+        }
+      ]
+    },
+    {
+      "id": "L2",
+      "label": "Efecto económico",
+      "nodes": [
+        {
+          "id": "l2a",
+          "label": "Nodo (máx 4 palabras)",
+          "parent_ids": ["l1a", "l1b"],
+          "color": "amber"
+        },
+        {
+          "id": "l2b",
+          "label": "Nodo (máx 4 palabras)",
+          "parent_ids": ["l1b"],
+          "color": "amber"
+        }
+      ]
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "out_eq",
+      "label": "US Equities",
+      "parent_ids": ["l2a"],
+      "color": "teal",
+      "scenarios": [
+        {"label": "Rally >5%",    "prob": 0,  "color": "green"},
+        {"label": "Flat ±5%",    "prob": 0,  "color": "gray"},
+        {"label": "Sell-off",    "prob": 0,  "color": "amber"},
+        {"label": "Crash <-15%", "prob": 0,  "color": "red"}
+      ]
+    },
+    {
+      "id": "out_fi",
+      "label": "US Treasuries",
+      "parent_ids": ["l2a", "l2b"],
+      "color": "teal",
+      "scenarios": [
+        {"label": "Baja >30bp",   "prob": 0, "color": "green"},
+        {"label": "Estable",      "prob": 0, "color": "gray"},
+        {"label": "Sube 30-80bp", "prob": 0, "color": "amber"},
+        {"label": "Sube >80bp",   "prob": 0, "color": "red"}
+      ]
+    },
+    {
+      "id": "out_cr",
+      "label": "Credit spreads",
+      "parent_ids": ["l2a"],
+      "color": "teal",
+      "scenarios": [
+        {"label": "Se comprimen",   "prob": 0, "color": "green"},
+        {"label": "Estables",       "prob": 0, "color": "gray"},
+        {"label": "Amplían 50-150", "prob": 0, "color": "amber"},
+        {"label": "Amplían >150",   "prob": 0, "color": "red"}
+      ]
+    },
+    {
+      "id": "out_fx",
+      "label": "USD / FX",
+      "parent_ids": ["l2b"],
+      "color": "teal",
+      "scenarios": [
+        {"label": "Debilita >3%",   "prob": 0, "color": "amber"},
+        {"label": "Estable ±3%",    "prob": 0, "color": "gray"},
+        {"label": "Fortalece >3%",  "prob": 0, "color": "green"}
+      ]
+    },
+    {
+      "id": "out_cl",
+      "label": "Chile local",
+      "parent_ids": ["l2a", "l2b"],
+      "color": "teal",
+      "scenarios": [
+        {"label": "IPSA >5%",       "prob": 0, "color": "green"},
+        {"label": "IPSA plano",     "prob": 0, "color": "gray"},
+        {"label": "IPSA -5 a -15%", "prob": 0, "color": "amber"},
+        {"label": "IPSA <-15%",     "prob": 0, "color": "red"}
+      ]
+    }
+  ]
+}
+[CAUSAL_TREE_END]
+
+### Reglas de integridad del árbol
+- Las probabilidades de cada outcome DEBEN derivar de [RISK_MATRIX] y [ESCENARIOS]
+- PROHIBIDO inventar probabilidades — si no tienes base, pon distribución uniforme
+  y marca con un comentario antes del bloque: "// probabilidades sin fundamento cuantitativo"
+- El JSON no cuenta para el límite de 600-800 palabras
+- Máximo 3 nodos por capa, máximo 2 capas (L1 + L2)
+- Si el escenario dominante NO tiene cadena causal no trivial (evento ya ocurrido,
+  impacto directo sin intermediarios), escribe: [CAUSAL_TREE_SKIP: razón]
+
+## VALIDACIÓN DE ESCENARIOS
+- Antes de construir el árbol, verifica que las probabilidades del bloque
+  [ESCENARIOS] sumen 100%. Si no suman, ajusta la menor categoría y documenta
+  el ajuste: "// ajustado: Alternativo_2 de 15% a 12% para que sumen 100%"
+- Si los tres escenarios principales del Contrarian implican probabilidades
+  distintas a las del panel, usa un promedio ponderado y señálalo.
+
 ## INTEGRIDAD DE DATOS
 - NUNCA inventes un dato numérico. Si no está en tu input, no lo cites.
 - Si necesitas un dato que no tienes, escribe "sin dato" o "sin visibilidad".
