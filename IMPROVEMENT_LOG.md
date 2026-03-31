@@ -191,6 +191,21 @@ Los siguientes items fueron verificados como **funcionales y correctamente conec
 
 **Estado final del IMPROVEMENT_LOG:** Todos los fixes #137-161 verificados en código. 0 discrepancias.
 
+### Sprint 35 — Fix Regresión: _md_to_html_inline escapaba HTML del reporte completo
+
+**Trigger:** Al correr pipeline AA, el reporte salía con `&lt;div&gt;` en vez de `<div>` — todo el HTML escapado. Causado por Sprint 34 que agregó `_html_escape()` dentro de `_md_to_html_inline()`, función que se aplica al HTML renderizado completo (no a campos individuales).
+
+| # | Hallazgo | Fix aplicado |
+|---|----------|-------------|
+| 162 | **`_html_escape()` en `_md_to_html_inline()` rompía los 3 reportes** — esta función se aplica al HTML final del reporte (línea 138/150/171 de rv/aa/macro), no a campos individuales. Al agregar escape ahí, se escapaba `<div>`, `<table>`, `<style>`, etc. | **FIXEADO:** Revertido `_html_escape()` de `_md_to_html_inline()` en rv, macro, aa. RF mantiene escape en `_md_to_html()` porque esa función solo se aplica a campos individuales, no al HTML completo |
+
+**Causa raíz:** `_md_to_html_inline()` tiene doble uso — convierte markdown Y se aplica como post-procesador al HTML completo del reporte. Agregar escape ahí afecta ambos usos. La protección XSS correcta es `_esc()` en cada campo individual (Sprint 30, 33 instancias) — no en el post-procesador global.
+
+**Validación:**
+- 4/4 renderers compilan OK
+- Reporte AA regenerado: HTML limpio, sección 10 "Árbol Causal" renderiza correctamente con nodos de colores y barras de probabilidad
+- Árbol del council real: "Estanflación moderada por shock energético geopolítico" con root "Conflicto EE.UU.-Irán Hormuz", 5 outcomes con distribución de probabilidades
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy
