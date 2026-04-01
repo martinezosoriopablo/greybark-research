@@ -152,6 +152,11 @@ class AssetAllocationRenderer:
         from html_nd_cleaner import clean_nd
         html = clean_nd(html)
 
+        # Post-render quality check
+        from report_quality_checker import check_report_quality, print_quality_report
+        issues = check_report_quality(html, 'aa')
+        print_quality_report(issues, 'aa')
+
         output_path = self.output_dir / output_filename
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html)

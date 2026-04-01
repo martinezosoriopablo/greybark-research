@@ -234,6 +234,27 @@ Los siguientes items fueron verificados como **funcionales y correctamente conec
 
 **Validación:** 2/2 archivos compilan OK. Requiere run completo del pipeline para verificar datos en reporte.
 
+### Sprint 38 — Report Quality Checker (detección post-render de celdas vacías)
+
+**Trigger:** Pregunta "cómo nos aseguramos de no tener tablas vacías en ningún reporte". Se necesitaba un mecanismo de detección automática.
+
+| # | Archivo | Cambio |
+|---|---------|--------|
+| 166 | `report_quality_checker.py` | **NUEVO:** Módulo `check_report_quality(html, report_name)` que escanea HTML post-render buscando: celdas "—" (datos no disponibles), residuos "N/D", placeholders `{{}}` sin reemplazar, tipos Python crudos (numpy, dicts, NaN, None). Retorna lista de issues con severidad (high/medium/low). `print_quality_report()` imprime resumen formateado |
+| 167 | 4 renderers | Integrado quality check después de `clean_nd()` y antes de escribir archivo. Los 4 reportes (rv, rf, macro, aa) ahora imprimen resumen de calidad en el log del pipeline |
+
+**Output ejemplo:**
+```
+[AA] Quality check: ALERT — 34 issues found:
+    !! 34 celdas con "—" (datos no disponibles)
+```
+o
+```
+[RV] Quality check: CLEAN — 0 issues
+```
+
+**Validación:** 5/5 archivos compilan OK. Test con reporte AA actual: detecta correctamente 34 celdas vacías.
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy
