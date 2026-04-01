@@ -123,15 +123,16 @@ python run_monthly.py --dry-run
 - Panel composition: `ai_council_runner.py`
 - Output structure: `council_parser.py` (block extraction patterns)
 
-## Recent Changes (2026-03-31)
-### Ciclo 7: Security + Pipeline + Coherence + CAUSAL_TREE (Sprints 26-33)
+## Recent Changes (2026-04-01)
+### Ciclo 7: Security + Pipeline + Coherence + CAUSAL_TREE + Data Fix (Sprints 26-37)
 1. Security: API key removed from source → env var, exec() → importlib, shell=True → webbrowser.open, JWT warning
 2. Pipeline: dynamic report_type for council, exit code includes self.errors, IPC Chile param fix
 3. Data robustness: `_clean_float()` NaN/inf guard, `.dropna()` aligned, timeouts 30s (FRED/BCCh/yfinance)
 4. AI quality: anti-hallucination threshold 5bp→2bp, block cache duplicate warning
-5. HTML escaping: `_esc()` helper in 3 renderers (33 instances), rate-limit retry with backoff
+5. HTML escaping: `_esc()` helper in 4 renderers (33+ instances), `_md_to_html` in RF also escapes, rate-limit retry with backoff
 6. Coherence: panel conflict warnings now passed to Refinador via `council_input['coherence_warnings']`
-7. CAUSAL_TREE: CIO generates JSON causal tree (root→L1→L2→5 outcomes), Contrarian challenges root, Refinador preserves, `council_parser.get_causal_tree()` extracts, AA renderer visualizes as HTML section 10
+7. CAUSAL_TREE: CIO generates JSON causal tree (root→L1→L2→5 outcomes), Contrarian challenges root, Refinador preserves, `council_parser.get_causal_tree()` extracts, `causal_tree_renderer.py` generates SVG visualization in AA section 10
+8. AA data fix: `council_input` quantitative data now persisted via `runner._last_council_input` → `self.data['macro_quant']` + saved as `council_input_*.json` for cache. Fixes ~55 empty cells (GDP, CPI, TPM, copper, etc.)
 
 ### Previous (2026-03-30)
 1. Renderer hardening: 28 crash points → 0 (all `dict['key']` → `.get('key', default)`)
