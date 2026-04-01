@@ -913,6 +913,19 @@ class ChartDataProvider:
         except Exception:
             pass
 
+        # CPI/PCE prev values (from get_usa_cpi YoY series)
+        try:
+            cpi_data = self.get_usa_cpi()
+            for key in ['cpi_headline_yoy', 'cpi_core_yoy', 'pce_core_yoy']:
+                series = cpi_data.get(key)
+                if series is not None and len(series) >= 2:
+                    clean = series.dropna()
+                    if len(clean) >= 2:
+                        result[key] = round(float(clean.iloc[-1]), 2)
+                        result[f'{key}_prev'] = round(float(clean.iloc[-2]), 2)
+        except Exception:
+            pass
+
         return result
 
     # =========================================================================

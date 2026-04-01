@@ -226,14 +226,12 @@ Documento pre-council con datos verificados:
 | **Quality checker** | `report_quality_checker.py` — escanea HTML post-render, cuenta celdas "—", alerta en log |
 | **Badge consistency** | Parser estructurado priorizado sobre text mining |
 
-### Celdas vacías conocidas (~50 "anterior"/"consenso")
+### Historical data store (columnas "anterior")
 
-Columnas que muestran "—" porque requieren **almacenamiento histórico** (dato actual vs período anterior).
-No son bugs — el sistema no implementa store temporal entre runs.
-
-**Solución pendiente:** Crear `output/historical/data_snapshot_{date}.json` que guarde métricas clave
-de cada run. En el siguiente run, cargar snapshot anterior y calcular deltas para columnas "anterior".
-Alternativa: ocultar columnas vacías con `{% if %}` guards en templates.
+`historical_store.py` guarda ~30 métricas clave por run en `output/historical/snapshot_{date}.json`.
+En el siguiente run, carga snapshot anterior e inyecta `_prev` values en quant_data.
+Primera ejecución: "anterior" vacío (sin historia). Segunda en adelante: datos del run previo.
+`chart_data_provider.get_usa_latest()` también calcula CPI/PCE prev directamente desde FRED series.
 
 ---
 

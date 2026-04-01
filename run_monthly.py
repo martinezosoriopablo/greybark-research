@@ -242,6 +242,16 @@ class MonthlyPipeline:
             data['directives'] = ''
             self._print_err(f"Directives: {e}")
 
+        # Save historical snapshot for "anterior" columns in future runs
+        try:
+            from historical_store import HistoricalStore
+            store = HistoricalStore()
+            self._prev_data = store.get_previous()
+            store.save_snapshot(data.get('macro_quant', {}), data.get('forecasts', {}))
+        except Exception as e:
+            self._prev_data = {}
+            self._print_err(f"Historical store: {e}")
+
         elapsed = time.time() - phase_start
         self._print(f"\n  Fase 1 completada en {elapsed:.1f}s")
 
@@ -344,6 +354,16 @@ class MonthlyPipeline:
             self._print_step("No forecast data found (will use defaults)", indent=2)
 
         data['wsj'] = self._collect_wsj_summaries()
+
+        # Load previous snapshot for "anterior" columns
+        try:
+            from historical_store import HistoricalStore
+            store = HistoricalStore()
+            self._prev_data = store.get_previous()
+        except Exception as e:
+            self._prev_data = {}
+            self._print_err(f"Historical store load: {e}")
+
         return data
 
     # =====================================================================
@@ -642,6 +662,18 @@ class MonthlyPipeline:
     ) -> List[Dict[str, Any]]:
         """Genera todos los reportes solicitados."""
         self._print_header("FASE 4", "GENERACIÓN DE REPORTES")
+
+        # Inject historical prev values into macro_quant for "anterior" columns
+        prev = getattr(self, '_prev_data', {})
+        if prev and isinstance(self.data.get('macro_quant'), dict):
+            try:
+                from historical_store import HistoricalStore
+                store = HistoricalStore()
+                self.data['macro_quant'] = store.inject_prev_into_data(
+                    self.data['macro_quant'], prev
+                )
+            except Exception as e:
+                print(f"  [WARN] Historical inject: {e}")
         results = []
 
         for report_name in self.reports:

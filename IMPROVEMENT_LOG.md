@@ -50,7 +50,7 @@
 |---|-----------|----------|---------|------|
 | P1 | MEDIO | Coherence validator no valida inversión de curva ni alignment macro/equity | `coherence_validator.py` | **RESUELTO por diseño:** La coherencia lógica (macro stance vs equity views) es responsabilidad del refinador, que ahora recibe alertas de discrepancias (#152). El coherence_validator se limita a métricas numéricas (13 metrics) — que es su rol correcto |
 | P2 | BAJO | Docker copia DB y passwords.json en imagen — deberían venir de secrets/volumes | `deploy/Dockerfile:20-21` | Usar Docker secrets o montar desde volumen |
-| P3 | MEDIO | **~50 celdas "anterior"/"consenso" vacías en 4 reportes** — columnas que comparan dato actual vs período anterior, pero el sistema no almacena datos entre runs | Todos los content generators | **Solución:** Crear `output/historical/data_snapshot_{date}.json` que guarde métricas clave de cada run. Próximo run carga snapshot anterior → calcula deltas → llena columnas "anterior". Alternativa: ocultar columnas vacías con `{% if %}` guards en templates. Afecta: CPI/PCE anterior (Macro), Europa/China anterior (Macro), fiscal anterior (Macro), AA macro indicators anterior/dirección, AA escenarios implicancias |
+| P3 | MEDIO | ~50 celdas "anterior"/"consenso" vacías en 4 reportes | Todos los content generators | **RESUELTO** (Sprint 40): `historical_store.py` guarda snapshot por run, inyecta `_prev` values en quant_data. `chart_data_provider` calcula CPI/PCE prev desde FRED series. Primera ejecución sin datos previos es esperado; segunda en adelante llena columnas "anterior" |
 
 ### Patrones Recurrentes Actualizados
 
@@ -307,6 +307,29 @@ Estas NO son datos disponibles que no llegan — son datos que el sistema no rec
 **Validación:**
 - `run_monthly.py` y `macro_content_generator.py` compilan OK
 - Deep merge test: 9/9 data points AA resuelven (GDP 0.7%, CPI 2.73%, TPM 4.5%, VIX 24.3, IG 93bp, UST 4.35%, Copper $5.51, USDCLP 927, BE5Y 2.54%)
+
+### Sprint 40 — Historical Data Store (eliminar celdas "anterior" vacías)
+
+**Trigger:** ~50 celdas "anterior"/"consenso" vacías en 4 reportes porque el sistema no almacenaba datos entre runs para comparación temporal.
+
+| # | Archivo | Cambio |
+|---|---------|--------|
+| 171 | `historical_store.py` | **NUEVO:** Módulo que guarda snapshot de ~30 métricas clave por run (`output/historical/snapshot_{date}.json`). `get_previous()` carga snapshot del run anterior. `inject_prev_into_data()` inyecta valores `_prev` en quant_data para que los content generators los lean sin modificaciones. Métricas: GDP, CPI, NFP, TPM, VIX, spreads, copper, FX, breakevens, etc. |
+| 172 | `run_monthly.py` | Integrado en 3 puntos: (1) `collect_all_data()` guarda snapshot + carga prev. (2) `_load_existing_data()` carga prev para --skip-collect. (3) `generate_reports()` inyecta prev values en macro_quant antes del rendering |
+| 173 | `chart_data_provider.py` | `get_usa_latest()` ahora incluye CPI/PCE prev values: calcula `cpi_headline_yoy_prev`, `cpi_core_yoy_prev`, `pce_core_yoy_prev` desde las series YoY de FRED |
+
+**Flujo:**
+```
+Run N: collect → save snapshot_20260401.json (14+ métricas) → render (sin prev, primera vez)
+Run N+1: load snapshot_20260401.json → inject _prev keys → render (columnas "anterior" llenas)
+```
+
+**Validación:**
+- 3/3 archivos compilan OK
+- Test: snapshot guarda 14 métricas, injection inyecta 8+ prev values en quant_data
+- CPI prev: `chart_data_provider` ahora produce `cpi_core_yoy_prev` directamente desde FRED series
+- Primera ejecución: columns "anterior" vacías (no hay snapshot previo — correcto)
+- Segunda ejecución en adelante: columns "anterior" llenas con datos del run anterior
 
 ---
 
