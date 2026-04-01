@@ -117,6 +117,21 @@ python run_monthly.py --dry-run
 1. Check which `{{placeholder}}` is empty in the template
 2. Trace to the content generator method that produces it
 3. Usually: API returned None, need fallback or new data source
+4. **Quality checker** runs post-render in all 4 renderers — shows count of "—" cells in pipeline log
+
+### Known remaining empty cells (~50 across 4 reports)
+These are NOT bugs — they are "anterior" (previous period) and "consenso" (consensus) columns
+that require **historical data storage** to fill. The system currently collects data per-run
+but does not store previous runs' values for comparison.
+
+**Affected columns:** CPI/PCE "anterior", Europe/China "anterior", fiscal "anterior",
+AA macro indicators "anterior"/"dirección", AA scenario "implicancias" (equities/bonds/usd/commodities)
+
+**Solution path (not yet implemented):**
+1. Create `output/historical/data_snapshot_{date}.json` — save key metrics each run
+2. On next run, load previous snapshot and compute deltas
+3. Content generators read `_prev` values from snapshot instead of expecting them from APIs
+4. Alternative: hide columns that are always empty (template-level `{% if %}` guards)
 
 ### Modifying council behavior
 - Agent prompts: `prompts/ias_*.txt`

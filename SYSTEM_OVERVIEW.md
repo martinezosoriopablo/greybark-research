@@ -221,8 +221,19 @@ Documento pre-council con datos verificados:
 | **Coherence Validator** | 13 métricas cruzadas entre los 4 reportes |
 | **Anti-fabricación** | 8 prompts con `INTEGRIDAD DE DATOS`: prohibido inventar números |
 | **None-safe** | VaR/CVaR None-safe, EPS growth capped ±500% |
-| **Fallback pattern** | Council → API → hardcoded defaults (nunca celdas vacías) |
+| **Fallback pattern** | Council → API → hardcoded defaults (nunca celdas vacías para datos actuales) |
+| **Deep merge** | AA report fusiona RF + macro_quant a nivel de sub-keys (evita colisiones, ej: `inflation`) |
+| **Quality checker** | `report_quality_checker.py` — escanea HTML post-render, cuenta celdas "—", alerta en log |
 | **Badge consistency** | Parser estructurado priorizado sobre text mining |
+
+### Celdas vacías conocidas (~50 "anterior"/"consenso")
+
+Columnas que muestran "—" porque requieren **almacenamiento histórico** (dato actual vs período anterior).
+No son bugs — el sistema no implementa store temporal entre runs.
+
+**Solución pendiente:** Crear `output/historical/data_snapshot_{date}.json` que guarde métricas clave
+de cada run. En el siguiente run, cargar snapshot anterior y calcular deltas para columnas "anterior".
+Alternativa: ocultar columnas vacías con `{% if %}` guards en templates.
 
 ---
 

@@ -50,6 +50,7 @@
 |---|-----------|----------|---------|------|
 | P1 | MEDIO | Coherence validator no valida inversión de curva ni alignment macro/equity | `coherence_validator.py` | **RESUELTO por diseño:** La coherencia lógica (macro stance vs equity views) es responsabilidad del refinador, que ahora recibe alertas de discrepancias (#152). El coherence_validator se limita a métricas numéricas (13 metrics) — que es su rol correcto |
 | P2 | BAJO | Docker copia DB y passwords.json en imagen — deberían venir de secrets/volumes | `deploy/Dockerfile:20-21` | Usar Docker secrets o montar desde volumen |
+| P3 | MEDIO | **~50 celdas "anterior"/"consenso" vacías en 4 reportes** — columnas que comparan dato actual vs período anterior, pero el sistema no almacena datos entre runs | Todos los content generators | **Solución:** Crear `output/historical/data_snapshot_{date}.json` que guarde métricas clave de cada run. Próximo run carga snapshot anterior → calcula deltas → llena columnas "anterior". Alternativa: ocultar columnas vacías con `{% if %}` guards en templates. Afecta: CPI/PCE anterior (Macro), Europa/China anterior (Macro), fiscal anterior (Macro), AA macro indicators anterior/dirección, AA escenarios implicancias |
 
 ### Patrones Recurrentes Actualizados
 
