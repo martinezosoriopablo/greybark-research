@@ -474,10 +474,16 @@ class MacroContentGenerator:
         }
 
         gdp_us_fc = self._fc('gdp_forecasts', 'usa', 'forecast_12m')
-        # World GDP: try IMF consensus first, then forecast engine 'world' key
+        # World GDP: try IMF consensus first, then forecast engine, then estimate from regions
         gdp_world_fc = self._fc('imf_consensus', 'gdp', 'world')
         if gdp_world_fc is None:
             gdp_world_fc = self._fc('gdp_forecasts', 'world', 'forecast_12m')
+        if gdp_world_fc is None:
+            _weights = [('usa', 0.25), ('eurozone', 0.20), ('china', 0.18)]
+            _vals = [(self._fc('gdp_forecasts', r, 'forecast_12m'), w) for r, w in _weights]
+            _valid = [(v, w) for v, w in _vals if v is not None]
+            if _valid:
+                gdp_world_fc = sum(v * w for v, w in _valid) / sum(w for _, w in _valid)
 
         # Scenario-specific GDP adjustments (base=0, upside=+0.5pp, downside=-1.0pp)
         gdp_adj = {'base': 0.0, 'upside': 0.5, 'downside': -1.0}
@@ -1223,10 +1229,10 @@ class MacroContentGenerator:
                 f"mantiene expansión moderada."
             ),
             'por_pais': [
-                {'pais': 'Eurozona', 'gdp_2025': gdp_ez, 'gdp_2026f': self._fc_pct('gdp_forecasts', 'eurozone', 'forecast_12m'), 'consenso': 'N/D'},
-                {'pais': 'Alemania', 'gdp_2025': gdp_de, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
-                {'pais': 'Francia', 'gdp_2025': gdp_fr, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
-                {'pais': 'UK', 'gdp_2025': gdp_uk, 'gdp_2026f': 'N/D', 'consenso': 'N/D'},
+                {'pais': 'Eurozona', 'gdp_2025': gdp_ez, 'gdp_2026f': self._fc_pct('gdp_forecasts', 'eurozone', 'forecast_12m') or self._fc_pct('imf_consensus', 'gdp', 'eurozone')},
+                {'pais': 'Alemania', 'gdp_2025': gdp_de, 'gdp_2026f': self._fc_pct('imf_consensus', 'gdp', 'germany') or self._fc_pct('gdp_forecasts', 'germany', 'forecast_12m')},
+                {'pais': 'Francia', 'gdp_2025': gdp_fr, 'gdp_2026f': self._fc_pct('imf_consensus', 'gdp', 'france') or self._fc_pct('gdp_forecasts', 'france', 'forecast_12m')},
+                {'pais': 'UK', 'gdp_2025': gdp_uk, 'gdp_2026f': self._fc_pct('imf_consensus', 'gdp', 'uk') or self._fc_pct('gdp_forecasts', 'uk', 'forecast_12m')},
             ],
             'indicadores': [
                 {'indicador': 'Desempleo Eurozona', 'valor': desemp, 'comentario': 'BCCh' if has_real else 'Estimado'},

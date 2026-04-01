@@ -134,6 +134,7 @@ python run_monthly.py --dry-run
 7. CAUSAL_TREE: CIO generates JSON causal tree (root→L1→L2→5 outcomes), Contrarian challenges root, Refinador preserves, `council_parser.get_causal_tree()` extracts, `causal_tree_renderer.py` generates SVG visualization in AA section 10
 8. AA data fix: `council_input` quantitative data now persisted via `runner._last_council_input` → `self.data['macro_quant']` + saved as `council_input_*.json` for cache. Fixes ~55 empty cells (GDP, CPI, TPM, copper, etc.)
 9. Report quality checker: `report_quality_checker.py` scans post-render HTML for empty cells ("—"), residual N/D, raw types. Integrated in all 4 renderers after `clean_nd()`
+10. Deep merge fix: AA data merge now does deep merge (RF + macro_quant dicts fused at sub-key level). Fixes CPI core and other data lost in key collisions. World GDP fallback from region average.
 
 ### Previous (2026-03-30)
 1. Renderer hardening: 28 crash points → 0 (all `dict['key']` → `.get('key', default)`)

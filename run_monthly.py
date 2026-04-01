@@ -730,11 +730,18 @@ class MonthlyPipeline:
             if equity_data and isinstance(equity_data, dict):
                 aa_data['equity'] = equity_data
             # Inject macro quant data (chile, inflation, rates, etc.)
+            # Deep merge: if both RF and macro_quant have the same key (e.g. 'inflation'),
+            # merge the dicts so RF's breakeven data and macro's CPI data coexist
             quant_data = self.data.get('macro_quant')
             if isinstance(quant_data, dict):
                 for k, v in quant_data.items():
-                    if k not in aa_data:  # Don't overwrite RF/equity keys
+                    if k not in aa_data:
                         aa_data[k] = v
+                    elif isinstance(aa_data[k], dict) and isinstance(v, dict):
+                        # Deep merge: macro_quant fills gaps in RF data
+                        for sub_k, sub_v in v.items():
+                            if sub_k not in aa_data[k]:
+                                aa_data[k][sub_k] = sub_v
             renderer = AssetAllocationRenderer(
                 council_result=council_result,
                 market_data=aa_data if aa_data else None,

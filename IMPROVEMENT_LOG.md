@@ -285,6 +285,28 @@ regime, macro_usa (GDP, CPI, employment), leading_indicators, inflation (breakev
 
 **Sprint 38 (quality checker):** Detecta cualquier celda vacía residual post-render → visible en log del pipeline.
 
+### Sprint 39 — Fix: Deep merge + GDP world fallback (celdas vacías restantes)
+
+**Trigger:** Pipeline completo mostró 73 celdas vacías (Macro 40, RV 2, RF 9, AA 22). Auditoría identificó 2 bugs reales de datos + columnas "anterior" que ninguna API produce.
+
+| # | Hallazgo | Fix aplicado |
+|---|----------|-------------|
+| 168 | **AA: CPI core = None por colisión de merge** — `rf_data` y `macro_quant` ambos tienen key `inflation`, pero RF's `inflation` no tiene `cpi_core_yoy`. Merge shallow (`if k not in aa_data: skip`) descartaba macro_quant's `inflation` completo | **FIXEADO:** `run_monthly.py` — deep merge: si ambos tienen la misma key y ambos son dicts, fusiona sub-keys (macro_quant llena gaps de RF). CPI core ahora: 2.73% |
+| 169 | **MACRO: World GDP siempre N/D** — `forecast_engine` no produce key 'world', solo regiones. IMF WEO tampoco tiene key directa | **FIXEADO:** `macro_content_generator.py` — si IMF y forecast engine no tienen 'world', calcula promedio ponderado de USA(25%), Eurozone(20%), China(18%) |
+| 170 | **MACRO: Europa GDP por país sin forecast** — `forecast_engine` solo produce 'eurozone' agregado, no por país | **FIXEADO:** `macro_content_generator.py` — busca en `imf_consensus.gdp.{country}` como fallback. Si IMF no tiene, queda N/D (dato genuinamente no disponible) |
+
+**Celdas vacías residuales después de estos fixes (no son bugs):**
+Las ~50 celdas vacías restantes son columnas "anterior" / "consenso" que **ninguna API produce**:
+- CPI/PCE "anterior" en Macro: requeriría almacenar valor del mes pasado (no implementado)
+- Europa/China "anterior": BCCh no da datos históricos por período anterior
+- AA escenarios "implicancias": dependen de que el council produzca texto estructurado de impacto por asset class
+
+Estas NO son datos disponibles que no llegan — son datos que el sistema no recolecta porque requieren comparación temporal (valor actual vs mes anterior). Implementar esto requiere un store histórico.
+
+**Validación:**
+- `run_monthly.py` y `macro_content_generator.py` compilan OK
+- Deep merge test: 9/9 data points AA resuelven (GDP 0.7%, CPI 2.73%, TPM 4.5%, VIX 24.3, IG 93bp, UST 4.35%, Copper $5.51, USDCLP 927, BE5Y 2.54%)
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy
