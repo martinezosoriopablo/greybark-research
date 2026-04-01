@@ -133,6 +133,7 @@ python run_monthly.py --dry-run
 6. Coherence: panel conflict warnings now passed to Refinador via `council_input['coherence_warnings']`
 7. CAUSAL_TREE: CIO generates JSON causal tree (root→L1→L2→5 outcomes), Contrarian challenges root, Refinador preserves, `council_parser.get_causal_tree()` extracts, `causal_tree_renderer.py` generates SVG visualization in AA section 10
 8. AA data fix: `council_input` quantitative data now persisted via `runner._last_council_input` → `self.data['macro_quant']` + saved as `council_input_*.json` for cache. Fixes ~55 empty cells (GDP, CPI, TPM, copper, etc.)
+9. Report quality checker: `report_quality_checker.py` scans post-render HTML for empty cells ("—"), residual N/D, raw types. Integrated in all 4 renderers after `clean_nd()`
 
 ### Previous (2026-03-30)
 1. Renderer hardening: 28 crash points → 0 (all `dict['key']` → `.get('key', default)`)

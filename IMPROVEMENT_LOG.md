@@ -255,6 +255,36 @@ o
 
 **Validación:** 5/5 archivos compilan OK. Test con reporte AA actual: detecta correctamente 34 celdas vacías.
 
+### Análisis de flujo de datos: por qué no habrá celdas vacías después del Sprint 37
+
+**Diagnóstico del problema original:** Las ~55 celdas vacías en AA eran TODAS de `macro_quant` (GDP, CPI, TPM, cobre, VIX, inflation, etc.). Los datos de `equity` y `rf` llegaban bien porque se guardan en JSON separados. Los de `macro_quant` se perdían porque el council runner los recolectaba internamente y no los exponía.
+
+**Flujo corregido (después de Sprint 37):**
+```
+Sin --skip-collect:
+1. collect_all_data() → self.data['macro_quant'] = collector.collect_quantitative_data()
+2. Council runner re-recolecta internamente (datos frescos)
+3. Sprint 37: self.data['macro_quant'] = runner._last_council_input.quantitative (sobrescribe con datos más frescos)
+4. Rendering: aa_data = rf_data + equity_data + macro_quant → COMPLETO
+
+Con --skip-collect:
+1. Busca council_input_*.json (creado por Sprint 37 en run previo)
+2. self.data['macro_quant'] = council_input.quantitative → COMPLETO
+3. Si no existe cache: fallback a recolección fresca
+4. Council runner re-recolecta → Sprint 37 sobrescribe → COMPLETO
+```
+
+**Keys de macro_quant que llegan al AA:**
+regime, macro_usa (GDP, CPI, employment), leading_indicators, inflation (breakevens, CPI), chile (TPM, IPC, USD/CLP), chile_extended, china, rates (Fed, SOFR), risk (VIX, correlations), breadth, international, bloomberg, cpi_fiscal, bea, oecd, nyfed
+
+**Merge en AA (run_monthly.py:726-737):**
+- rf_data → top level (yield_curve, credit_spreads, chile_rates)
+- equity_data → nested under 'equity' key
+- macro_quant → top level, no sobrescribe RF/equity keys
+- Sin colisiones destructivas: RF `chile_rates` tiene precedencia (datos más específicos de tasas), macro_quant `chile` aporta datos complementarios (TPM, IPC, USD/CLP)
+
+**Sprint 38 (quality checker):** Detecta cualquier celda vacía residual post-render → visible en log del pipeline.
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy
