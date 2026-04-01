@@ -220,6 +220,20 @@ Los siguientes items fueron verificados como **funcionales y correctamente conec
 - Reporte AA regenerado con SVG: viewBox 900x528, flechas con markers, 5 outcomes con barras de probabilidad
 - Backward compatible: si no hay árbol, retorna ''
 
+### Sprint 37 — Fix: Datos cuantitativos vacíos en reporte AA
+
+**Trigger:** Reporte AA mostraba ~55 celdas con "—" o "N/D" (GDP, CPI, TPM, Cobre, etc.) a pesar de que los datos se recolectaban durante el council.
+
+**Causa raíz:** El council runner recolecta `council_input` (con `quantitative` dict completo) pero solo guarda `council_result` (que excluye datos cuantitativos). Cuando el renderer del AA pide `self.data['macro_quant']`, no existe — los datos se recolectaron en memoria para el council pero nunca se persistieron ni se pasaron al renderer.
+
+| # | Hallazgo | Fix aplicado |
+|---|----------|-------------|
+| 165 | **Datos cuantitativos del council no llegaban al renderer AA** — `council_input.quantitative` se descartaba después del council run | **FIXEADO:** (1) `ai_council_runner.py`: nuevo atributo `self._last_council_input` expone el council_input completo después del run. (2) `run_monthly.py`: después del council, extrae `quantitative` → `self.data['macro_quant']` para el renderer + guarda `council_input_*.json` para cache en futuros `--skip-collect` |
+
+**Impacto:** En el próximo run, el AA tendrá acceso a: macro_usa (GDP, CPI, retail sales), chile (TPM, IPC, cobre), inflation, rates, risk metrics, china, international — todo lo que el collector recolecta. Las ~55 celdas vacías se llenarán.
+
+**Validación:** 2/2 archivos compilan OK. Requiere run completo del pipeline para verificar datos en reporte.
+
 ---
 
 ## Ciclo 6 — 2026-03-25: Prompt Audit + Dashboard Isolation + Hetzner Deploy

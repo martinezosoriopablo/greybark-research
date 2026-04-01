@@ -535,6 +535,17 @@ class MonthlyPipeline:
             council_file = COUNCIL_DIR / f"council_result_{self.timestamp}.json"
             runner.save_result(result, str(council_file))
 
+            # Guardar council_input con datos cuantitativos para rendering + cache futuro
+            ci = getattr(runner, '_last_council_input', None)
+            if ci and isinstance(ci, dict):
+                quant = ci.get('quantitative', {})
+                if quant and isinstance(quant, dict) and 'error' not in quant:
+                    self.data['macro_quant'] = quant
+                    ci_file = COUNCIL_DIR / f"council_input_{self.timestamp}.json"
+                    with open(ci_file, 'w', encoding='utf-8') as f:
+                        json.dump(ci, f, ensure_ascii=False, default=str)
+                    self._print(f"  [OK] Council input guardado: {ci_file.name} ({len(quant)} módulos)")
+
             elapsed = time.time() - phase_start
             api_duration = result.get('metadata', {}).get('duration_seconds', 0)
             self._print(f"\n  Council completado en {elapsed:.1f}s (API: {api_duration:.1f}s)")

@@ -824,6 +824,7 @@ El output debe ser profesional y listo para el cliente.
 
         # Recopilar datos
         council_input = self.data_collector.prepare_council_input(report_type)
+        self._last_council_input = council_input  # Expose for run_monthly.py to cache
 
         # Run analytics modules (skip if _skip_modules flag is set)
         if getattr(self, '_skip_modules', False):
