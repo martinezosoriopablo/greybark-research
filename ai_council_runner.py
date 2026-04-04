@@ -355,6 +355,13 @@ Los siguientes datos provienen directamente de Bloomberg Terminal.
 {module_outputs}
 """
 
+        # Inyectar tabla de episodios históricos de crisis
+        try:
+            from crisis_reference import get_crisis_reference_text
+            prompt += f"\n{get_crisis_reference_text()}\n"
+        except Exception:
+            pass
+
         # Inyectar directivas del usuario — siempre prominente
         if user_directives:
             prompt += f"""

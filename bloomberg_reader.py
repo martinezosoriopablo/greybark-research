@@ -728,8 +728,28 @@ class BloombergData:
 
     # ── Agent Formatters ────────────────────────────────────────────────
 
+    def get_percentile(self, campo_id: str, years: int = 5) -> Optional[int]:
+        """Get percentile ranking of current value vs last N years of data.
+
+        Returns integer 0-100, or None if insufficient data.
+        """
+        s = self._series.get(campo_id)
+        if s is None or len(s) < 12:
+            return None
+        try:
+            import numpy as np
+            cutoff = len(s) - (years * 12)
+            window = s.iloc[max(0, cutoff):].dropna()
+            if len(window) < 12:
+                return None
+            current = float(window.iloc[-1])
+            pct = int((window < current).sum() / len(window) * 100)
+            return pct
+        except Exception:
+            return None
+
     def _fmt_series_line(self, campo_id: str, label: str = None) -> str:
-        """Format one series as: Label: value (prev: value, chg: +/-value)."""
+        """Format one series as: Label: value (prev: value, chg: +/-value, p5Y: XX)."""
         val = self.get_latest(campo_id)
         if val is None:
             return ''
@@ -739,6 +759,7 @@ class BloombergData:
 
         prev = self.get_previous(campo_id)
         chg = self.get_change(campo_id, 1)
+        pct5 = self.get_percentile(campo_id, 5)
 
         parts = [f"  {label}: {val:.1f}"]
         if prev is not None:
@@ -746,6 +767,8 @@ class BloombergData:
         if chg is not None:
             sign = '+' if chg >= 0 else ''
             parts.append(f"chg: {sign}{chg:.1f}")
+        if pct5 is not None:
+            parts.append(f"p5Y: {pct5}")
 
         line = parts[0]
         if len(parts) > 1:

@@ -135,7 +135,10 @@ First run: "anterior" columns empty (no history). Second run onward: filled with
 1. Contrarian now receives verified data inventory (same as CIO) for fact-checking panelist claims
 2. Contrarian prompt reinforces 6 obligatory sections: SUPUESTO MÁS PELIGROSO, RAÍZ DEL ÁRBOL, ESCENARIOS NO CONSIDERADOS, CÓMO PUEDE FALLAR, AJUSTES RECOMENDADOS, VEREDICTO
 3. Token budgets: CIO 6K→8K (room for CAUSAL_TREE), Contrarian 6K→7K (room for structured sections)
-4. Chile equity: 5 ADRs → 21 stocks (+ 16 Santiago Exchange .SN tickers with sector labels)
+4. Agent data enrichment: RV gets +6 modules (inflation, fiscal, risk, leading, BEA, china), Riesgo +5 (rates, inflation, macro, breadth, term_premia), RF +2 (macro, leading)
+5. Bloomberg percentiles: `get_percentile(campo, years=5)` + `p5Y: XX` in every formatted line
+6. Crisis reference: `crisis_reference.py` with 8 verified episodes (GFC/COVID/Taper/SVB/Vol/2022/Euro/Q4-2018) injected into all agent prompts
+7. Chile equity: 5 ADRs → 21 stocks (+ 16 Santiago Exchange .SN tickers with sector labels)
 5. Chile data dedup: Module 4 derives from Module 5 (chile_extended.macro) — eliminates ~5 duplicate BCCh API calls
 6. Footer legend: "— = dato no disponible" added to all 4 report templates
 

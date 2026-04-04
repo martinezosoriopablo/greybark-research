@@ -25,6 +25,36 @@
 
 **Validación:** `ai_council_runner.py` compila OK
 
+### Sprint 43 — Agent Data Enrichment + Historical Context (3 mejoras)
+
+**Trigger:** Auditoría de arquitectura reveló que agentes RV y Riesgo recibían datos insuficientes, y que ningún agente recibía percentiles históricos ni tabla de episodios de crisis para anclar sus análisis.
+
+| # | Hallazgo | Fix aplicado |
+|---|----------|-------------|
+| 180 | **RV recibía 6/25 módulos** — sin inflation, fiscal, leading_indicators, risk, BEA profits, china. No podía evaluar sostenibilidad de valuaciones | **FIXEADO:** `council_data_collector.py` — RV ahora recibe: inflation, fiscal, leading_indicators, risk, bea_profits, china (6 módulos adicionales = 12/25 total) |
+| 181 | **Riesgo recibía 8/25 módulos** — sin rates, inflation, macro_usa, breadth, nyfed_term_premia. No podía evaluar riesgo de duración ni drivers sistémicos | **FIXEADO:** `council_data_collector.py` — Riesgo ahora recibe: rates, inflation, macro_usa, breadth, nyfed_term_premia (5 módulos adicionales = 13/25 total) |
+| 182 | **RF faltaba macro_usa y leading_indicators** — ciego a empleo y momentum de crecimiento (drivers clave de Fed) | **FIXEADO:** `council_data_collector.py` — RF ahora recibe macro_usa + leading_indicators |
+| 183 | **Sin percentiles históricos en datos Bloomberg** — agentes veían solo valor actual + anterior + cambio 1M. RF admitía: "Sin percentil histórico disponible" | **FIXEADO:** `bloomberg_reader.py` — nuevo método `get_percentile(campo_id, years=5)` calcula ranking percentil vs últimos 5 años. `_fmt_series_line()` ahora incluye `p5Y: XX` en cada línea |
+| 184 | **Sin tabla de episodios de crisis** — agentes citaban GFC/COVID/Taper de memoria del LLM, no de datos verificados | **FIXEADO:** Nuevo `crisis_reference.py` con 8 episodios cuantificados (GFC, COVID, Taper, SVB, Volmageddon, Shock 2022, Euro Crisis, Q4 2018). Cada uno con: S&P%, HY/IG spreads, VIX, UST move, USD/CLP, Cobre, duración, condiciones. Inyectado en prompts de TODOS los agentes vía `_build_panel_user_prompt()` |
+
+**Datos por agente después del fix:**
+| Agente | Antes | Después | Nuevos módulos |
+|--------|-------|---------|----------------|
+| Macro | 22/25 | 22/25 | (sin cambio — ya era completo) |
+| RV | 6/25 | 12/25 | +inflation, fiscal, leading_indicators, risk, bea_profits, china |
+| RF | 14/25 | 16/25 | +macro_usa, leading_indicators |
+| Riesgo | 8/25 | 13/25 | +rates, inflation, macro_usa, breadth, nyfed_term_premia |
+| Geo | 10/25 | 10/25 | (sin cambio — datos geo-específicos suficientes) |
+| **Todos** | Sin percentiles | Con p5Y | Bloomberg `_fmt_series_line` incluye percentil |
+| **Todos** | Sin crisis ref | Con 8 episodios | `crisis_reference.py` inyectado en prompt |
+
+**Verificación de compatibilidad:**
+- Sprint 41 (Ciclo 8) agregó data_inventory al Contrarian — compatible, no afecta agent_data routing
+- Sprint 32 (Ciclo 7) agregó CAUSAL_TREE al CIO — compatible, CIO ya recibía datos completos
+- Sprint 31 (Ciclo 7) conectó coherence_warnings — compatible, no depende de agent_data
+
+**Validación:** 4/4 archivos compilan OK. Crisis reference genera 2.5KB con 8 episodios verificados.
+
 ### Sprint 42 — Chile Equity Expansion + Data Dedup + Leyenda (3 mejoras)
 
 | # | Hallazgo | Fix aplicado |

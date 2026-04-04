@@ -892,13 +892,20 @@ class CouncilDataCollector:
             'temas_mes': daily.get('temas_recurrentes', []),
         }
 
-        # IAS RV: regime + breadth + international indices + rates context
+        # IAS RV: regime + breadth + indices + rates + macro context for valuation sustainability
         agent_data['rv'] = {
             'regime': quant.get('regime', {}),
             'breadth': quant.get('breadth', {}),
             'indices': quant.get('international', {}).get('stock_indices', {}),
             'macro_usa': quant.get('macro_usa', {}),
             'rates': quant.get('rates', {}),
+            # Macro context (critical for valuation sustainability assessment)
+            'inflation': quant.get('inflation', {}),
+            'fiscal': quant.get('fiscal', {}),
+            'leading_indicators': quant.get('leading_indicators', {}),
+            'risk': quant.get('risk', {}),
+            'bea_profits': bea.get('corporate_profits', {}),
+            'china': quant.get('china', {}),
             # Bloomberg structured
             'bbg_valuations': bbg.get('valuations_extended', {}),
             'bbg_factor_returns': bbg.get('factor_returns', {}),
@@ -914,13 +921,15 @@ class CouncilDataCollector:
             'temas_mes': daily.get('temas_recurrentes', []),
         }
 
-        # IAS RF: regime + rates + inflation + chile rates + fiscal + NYFed
+        # IAS RF: regime + rates + inflation + chile + fiscal + macro context + NYFed
         agent_data['rf'] = {
             'regime': quant.get('regime', {}),
             'rates': quant.get('rates', {}),
             'inflation': quant.get('inflation', {}),
             'cpi_components': quant.get('cpi_components', {}),
             'fiscal': quant.get('fiscal', {}),
+            'macro_usa': quant.get('macro_usa', {}),
+            'leading_indicators': quant.get('leading_indicators', {}),
             'chile': quant.get('chile', {}),
             'chile_extended': quant.get('chile_extended', {}),
             'bonds_intl': quant.get('international', {}).get('bonds_10y', {}),
@@ -951,14 +960,20 @@ class CouncilDataCollector:
             'temas_mes': daily.get('temas_recurrentes', []),
         }
 
-        # IAS Riesgo: regime + risk + volatility/EPU + GSCPI
+        # IAS Riesgo: regime + risk + volatility/EPU + GSCPI + macro context for systemic risk
         agent_data['riesgo'] = {
             'regime': quant.get('regime', {}),
             'risk': quant.get('risk', {}),
             'china': quant.get('china', {}),
             'volatility_epu': quant.get('international', {}).get('volatility_epu', {}),
             'nyfed_gscpi': nyfed.get('gscpi', {}),
+            'nyfed_term_premia': nyfed.get('term_premia', {}),
             'oecd_cli': oecd.get('cli', {}),
+            # Macro context (critical for systemic risk assessment)
+            'rates': quant.get('rates', {}),
+            'inflation': quant.get('inflation', {}),
+            'macro_usa': quant.get('macro_usa', {}),
+            'breadth': quant.get('breadth', {}),
             # Bloomberg structured: CDS + credit spreads for risk monitoring
             'bbg_cds': bbg.get('cds', {}),
             'bbg_credit_spreads': bbg.get('credit_spreads', {}),
