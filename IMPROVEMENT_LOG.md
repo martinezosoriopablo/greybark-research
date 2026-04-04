@@ -5,6 +5,28 @@
 
 ---
 
+## Ciclo 8 — 2026-04-03: Auditoría de Calidad del AI Council
+
+**Trigger:** Auditoría completa del codebase post-deploy a servidor. 3 agentes paralelos: data collection, report quality, AI council system. Se cruzaron hallazgos contra Ciclo 7 — los 3 siguientes son genuinamente nuevos.
+
+### Sprint 41 — Contrarian + CIO Token Budget (3 hallazgos)
+
+| # | Severidad | Hallazgo | Archivo | Fix aplicado |
+|---|-----------|----------|---------|-------------|
+| 174 | ALTA | **Contrarian no recibe datos verificados** — `_build_contrarian_prompt()` no incluía `council_input`, `data_inventory` ni `verified_data`. Contrarian argumentaba en abstracto sin poder fact-check al CIO | `ai_council_runner.py:593-625` | **FIXEADO:** `_build_contrarian_prompt()` ahora recibe `council_input`, llama `_build_cio_data_inventory()` para inyectar datos verificados de los 5 agentes. Contrarian puede contrastar citas numéricas del CIO contra datos reales |
+| 175 | ALTA | **Contrarian saltaba secciones obligatorias** — output del 1 abril no contenía "SUPUESTO MÁS PELIGROSO", "CÓMO PUEDE FALLAR", "RAÍZ DEL ÁRBOL" (secciones obligatorias del prompt ias_contrarian.txt) | `ai_council_runner.py:593-625` | **FIXEADO:** User prompt del Contrarian ahora incluye sección "RECORDATORIO DE SECCIONES OBLIGATORIAS" con los 6 headers exactos que debe producir. Word limit corregido de "500-600" → "600-800" (consistente con ias_contrarian.txt) |
+| 176 | ALTA | **CIO token budget insuficiente** — CIO usaba MAX_TOKENS=6000 (igual que panelistas) pero genera síntesis + CAUSAL_TREE JSON (~10K chars). Riesgo de truncación | `ai_council_runner.py:54-56` | **FIXEADO:** Nuevas constantes `CIO_MAX_TOKENS=8000`, `CONTRARIAN_MAX_TOKENS=7000`. CIO y Contrarian ahora usan tokens dedicados en vez de compartir MAX_TOKENS con panelistas |
+
+**Verificación de compatibilidad:**
+- Sprint 2 (Ciclo 5) subió MAX_TOKENS de 4000→6000 para panelistas — no afectado, panelistas siguen en 6000
+- Sprint 30 (Ciclo 7) agregó `_call_llm_with_retry()` — compatible, nuevos max_tokens se pasan por el retry handler
+- Sprint 32 (Ciclo 7) agregó CAUSAL_TREE al CIO — el aumento de tokens asegura que el JSON no se trunca
+- Sprint 31 (Ciclo 7) conectó coherence_warnings al refinador — Contrarian ahora recibe data_inventory adicional pero refinador sigue funcionando igual
+
+**Validación:** `ai_council_runner.py` compila OK
+
+---
+
 ## Ciclo 7 — 2026-03-30: Auditoría de Seguridad + Lógica de Pipeline + Robustez
 
 **Trigger:** Auditoría completa del codebase (5 agentes en paralelo: pipeline, data collectors, AI council, renderers, seguridad). Se cruzaron hallazgos contra IMPROVEMENT_LOG y se filtraron los ya resueltos en sprints anteriores. Los 15 hallazgos siguientes son genuinamente nuevos.

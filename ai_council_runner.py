@@ -53,6 +53,8 @@ from narrative_engine import validate_narrative
 DEFAULT_MODEL = "claude-sonnet-4-6"          # Panel (5 agentes)
 SYNTHESIS_MODEL = "claude-opus-4-6"          # CIO + Contrarian + Refinador
 MAX_TOKENS = 6000           # Panel agents (5 analysts)
+CIO_MAX_TOKENS = 8000       # CIO synthesis + CAUSAL_TREE JSON
+CONTRARIAN_MAX_TOKENS = 7000  # Contrarian critique with structured sections
 REFINADOR_MAX_TOKENS = 12000  # Refinador final document (~8K words)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -478,14 +480,14 @@ Limita tu respuesta a 400-500 palabras máximo.
         # Paso 1: CIO sintetiza (Opus 4.6)
         self._print(f"\n  -> IAS CIO sintetizando opiniones del panel... [{SYNTHESIS_MODEL}]")
         cio_prompt = self._build_cio_prompt(panel_outputs, council_input)
-        cio_output = await self._call_llm_async(self.prompts['cio'], cio_prompt, model=SYNTHESIS_MODEL)
+        cio_output = await self._call_llm_async(self.prompts['cio'], cio_prompt, model=SYNTHESIS_MODEL, max_tokens=CIO_MAX_TOKENS)
         synthesis_outputs['cio'] = cio_output
         self._print(f"  <- IAS CIO completado ({len(cio_output)} chars)")
 
         # Paso 2: Contrarian critica (Opus 4.6)
         self._print(f"\n  -> IAS CONTRARIAN desafiando síntesis... [{SYNTHESIS_MODEL}]")
-        contrarian_prompt = self._build_contrarian_prompt(cio_output, panel_outputs)
-        contrarian_output = await self._call_llm_async(self.prompts['contrarian'], contrarian_prompt, model=SYNTHESIS_MODEL)
+        contrarian_prompt = self._build_contrarian_prompt(cio_output, panel_outputs, council_input)
+        contrarian_output = await self._call_llm_async(self.prompts['contrarian'], contrarian_prompt, model=SYNTHESIS_MODEL, max_tokens=CONTRARIAN_MAX_TOKENS)
         synthesis_outputs['contrarian'] = contrarian_output
         self._print(f"  <- IAS CONTRARIAN completado ({len(contrarian_output)} chars)")
 
@@ -590,11 +592,20 @@ Si hay research externo, contrasta las opiniones del panel con las visiones exte
 """
         return prompt
 
-    def _build_contrarian_prompt(self, cio_output: str, panel_outputs: Dict) -> str:
-        """Construye el prompt para el Contrarian."""
+    def _build_contrarian_prompt(self, cio_output: str, panel_outputs: Dict,
+                                 council_input: Dict = None) -> str:
+        """Construye el prompt para el Contrarian con datos verificados."""
         panel_summary = "\n\n".join([f"### {k.upper()}\n{v}" for k, v in panel_outputs.items()])
 
-        return f"""
+        # Build verified data inventory so Contrarian can fact-check
+        data_inventory = ''
+        if council_input:
+            try:
+                data_inventory = self._build_cio_data_inventory(council_input)
+            except Exception:
+                data_inventory = ''
+
+        prompt = f"""
 <sintesis_cio>
 {cio_output}
 </sintesis_cio>
@@ -603,26 +614,42 @@ Si hay research externo, contrasta las opiniones del panel con las visiones exte
 {panel_summary}
 </resumen_opiniones_panel>
 
-## ESTILO DE ESCRITURA — IMPORTANTE
-Tu output es interno pero debe ser claro y profesional. Escribe como un
-analista senior cuestionando una tesis, no como un modelo listando objeciones.
+{data_inventory}
 
-Reglas de estilo:
-- Sé DIRECTO y ESPECÍFICO. Cada cuestionamiento debe apuntar a un dato
-  o supuesto concreto.
-- EVITA relleno: "es importante considerar", "cabe señalar", "en este contexto".
-- EVITA adjetivos grandilocuentes: "dramáticamente", "inequívocamente".
-- Cuantifica cuando sea posible. "Las reservas chinas cubren ~80 días" es
-  mejor que "las reservas podrían amortiguar el impacto".
+## RECORDATORIO DE SECCIONES OBLIGATORIAS
+Tu output DEBE incluir TODAS estas secciones con sus headers exactos:
 
-Idioma: español profesional. Términos en inglés SOLO cuando son convención
-de mercado (risk-on/off, spread, carry, ETF, VaR, CDS, TIPS, P/E, etc.).
-Traduce todo lo demás al español.
+### SUPUESTO MÁS PELIGROSO
+(Siempre primero. Nombra el supuesto #1, prob de falla, impacto si falla, señal temprana.)
+
+### RAÍZ DEL ÁRBOL
+(¿El CIO eligió el driver correcto? ¿Canales completos? ¿Probabilidades consistentes con RISK_MATRIX?)
+
+### ESCENARIOS NO CONSIDERADOS
+(Con analogía histórica OBLIGATORIA y resultado cuantificado.)
+
+### CÓMO PUEDE FALLAR ESTA TESIS
+(3 formas con probabilidades y magnitud estimada del impacto.)
+
+### AJUSTES RECOMENDADOS
+(Cambios específicos y cuantificados.)
+
+### VEREDICTO
+(¿La dirección es correcta? ¿La magnitud? ¿El timing?)
+
+## ESTILO DE ESCRITURA
+Escribe como un analista senior cuestionando una tesis. Sé DIRECTO y ESPECÍFICO.
+Cada cuestionamiento debe apuntar a un dato o supuesto concreto.
+Usa los DATOS VERIFICADOS para contrastar lo que el CIO y los panelistas citan.
+Si un panelista cita un número distinto al dato verificado, señálalo.
+
+Idioma: español profesional. Términos en inglés solo convención de mercado.
 
 ## TU TAREA
 Desafía la síntesis del CIO. Encuentra las fallas. Propón mejoras.
-500-600 palabras máximo.
+600-800 palabras máximo.
 """
+        return prompt
 
     def _check_panel_coherence(self, council_input: Dict) -> List[str]:
         """Check if panelists cite the same indicator with conflicting values.

@@ -130,8 +130,13 @@ First run: "anterior" columns empty (no history). Second run onward: filled with
 - Panel composition: `ai_council_runner.py`
 - Output structure: `council_parser.py` (block extraction patterns)
 
-## Recent Changes (2026-04-01)
-### Ciclo 7: Security + Pipeline + Coherence + CAUSAL_TREE + Data Fix (Sprints 26-37)
+## Recent Changes (2026-04-03)
+### Ciclo 8: AI Council Quality (Sprint 41)
+1. Contrarian now receives verified data inventory (same as CIO) for fact-checking panelist claims
+2. Contrarian prompt reinforces 6 obligatory sections: SUPUESTO MÁS PELIGROSO, RAÍZ DEL ÁRBOL, ESCENARIOS NO CONSIDERADOS, CÓMO PUEDE FALLAR, AJUSTES RECOMENDADOS, VEREDICTO
+3. Token budgets: CIO 6K→8K (room for CAUSAL_TREE), Contrarian 6K→7K (room for structured sections)
+
+### Ciclo 7: Security + Pipeline + Coherence + CAUSAL_TREE + Data Fix (Sprints 26-40)
 1. Security: API key removed from source → env var, exec() → importlib, shell=True → webbrowser.open, JWT warning
 2. Pipeline: dynamic report_type for council, exit code includes self.errors, IPC Chile param fix
 3. Data robustness: `_clean_float()` NaN/inf guard, `.dropna()` aligned, timeouts 30s (FRED/BCCh/yfinance)
