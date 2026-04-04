@@ -1056,10 +1056,10 @@ class EquityDataCollector:
         return result
 
     # =========================================================================
-    # 11. CHILE TOP PICKS (yfinance ADRs)
+    # 11. CHILE TOP PICKS (ADRs + Santiago Exchange)
     # =========================================================================
 
-    # Mapping ADR ticker → local name
+    # ADR tickers (US-listed)
     CHILE_ADR_MAP = {
         'BCH': 'Banco de Chile',
         'BSAC': 'Santander Chile',
@@ -1068,16 +1068,36 @@ class EquityDataCollector:
         'CCU': 'CCU',
     }
 
+    # Santiago Exchange tickers (.SN suffix) — IPSA constituents
+    CHILE_SN_MAP = {
+        'CENCOSUD.SN': ('Cencosud', 'Retail'),
+        'FALABELLA.SN': ('Falabella', 'Retail'),
+        'COPEC.SN': ('Copec', 'Industrial'),
+        'BCI.SN': ('BCI', 'Banca'),
+        'ENELCHILE.SN': ('Enel Chile', 'Utilities'),
+        'ENELAM.SN': ('Enel Américas', 'Utilities'),
+        'CMPC.SN': ('CMPC', 'Forestal'),
+        'VAPORES.SN': ('Vapores', 'Naviera'),
+        'COLBUN.SN': ('Colbún', 'Utilities'),
+        'ITAUCORP.SN': ('Itaú Corpbanca', 'Banca'),
+        'CAP.SN': ('CAP', 'Minería'),
+        'RIPLEY.SN': ('Ripley', 'Retail'),
+        'PARAUCO.SN': ('Parque Arauco', 'Inmobiliario'),
+        'SECURITY.SN': ('Security', 'Financiero'),
+        'SONDA.SN': ('Sonda', 'Tecnología'),
+        'AGUAS-A.SN': ('Aguas Andinas', 'Utilities'),
+    }
+
     def collect_chile_top_picks(self) -> List[Dict[str, Any]]:
         """
-        Obtiene datos fundamentales de ADRs chilenos via yfinance.
+        Obtiene datos fundamentales de acciones chilenas via yfinance.
 
-        Datos: P/E trailing, P/E forward, dividend yield, precio, 52w high.
-        ENIC omitido (P/E distorsionado ~106x).
+        Fuentes: ADRs (US-listed) + Santiago Exchange (.SN tickers).
+        Datos: P/E trailing, P/E forward, dividend yield, precio, 52w high, sector.
 
         Fuente: yfinance (Yahoo Finance API)
         """
-        self._print("  [11/11] Chile top picks (yfinance ADRs)...")
+        self._print("  [11/11] Chile top picks (ADRs + Santiago Exchange)...")
 
         try:
             import yfinance as yf
@@ -1085,6 +1105,8 @@ class EquityDataCollector:
             return []
 
         picks = []
+
+        # ADRs
         for ticker, name in self.CHILE_ADR_MAP.items():
             try:
                 info = yf.Ticker(ticker).info
@@ -1122,7 +1144,48 @@ class EquityDataCollector:
             except Exception as e:
                 self._print(f"    [ERR] {ticker}: {e}")
 
-        self._print(f"    [OK] Chile picks: {len(picks)}/{len(self.CHILE_ADR_MAP)} ADRs")
+        adr_count = len(picks)
+
+        # Santiago Exchange (.SN) tickers
+        for ticker, (name, sector) in self.CHILE_SN_MAP.items():
+            try:
+                info = yf.Ticker(ticker).info
+                pe_trailing = self._safe_float(info.get('trailingPE'))
+                pe_forward = self._safe_float(info.get('forwardPE'))
+                div_yield_raw = self._safe_float(info.get('dividendYield'))
+                if div_yield_raw is not None:
+                    div_yield = round(div_yield_raw * 100, 2) if div_yield_raw < 1 else round(div_yield_raw, 2)
+                else:
+                    div_yield = None
+                price = self._safe_float(info.get('currentPrice') or info.get('regularMarketPrice'))
+                high_52w = self._safe_float(info.get('fiftyTwoWeekHigh'))
+
+                pick = {
+                    'ticker': ticker.replace('.SN', ''),
+                    'name': name,
+                    'sector': sector,
+                    'price': price,
+                    'pe_trailing': pe_trailing,
+                    'pe_forward': pe_forward,
+                    'dividend_yield': div_yield,
+                    'fifty_two_week_high': high_52w,
+                    'source': 'yfinance_sn',
+                }
+
+                # Filter distorted P/E (>80x) or P/B (>100x)
+                pe_display = pe_trailing or pe_forward
+                if pe_display and pe_display > 80:
+                    pick['pe_trailing'] = None
+                    pick['pe_forward'] = pe_forward if pe_forward and pe_forward < 80 else None
+
+                self._print(f"    [OK] {ticker} ({name}): PE={pe_trailing}, Div={div_yield}%, Sector={sector}")
+                picks.append(pick)
+
+            except Exception as e:
+                self._print(f"    [ERR] {ticker}: {e}")
+
+        sn_count = len(picks) - adr_count
+        self._print(f"    [OK] Chile picks: {adr_count} ADRs + {sn_count} Santiago = {len(picks)} total")
         return picks
 
     def save(self, data: Dict, filepath: str = None) -> str:

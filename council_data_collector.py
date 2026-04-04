@@ -167,18 +167,11 @@ class CouncilDataCollector:
             self._print(f"  [ERR] Inflation: {e}")
             data['inflation'] = {'error': str(e)}
 
-        # 4. Chile Analytics
-        def _fetch_chile():
-            from greybark.analytics.chile.chile_analytics import ChileAnalytics
-            return ChileAnalytics().get_macro_snapshot()
-        try:
-            self._print("  -> Chile analytics...")
-            data['chile'] = resilient_fetch('chile', _fetch_chile, verbose_fn=_log)
-        except Exception as e:
-            self._print(f"  [ERR] Chile: {e}")
-            data['chile'] = {'error': str(e)}
+        # 4-5. Chile (Analytics + Extended BCCh — unified to avoid duplicate API calls)
+        #      Module 5 (BCChExtended) covers everything Module 4 (ChileAnalytics) produces.
+        #      We fetch extended first, then derive 'chile' from extended.macro for backward compat.
 
-        # 5. Chile Extended (BCCh)
+        # 5. Chile Extended (BCCh) — fetch first (superset of Module 4)
         def _fetch_chile_extended():
             from greybark.data_sources.bcch_extended import BCChExtendedClient
             bcch = BCChExtendedClient()
@@ -197,6 +190,23 @@ class CouncilDataCollector:
         except Exception as e:
             self._print(f"  [ERR] Chile Extended: {e}")
             data['chile_extended'] = {'error': str(e)}
+
+        # 4. Chile (derived from chile_extended.macro — avoids duplicate BCCh API calls)
+        ce = data.get('chile_extended', {})
+        if isinstance(ce, dict) and 'error' not in ce and 'macro' in ce:
+            data['chile'] = ce['macro']
+            self._print("  [OK] Chile: derived from chile_extended.macro (no extra API call)")
+        else:
+            # Fallback: fetch independently if extended failed
+            def _fetch_chile():
+                from greybark.analytics.chile.chile_analytics import ChileAnalytics
+                return ChileAnalytics().get_macro_snapshot()
+            try:
+                self._print("  -> Chile analytics (fallback)...")
+                data['chile'] = resilient_fetch('chile', _fetch_chile, verbose_fn=_log)
+            except Exception as e:
+                self._print(f"  [ERR] Chile: {e}")
+                data['chile'] = {'error': str(e)}
 
         # 6. China Credit
         def _fetch_china():

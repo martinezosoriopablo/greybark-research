@@ -25,6 +25,21 @@
 
 **Validación:** `ai_council_runner.py` compila OK
 
+### Sprint 42 — Chile Equity Expansion + Data Dedup + Leyenda (3 mejoras)
+
+| # | Hallazgo | Fix aplicado |
+|---|----------|-------------|
+| 177 | **Chile picks: 5 ADRs → 21 acciones** — RV report solo tenía BCH, BSAC, SQM, LTM, CCU. Faltan 16 stocks IPSA que yfinance cubre con tickers .SN | **FIXEADO:** `equity_data_collector.py` — nuevo `CHILE_SN_MAP` con 16 acciones Santiago Exchange (Cencosud, Falabella, Copec, BCI, Enel Chile, CMPC, Vapores, Colbún, Itaú, CAP, Ripley, Parque Arauco, Security, Sonda, Aguas Andinas, Enel Américas). Cada una con sector label. `collect_chile_top_picks()` ahora itera ADRs + .SN = 21 total |
+| 178 | **Chile data duplicada** — Module 4 (ChileAnalytics) y Module 5 (BCChExtended) ambos fetch TPM, IPC, IMACEC, USD/CLP del BCCh = 5+ llamadas API duplicadas | **FIXEADO:** `council_data_collector.py` — Module 5 (extended) se fetch primero, `data['chile']` se deriva de `chile_extended.macro` sin API call adicional. Fallback a ChileAnalytics solo si extended falla |
+| 179 | **Sin leyenda "—" en reportes** — clientes no saben qué significa el guion largo en celdas vacías | **FIXEADO:** 4 templates HTML — nota "— = dato no disponible en las fuentes consultadas para este período" en footer de Macro, RV, RF, AA |
+
+**Verificación de compatibilidad:**
+- Sprint 37 (data persist) y Sprint 39 (deep merge) alimentan `data['chile']` al AA — la derivación desde chile_extended.macro produce el mismo dict, sin conflicto
+- Sprint 40 (historical store) busca `chile.tpm` en quant_data — compatible porque `chile_extended.macro` contiene `tpm`
+- Chile picks expansion no afecta ningún fix previo — solo agrega más stocks al mismo array
+
+**Validación:** 2/2 archivos Python compilan OK. 4 templates actualizados.
+
 ---
 
 ## Ciclo 7 — 2026-03-30: Auditoría de Seguridad + Lógica de Pipeline + Robustez
