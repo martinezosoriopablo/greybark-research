@@ -217,21 +217,38 @@ Documento pre-council con datos verificados:
 
 | Control | Qué hace |
 |---------|----------|
-| **Preflight Validator** | Gate GO/CAUTION/NO_GO — verifica completitud de datos |
-| **Coherence Validator** | 13 métricas cruzadas entre los 4 reportes |
-| **Anti-fabricación** | 8 prompts con `INTEGRIDAD DE DATOS`: prohibido inventar números |
-| **None-safe** | VaR/CVaR None-safe, EPS growth capped ±500% |
-| **Fallback pattern** | Council → API → hardcoded defaults (nunca celdas vacías para datos actuales) |
-| **Deep merge** | AA report fusiona RF + macro_quant a nivel de sub-keys (evita colisiones, ej: `inflation`) |
+| **Preflight Validator** | Gate GO/CAUTION/NO_GO — verifica completitud de datos. CRÍTICO: limits deben ser altos (DAILY_CONTEXT_LIMIT=15000) para no bloquear datos válidos |
+| **Coherence Validator** | 13 métricas cruzadas entre los 4 reportes — tolerancias estrictas, NUNCA relajar |
+| **Anti-fabricación** | 8 prompts con `INTEGRIDAD DE DATOS` + `narrative_engine` corrige números (threshold 2bp para tasas) |
 | **Quality checker** | `report_quality_checker.py` — escanea HTML post-render, cuenta celdas "—", alerta en log |
-| **Badge consistency** | Parser estructurado priorizado sobre text mining |
+| **Deep merge** | AA report fusiona RF + macro_quant a nivel de sub-keys (evita colisiones) |
+| **Historical store** | `historical_store.py` guarda ~30 métricas por run, inyecta `_prev` values en siguiente run |
+| **Crisis reference** | `crisis_reference.py` — 8 episodios verificados inyectados en todos los agentes |
+| **Bloomberg percentiles** | Cada serie muestra `p5Y: XX` (percentil vs 5 años) |
 
-### Historical data store (columnas "anterior")
+### ALERTA: Datos Inventados cuando Council No Corre
 
-`historical_store.py` guarda ~30 métricas clave por run en `output/historical/snapshot_{date}.json`.
-En el siguiente run, carga snapshot anterior e inyecta `_prev` values en quant_data.
-Primera ejecución: "anterior" vacío (sin historia). Segunda en adelante: datos del run previo.
-`chart_data_provider.get_usa_latest()` también calcula CPI/PCE prev directamente desde FRED series.
+Si el preflight bloquea el council (NO_GO), los reportes se generan con narrativas GENÉRICAS
+del `narrative_engine` que contienen datos INVENTADOS/STALE del entrenamiento del LLM (ej: "fed funds 5.25%"
+cuando el real es 3.64%). Esto es INACEPTABLE para producción.
+
+**Prevención:**
+- NUNCA bajar limits del preflight que bloqueen datos válidos (Sprint 45: DAILY_CONTEXT_LIMIT 4000→15000)
+- Verificar `council_result.final_recommendation` tiene >0 chars antes de renderizar
+- Si council falla, NO generar reportes — mejor no entregar que entregar con datos falsos
+
+### Información que recibe el AI Council (COMPLETA)
+
+| Fuente | Contenido | Tamaño | Frecuencia |
+|--------|-----------|--------|-----------|
+| **Reportes diarios** | 41+ reportes, 23 temas, 49 ideas tácticas, sentimiento semanal | 13K chars | Diaria |
+| **Analyst calls (Telegram/Substack)** | 35+ calls BUY/SELL con analyst, firma, thesis, conviction | 5K chars | Diaria |
+| **Bloomberg Terminal** | 95 series históricas con percentiles 5Y | Variable | Por run |
+| **FRED/BCCh/yfinance** | 25 módulos cuantitativos (macro, rates, inflation, equity, risk) | Variable | Por run |
+| **TAA Model** | Tilts, stress score, regime, momentum, track record (IR 0.40) | 3K chars | Por run |
+| **Research externo** | PDFs Goldman Sachs, Vanguard sintetizados | 3K chars | Manual |
+| **Episodios de crisis** | 8 episodios verificados con impactos cuantificados | 2.5K chars | Estático |
+| **Directivas del usuario** | Instrucciones del comité | ~700 chars | Manual |
 
 ---
 

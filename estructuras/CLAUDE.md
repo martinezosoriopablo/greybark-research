@@ -89,29 +89,59 @@ python run_monthly.py --dry-run
 
 ## Architecture Notes
 
+### PRINCIPIO CRÍTICO: Máxima Información al Council
+El AI Council toma mejores decisiones con MÁS datos, no menos. NUNCA limitar arbitrariamente
+la información que llega a los agentes. Si un preflight limit bloquea datos válidos, SUBIR el
+límite — no truncar los datos. Sprint 45 documentó un caso donde un `DAILY_CONTEXT_LIMIT=4000`
+abortó el council porque el intelligence digest (13K chars) era "demasiado grande", causando
+reportes con datos inventados/stale. El límite se subió a 15000.
+
+### Datos que recibe el AI Council
+Cada agente recibe TODA esta información en su prompt:
+1. **Datos cuantitativos** — 25 módulos (FRED, BCCh, yfinance, Bloomberg, BEA, OECD, NY Fed, IMF)
+2. **Reportes diarios** — Intelligence digest de ~13K chars (41+ reportes, 23+ temas, 49+ ideas tácticas, sentimiento semanal)
+3. **Analyst calls** — Recomendaciones de analistas de Telegram/Substack (~35 calls/semana con BUY/SELL, thesis, conviction)
+4. **Señales TAA** — Modelo cuantitativo de asset allocation (24 ETFs, 16 FRED series, IR 0.40, stress score, tilts)
+5. **Bloomberg** — 95 series históricas con percentiles 5Y (`p5Y: XX` en cada línea)
+6. **Episodios de crisis** — 8 episodios verificados (GFC, COVID, Taper, SVB, etc.) con impactos cuantificados
+7. **Research externo** — PDFs de Goldman Sachs, Vanguard, etc. sintetizados por Claude
+8. **Directivas del usuario** — Instrucciones específicas del comité
+
 ### AI Council (3-Layer)
-- **Layer 1 (Panel)**: 5 specialist agents analyze in parallel, each sees filtered data by expertise
-- **Layer 2 (Synthesis)**: CIO synthesizes + generates CAUSAL_TREE -> Contrarian challenges (incl. tree root) -> Refinador produces final output (preserves CAUSAL_TREE JSON)
-- **Layer 3 (Output)**: Structured blocks (EQUITY_VIEWS, FI_POSITIONING, CAUSAL_TREE, etc.) parsed by `council_parser.py`
-- **Coherence**: Panel conflicts detected by `_check_panel_coherence()` and passed to Refinador via `council_input['coherence_warnings']`
+- **Layer 1 (Panel)**: 5 specialist agents in parallel, each sees filtered data by expertise + daily intelligence + analyst calls + TAA signals + crisis reference
+- **Layer 2 (Synthesis)**: CIO synthesizes + generates CAUSAL_TREE -> Contrarian challenges with verified data -> Refinador produces final output
+- **Layer 3 (Output)**: Structured blocks parsed by `council_parser.py`
+- **Coherence**: Panel conflicts detected and passed to Refinador
+
+### CRÍTICO: Datos Inventados y Tablas Vacías
+Si el council NO corre (preflight NO_GO, API error, timeout), el narrative_engine genera texto
+genérico con datos STALE de su entrenamiento — NO de las APIs reales. Esto produce reportes
+con información INCORRECTA (ej: "fed funds 5.25%" cuando el real es 3.64%).
+
+Para prevenir esto:
+- **NUNCA** bajar preflight limits que bloqueen datos válidos
+- **SIEMPRE** verificar que `council_result.final_recommendation` tiene >0 chars antes de renderizar
+- **report_quality_checker.py** detecta celdas vacías ("—") post-render en los 4 reportes
+- **historical_store.py** guarda métricas entre runs para columnas "anterior"
+- **deep merge** (Sprint 39) evita colisiones de datos entre RF y macro_quant
 
 ### Content Generation
 - Each report has a `*_content_generator.py` that combines council output + real API data
 - `narrative_engine.py` calls Claude for narrative sections with anti-fabrication filters
-- Fallback pattern: council data -> API data -> hardcoded defaults (never empty cells)
+- Anti-fabrication threshold: 2bp for rates, catches discrepancies between LLM output and verified data
+- Fallback pattern: council data -> API data -> defaults. If council is empty, narratives are GENERIC — this is a known degradation mode
 
 ### Key Patterns
 - All modules fail silently: `{'error': str(e)}` — downstream checks before using data
 - `_has_data()` / `_has_council()` guards everywhere
-- Spanish text with proper accents (accented dict keys: `inflaci{o'}n`, `pol{i'}tica_monetaria`)
-- VaR/CVaR values are None-safe (not 0.0) with sanity range [0.01%, 15.0%]
-- EPS growth capped at +/-500% (low-base outlier protection)
-- Earnings calendar filters past dates automatically
-- Coherence validator checks 13 shared metrics across all 4 reports
+- Coherence validator checks 13 shared metrics with strict tolerances (NEVER relax them)
+- Bloomberg percentiles: `get_percentile(campo, 5)` adds `p5Y: XX` to every data line
 
 ### Report Design System
 - All 4 reports share: header (split layout), orange accent, Segoe UI body, black tables
-- Badges: OW=green `#276749`, N=warm-neutral `#744210`, UW=red `#c53030`
+- Section 10 (AA): CAUSAL_TREE SVG visualization
+- Section 11 (AA): TAA quantitative tool (stress gauge, tilts, track record)
+- Footer: "— = dato no disponible en las fuentes consultadas para este período"
 - Print-ready: `page-break-inside: avoid`
 
 ## Common Tasks
@@ -121,23 +151,25 @@ python run_monthly.py --dry-run
 2. Add series codes to `greybark/config.py` if BCCh/FRED
 3. Wire into content generator with `_has_data()` guard
 4. Add to coherence validator if cross-report metric
+5. Add to `_prepare_agent_specific_data()` for relevant agents — MORE data is BETTER
 
 ### Fixing empty cells in reports
-1. Check which `{{placeholder}}` is empty in the template
-2. Trace to the content generator method that produces it
-3. Usually: API returned None, need fallback or new data source
+1. Check `council_result.final_recommendation` — if empty, council didn't run (check preflight)
+2. Check which `{{placeholder}}` is empty in the template
+3. Trace to the content generator method that produces it
 4. **Quality checker** runs post-render in all 4 renderers — shows count of "—" cells in pipeline log
+5. If council didn't run, narratives will be GENERIC — fix the council, don't fix the narrative
 
 ### Historical data store (for "anterior" columns)
 `historical_store.py` saves ~30 key metrics per run to `output/historical/snapshot_{date}.json`.
 On next run, loads previous snapshot and injects `_prev` values into quant_data before rendering.
-First run: "anterior" columns empty (no history). Second run onward: filled with previous values.
 `chart_data_provider.get_usa_latest()` also calculates CPI/PCE prev directly from FRED series.
 
 ### Modifying council behavior
 - Agent prompts: `prompts/ias_*.txt`
 - Panel composition: `ai_council_runner.py`
 - Output structure: `council_parser.py` (block extraction patterns)
+- **NEVER** reduce data limits, token budgets, or tolerances — always increase if needed
 
 ## Recent Changes (2026-04-04)
 ### Ciclo 9: Herramienta Cuantitativa TAA (Sprint 42)
