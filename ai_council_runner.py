@@ -362,6 +362,11 @@ Los siguientes datos provienen directamente de Bloomberg Terminal.
 {taa_context}
 """
 
+        # Inyectar analyst calls filtrados por agente
+        analyst_calls_ctx = agent_data.pop('analyst_calls_context', '')
+        if analyst_calls_ctx:
+            prompt += f"\n{analyst_calls_ctx}\n"
+
         # Inyectar tabla de episodios históricos de crisis
         try:
             from crisis_reference import get_crisis_reference_text
@@ -566,6 +571,13 @@ Considera estas perspectivas externas en tu síntesis:
         if taa_cio_context:
             prompt += f"""
 {taa_cio_context}
+"""
+
+        # Inyectar analyst calls (consenso de mercado externo)
+        analyst_cio = council_input.get('analyst_calls_cio', '')
+        if analyst_cio:
+            prompt += f"""
+{analyst_cio}
 """
 
         if user_directives:

@@ -140,6 +140,7 @@ First run: "anterior" columns empty (no history). Second run onward: filled with
 6. All 5 panel prompts + CIO prompt updated with `## HERRAMIENTA CUANTITATIVA TAA` section explaining it's an additional input, not a directive
 7. TAA project lives at `greybark-asset-allocation/` (sibling of `Wealth/`). Model: 24 ETFs, 16 FRED series, IR 0.40, 168 months backtest. Runs in ~30s using cached data.
 8. Bug fix: `taa_data_collector.py` now loads data once (was 4x). NEWORDER series correctly displayed as $B with YoY change (was showing raw $M as if PMI). Added `save()` method for cache/audit (outputs `taa_data_{date}.json`).
+9. Analyst calls: `analyst_calls_reader.py` reads analyst recommendations from `greybark-intelligence/data/` (Telegram + Substack). 22 calls/week with BUY/SELL direction, asset, thesis, conviction. Distributed to agents by asset_class, CIO gets full summary.
 9. Bug fix: `feature_engineering.py` NEWORDER changed from absolute level to `pct_change(12)` (YoY). `optimizer.py` stress score NEWORDER component uses YoY decline >5% threshold (was comparing $M value vs 50).
 
 ### Ciclo 8: AI Council Quality (Sprint 41)

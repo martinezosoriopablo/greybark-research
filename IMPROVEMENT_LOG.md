@@ -33,6 +33,18 @@
 
 **Track record del modelo:** IR 0.40, hit rate 52.4%, excess return +0.62% ann, 168 meses (2012-2026).
 
+### Sprint 44 — Analyst Calls Integration (Telegram + Substack → Council)
+
+**Trigger:** Nueva fuente `greybark-intelligence` genera `analyst_calls.json` diario con recomendaciones de analistas (Telegram + Substack). 22 calls con: analyst, firm, direction, asset, thesis, conviction.
+
+| # | Archivo | Cambio |
+|---|---------|--------|
+| 185 | `analyst_calls_reader.py` | **NUEVO:** Lee `analyst_calls.json` últimos 7 días. Formato council (5KB) + formato por agente (filtrado por asset_class) |
+| 186 | `council_data_collector.py` | Recolecta analyst calls en `prepare_council_input()`. Distribuye filtrado a cada agente + resumen completo a CIO |
+| 187 | `ai_council_runner.py` | Inyecta `analyst_calls_context` en panel prompts + `analyst_calls_cio` en CIO prompt |
+
+**Validación:** 3/3 compilan OK. Test: 22 calls, 5KB council format, routing correcto a 5 agentes.
+
 ---
 
 ## Ciclo 8 — 2026-04-03: Auditoría de Calidad del AI Council

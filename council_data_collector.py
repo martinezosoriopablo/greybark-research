@@ -662,6 +662,19 @@ class CouncilDataCollector:
         user_directives = self.collect_user_directives()
         external_research = self.collect_external_research()
 
+        # Analyst calls (Telegram + Substack)
+        analyst_calls = []
+        analyst_calls_text = ''
+        try:
+            from analyst_calls_reader import AnalystCallsReader
+            acr = AnalystCallsReader(verbose=self.verbose)
+            analyst_calls = acr.get_recent_calls(days=7)
+            analyst_calls_text = acr.format_for_council(analyst_calls)
+            self._analyst_calls_reader = acr  # Keep for agent-specific formatting
+        except Exception as e:
+            self._print(f"  [WARN] Analyst calls: {e}")
+            self._analyst_calls_reader = None
+
         # Usar Intelligence Digest como contexto principal para prompts
         # format_for_council() da ~12K chars con temas, sentimiento, ideas
         daily_context = self.intelligence_digest.format_for_council(intelligence)
@@ -692,6 +705,8 @@ class CouncilDataCollector:
             'intelligence': intelligence,
             'user_directives': user_directives,
             'external_research': external_research,
+            'analyst_calls': analyst_calls_text,
+            'analyst_calls_count': len(analyst_calls),
             'preflight': preflight.to_dict()
         }
 
@@ -804,6 +819,15 @@ class CouncilDataCollector:
             # CIO gets the full formatted block + raw data
             # (will be picked up by ai_council_runner.py when building CIO prompt)
             council_input['taa_cio_context'] = taa_formatted.get('cio', '')
+
+        # Inject analyst calls per agent (filtered by asset_class)
+        acr = getattr(self, '_analyst_calls_reader', None)
+        if acr and analyst_calls:
+            for agent_key in ('macro', 'rv', 'rf', 'riesgo', 'geo'):
+                agent = council_input['agent_data'].get(agent_key, {})
+                agent['analyst_calls_context'] = acr.format_for_agent(analyst_calls, agent_key)
+            # CIO gets the full council-level summary
+            council_input['analyst_calls_cio'] = analyst_calls_text
 
         # Data completeness validation (field-by-field)
         try:
