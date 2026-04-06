@@ -28,6 +28,13 @@ estructuras/
     narrative_engine.py        # Claude-powered narrative generation
     council_parser.py          # Structured extraction from council output
     coherence_validator.py     # Cross-report numeric consistency (13 metrics)
+    crisis_reference.py        # 8 verified historical crisis episodes for agents
+    historical_store.py        # Saves/loads metrics between runs for "anterior" columns
+    report_quality_checker.py  # Post-render empty cell detection
+    causal_tree_renderer.py    # SVG renderer for CIO's causal tree
+    analyst_calls_reader.py    # Reads analyst calls from greybark-intelligence
+    taa_data_collector.py      # Quantitative TAA model collector
+    taa_report_section.py      # TAA section HTML renderer for AA report
     templates/                 # HTML templates for each report
     output/                    # Generated reports (gitignored)
     input/                     # User directives, research, logos
@@ -69,6 +76,8 @@ python run_monthly.py --dry-run
 - **AlphaVantage**: Earnings, fundamentals, analyst estimates
 - **yfinance**: ETF valuations, returns, VIX, risk metrics
 - **IMF WEO API**: GDP/inflation consensus forecasts
+- **greybark-intelligence**: Analyst calls from Telegram + Substack (BUY/SELL with thesis, conviction)
+- **TAA Model**: Quantitative tactical asset allocation (24 ETFs, 16 FRED series, IR 0.40)
 
 ## Environment Requirements
 - Python 3.10+

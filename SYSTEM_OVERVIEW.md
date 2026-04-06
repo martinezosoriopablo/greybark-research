@@ -101,7 +101,7 @@ FASE 5: Resumen + Entrega por cliente
 
 ### Capa 1 — Panel Horizontal (5 agentes en paralelo, claude-sonnet)
 
-Cada agente recibe datos cuantitativos filtrados por su expertise + directivas del usuario + intelligence briefing.
+Cada agente recibe datos cuantitativos filtrados por su expertise + directivas del usuario + intelligence briefing + analyst calls (Telegram/Substack) + episodios históricos de crisis + señales TAA.
 
 | Agente | Expertise | Bloques que produce |
 |--------|-----------|---------------------|
@@ -252,9 +252,9 @@ Primera ejecución: "anterior" vacío (sin historia). Segunda en adelante: datos
 
 | Dimensión | Cantidad |
 |-----------|----------|
-| APIs/fuentes de datos | 14+ (13 originales + TAA model) |
-| Métricas únicas recolectadas | 320+ |
-| Módulos data collection | 45+ (44 originales + taa_data_collector) |
+| APIs/fuentes de datos | 15+ (13 originales + TAA model + analyst calls Telegram/Substack) |
+| Métricas únicas recolectadas | 340+ (320 originales + 22 analyst calls/semana) |
+| Módulos data collection | 46+ (44 originales + taa_data_collector + analyst_calls_reader) |
 | Agentes AI Council | 8 (5 panel + 3 síntesis) |
 | Bloques estructurados | 12 |
 | Reportes generados | 5 (Macro, RV, RF, AA con sección TAA, Briefing) |
