@@ -62,7 +62,7 @@ FRESHNESS_THRESHOLDS = {
 
 # Límites de tamaño (chars del JSON serializado)
 TRUNCATION_LIMIT = 8000
-DAILY_CONTEXT_LIMIT = 4000
+DAILY_CONTEXT_LIMIT = 15000  # Intelligence digest normally generates 12-14K chars
 
 # Stubs conocidos
 KNOWN_STUBS = {

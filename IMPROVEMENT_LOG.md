@@ -45,6 +45,16 @@
 
 **Validación:** 3/3 compilan OK. Test: 22 calls, 5KB council format, routing correcto a 5 agentes.
 
+### Sprint 45 — Fix: Preflight NO_GO por contexto >4000 chars
+
+**Trigger:** Pipeline del 6 abril abortó council con `"aborted": true, "overall_verdict": "NO_GO"`. Causa: `DAILY_CONTEXT_LIMIT = 4000` en preflight validator, pero el intelligence digest genera 12-14K chars normalmente (49 reportes, 23 temas, 49 ideas). El run del 1 abril funcionó porque la completeness validator no override a NO_GO ese día.
+
+| # | Hallazgo | Fix |
+|---|----------|-----|
+| 188 | `council_preflight_validator.py:65` — `DAILY_CONTEXT_LIMIT = 4000` demasiado bajo para el intelligence digest actual (12-14K chars). Causó issue que la completeness validator escaló a NO_GO | **FIXEADO:** `DAILY_CONTEXT_LIMIT = 15000`. El digest de 12-14K es correcto y necesario para los agentes |
+
+**Impacto:** Council abortado → 4 reportes generados sin narrativas del council → resumen ejecutivo con datos genéricos/stale del narrative_engine → reportes de mala calidad.
+
 ---
 
 ## Ciclo 8 — 2026-04-03: Auditoría de Calidad del AI Council
