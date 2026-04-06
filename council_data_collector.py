@@ -63,6 +63,7 @@ class CouncilDataCollector:
         self._equity_data = None
         self._rf_data = None
         self._forecast_data = None
+        self._taa_data = None
 
     def _print(self, msg: str):
         if self.verbose:
@@ -779,6 +780,30 @@ class CouncilDataCollector:
                     'inflation_usa': self._forecast_data.get('inflation_forecasts', {}).get('usa', {}).get('forecast_12m'),
                     'fed_direction': self._forecast_data.get('rate_forecasts', {}).get('fed_funds', {}).get('direction'),
                 }
+
+        # Inject TAA data (quantitative tactical asset allocation)
+        if self._taa_data and isinstance(self._taa_data, dict) and 'error' not in self._taa_data:
+            council_input['taa_data'] = self._taa_data
+            council_input['metadata']['has_taa_data'] = True
+            self._print(f"[DataCollector] TAA data incluida ({self._taa_data.get('metadata', {}).get('modules_ok', '?')}/7 módulos)")
+
+            # Get pre-formatted prompt blocks for each agent
+            taa_formatted = self._taa_data.get('formatted', {})
+
+            # Inject TAA context into each agent's data
+            for agent_key in ('macro', 'rv', 'rf', 'riesgo', 'geo'):
+                agent = council_input['agent_data'].get(agent_key, {})
+                agent['taa_context'] = taa_formatted.get(agent_key, '')
+                agent['taa_data'] = {
+                    'tilts_by_class': self._taa_data.get('tilts', {}).get('tilts_by_class', {}),
+                    'stress': self._taa_data.get('stress', {}),
+                    'regime': self._taa_data.get('regime', {}),
+                    'backtest_metrics': self._taa_data.get('backtest_metrics', {}),
+                }
+
+            # CIO gets the full formatted block + raw data
+            # (will be picked up by ai_council_runner.py when building CIO prompt)
+            council_input['taa_cio_context'] = taa_formatted.get('cio', '')
 
         # Data completeness validation (field-by-field)
         try:

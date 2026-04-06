@@ -355,6 +355,13 @@ Los siguientes datos provienen directamente de Bloomberg Terminal.
 {module_outputs}
 """
 
+        # Inyectar señales TAA (modelo cuantitativo de asset allocation)
+        taa_context = agent_data.pop('taa_context', '')
+        if taa_context:
+            prompt += f"""
+{taa_context}
+"""
+
         # Inyectar tabla de episodios históricos de crisis
         try:
             from crisis_reference import get_crisis_reference_text
@@ -552,6 +559,13 @@ Considera estas perspectivas externas en tu síntesis:
             prompt += f"""
 ## ANALYTICS MODULES (Señales Cuantitativas)
 {module_outputs}
+"""
+
+        # Inyectar TAA model context for CIO (allocation reference)
+        taa_cio_context = council_input.get('taa_cio_context', '')
+        if taa_cio_context:
+            prompt += f"""
+{taa_cio_context}
 """
 
         if user_directives:

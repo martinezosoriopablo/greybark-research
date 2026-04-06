@@ -130,7 +130,18 @@ First run: "anterior" columns empty (no history). Second run onward: filled with
 - Panel composition: `ai_council_runner.py`
 - Output structure: `council_parser.py` (block extraction patterns)
 
-## Recent Changes (2026-04-03)
+## Recent Changes (2026-04-04)
+### Ciclo 9: Herramienta Cuantitativa TAA (Sprint 42)
+1. New module: `taa_data_collector.py` — runs quantitative TAA model (MOM_MACRO: momentum 12-1 + macro signals + stress circuit breaker) and packages results for council
+2. TAA data injected into all 5 panel agents + CIO via `taa_context` in agent_data (formatted text blocks per agent)
+3. New section "11. Herramienta Cuantitativa — Señales TAA" in Asset Allocation report: stress gauge, regime badge, tilts chart, track record table, leading indicators, concordance table
+4. Files: `taa_report_section.py` (HTML renderer), `taa_data_collector.py` (data collection)
+5. Modified: `run_monthly.py` (Phase 1 + Phase 3 injection), `council_data_collector.py` (_taa_data attr + agent distribution), `ai_council_runner.py` (panel + CIO prompt injection), `asset_allocation_renderer.py` (_render_quant_tool method), `templates/asset_allocation_professional.html` (section 11)
+6. All 5 panel prompts + CIO prompt updated with `## HERRAMIENTA CUANTITATIVA TAA` section explaining it's an additional input, not a directive
+7. TAA project lives at `greybark-asset-allocation/` (sibling of `Wealth/`). Model: 24 ETFs, 16 FRED series, IR 0.40, 168 months backtest. Runs in ~30s using cached data.
+8. Bug fix: `taa_data_collector.py` now loads data once (was 4x). NEWORDER series correctly displayed as $B with YoY change (was showing raw $M as if PMI). Added `save()` method for cache/audit (outputs `taa_data_{date}.json`).
+9. Bug fix: `feature_engineering.py` NEWORDER changed from absolute level to `pct_change(12)` (YoY). `optimizer.py` stress score NEWORDER component uses YoY decline >5% threshold (was comparing $M value vs 50).
+
 ### Ciclo 8: AI Council Quality (Sprint 41)
 1. Contrarian now receives verified data inventory (same as CIO) for fact-checking panelist claims
 2. Contrarian prompt reinforces 6 obligatory sections: SUPUESTO MÁS PELIGROSO, RAÍZ DEL ÁRBOL, ESCENARIOS NO CONSIDERADOS, CÓMO PUEDE FALLAR, AJUSTES RECOMENDADOS, VEREDICTO

@@ -1156,6 +1156,19 @@
     </section>
     {% endif %}
 
+    <!-- 11. HERRAMIENTA CUANTITATIVA -->
+    {% if quant_tool_html %}
+    <section class="section">
+        <h2 class="section-title"><span class="section-number">11.</span> Herramienta Cuantitativa — Señales TAA</h2>
+        <p style="font-size: 9pt; color: var(--text-light); margin-bottom: 12px;">
+            Modelo cuantitativo de Tactical Asset Allocation (momentum cross-sectional + leading indicators macro).
+            Las señales son un <strong>input adicional</strong> para el Comité, no una recomendación directa.
+            El Comité puede confirmar, matizar o divergir de estas señales con argumentos cualitativos.
+        </p>
+        {{ quant_tool_html }}
+    </section>
+    {% endif %}
+
     <!-- Glossary -->
     <section class="glossary-section">
         <div class="glossary-toggle" onclick="var c=this.nextElementSibling;c.classList.toggle('open');this.querySelector('.glossary-toggle-icon').textContent=c.classList.contains('open')?'\u25B2':'\u25BC';">

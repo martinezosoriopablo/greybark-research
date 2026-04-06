@@ -5,6 +5,36 @@
 
 ---
 
+## Ciclo 9 — 2026-04-04: Herramienta Cuantitativa TAA
+
+**Trigger:** Integración del modelo cuantitativo de Tactical Asset Allocation como input adicional al AI Council y nueva sección en el reporte de Asset Allocation.
+
+### Sprint 42 — TAA Integration (7 cambios)
+
+| # | Severidad | Hallazgo | Archivo | Fix aplicado |
+|---|-----------|----------|---------|-------------|
+| 1 | Feature | Nuevo módulo TAA data collector | `taa_data_collector.py` | Ejecuta modelo MOM_MACRO (24 ETFs, 16 FRED series), empaqueta tilts, stress, régimen, momentum, track record en ~30s |
+| 2 | Feature | Sección 11 en reporte AA | `taa_report_section.py` | HTML con stress gauge SVG, tilts chart PNG, leading indicators, track record, concordancia modelo vs comité |
+| 3 | Feature | Inyección TAA en pipeline | `run_monthly.py` | Fase 1 ejecuta TAA collector, Fase 3 inyecta via `_taa_data` al council |
+| 4 | Feature | Distribución a agentes | `council_data_collector.py` | `_taa_data` attr + distribución de `taa_context` formateado por agente + datos raw a cada panel |
+| 5 | Feature | Inyección en prompts dinámicos | `ai_council_runner.py` | `taa_context` extraído e inyectado en panel user prompts + `taa_cio_context` en CIO prompt |
+| 6 | Feature | Prompts actualizados | `prompts/ias_*.txt` (6 archivos) | Nueva sección "HERRAMIENTA CUANTITATIVA TAA" en cada prompt: explica que es input adicional, patrón confirmar/divergir |
+| 7 | Feature | Render en AA | `asset_allocation_renderer.py` | Método `_render_quant_tool()` + placeholder `{{quant_tool_html}}` en template |
+
+### Sprint 43 — TAA Fixes (3 bugs)
+
+| # | Severidad | Hallazgo | Fix aplicado |
+|---|-----------|----------|-------------|
+| 8 | Bug | `taa_data_collector.py` cargaba datos 4 veces (una por sub-módulo) | Carga única en `_cached_data` al inicio de `collect_all()`, sub-módulos referencian cache |
+| 9 | Bug | Serie FRED `NEWORDER` = manufacturers' new orders en $M, no ISM PMI. Mostraba 79,324 como si fuera índice PMI | Cambiado a variación YoY ($79B, +6.3%). Stress score usa caída >5% YoY como señal (no comparación vs 50). Feature engineering también corregido. |
+| 10 | Missing | Sin método `save()` — si pipeline falla post-Phase 1, se pierde el TAA data | Agregado `save()` que genera `taa_data_{date}.json` (~12KB). Conectado en `run_monthly.py` Phase 1. |
+
+**Principio de diseño:** TAA es un input cuantitativo más para el Comité. Los agentes pueden confirmar, matizar o divergir. Los tilts no van directamente a los portafolios modelo. La sección del reporte incluye disclaimer explícito.
+
+**Track record del modelo:** IR 0.40, hit rate 52.4%, excess return +0.62% ann, 168 meses (2012-2026).
+
+---
+
 ## Ciclo 8 — 2026-04-03: Auditoría de Calidad del AI Council
 
 **Trigger:** Auditoría completa del codebase post-deploy a servidor. 3 agentes paralelos: data collection, report quality, AI council system. Se cruzaron hallazgos contra Ciclo 7 — los 3 siguientes son genuinamente nuevos.

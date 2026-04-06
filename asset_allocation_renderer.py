@@ -536,6 +536,9 @@ class AssetAllocationRenderer:
         # 10. CAUSAL TREE
         replacements['{{causal_tree_html}}'] = self._render_causal_tree()
 
+        # 11. HERRAMIENTA CUANTITATIVA TAA
+        replacements['{{quant_tool_html}}'] = self._render_quant_tool()
+
         # Convert {{key}} → key for Jinja2 context
         context = {}
         for key, value in replacements.items():
@@ -558,6 +561,57 @@ class AssetAllocationRenderer:
         if not tree:
             return ''
         return render_causal_tree_html(tree)
+
+
+    def _render_quant_tool(self) -> str:
+        """Render the Herramienta Cuantitativa TAA section."""
+        try:
+            taa_data = self.market_data.get('taa', {}) if self.market_data else {}
+            if not taa_data or 'error' in taa_data:
+                return ''
+
+            from taa_report_section import render_quant_tool_section
+
+            # Try to extract council views for concordance
+            council_views = {}
+            try:
+                from council_parser import CouncilParser
+                parser = CouncilParser(self.council_result)
+                equity_views = parser.get_block('EQUITY_VIEWS') or ''
+                fi_views = parser.get_block('FI_POSITIONING') or ''
+                # Map council views to asset class format for concordance
+                for line in (equity_views + '\n' + fi_views).split('\n'):
+                    line_lower = line.lower().strip()
+                    if 'usa' in line_lower or 'us equity' in line_lower or 's&p' in line_lower:
+                        if 'ow' in line_lower or 'sobrepon' in line_lower:
+                            council_views['US Equity'] = {'direction': 'OW'}
+                        elif 'uw' in line_lower or 'subpon' in line_lower:
+                            council_views['US Equity'] = {'direction': 'UW'}
+                        elif 'neutral' in line_lower:
+                            council_views['US Equity'] = {'direction': 'N'}
+                    if 'europa' in line_lower or 'eafe' in line_lower or 'internacional' in line_lower:
+                        if 'ow' in line_lower or 'sobrepon' in line_lower:
+                            council_views['Intl Equity'] = {'direction': 'OW'}
+                        elif 'uw' in line_lower or 'subpon' in line_lower:
+                            council_views['Intl Equity'] = {'direction': 'UW'}
+                        elif 'neutral' in line_lower:
+                            council_views['Intl Equity'] = {'direction': 'N'}
+                    if 'renta fija' in line_lower or 'duration' in line_lower or 'fixed' in line_lower:
+                        if 'ow' in line_lower or 'sobrepon' in line_lower or 'larga' in line_lower:
+                            council_views['Fixed Income'] = {'direction': 'OW'}
+                        elif 'uw' in line_lower or 'subpon' in line_lower or 'corta' in line_lower:
+                            council_views['Fixed Income'] = {'direction': 'UW'}
+                        elif 'neutral' in line_lower:
+                            council_views['Fixed Income'] = {'direction': 'N'}
+            except Exception:
+                pass
+
+            return render_quant_tool_section(taa_data, council_views=council_views or None)
+
+        except Exception as e:
+            if self.verbose:
+                print(f"  [WARN] TAA section render failed: {e}")
+            return ''
 
 
 def main():

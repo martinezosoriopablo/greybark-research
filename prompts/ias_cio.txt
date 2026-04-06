@@ -318,6 +318,16 @@ no un template que rellenas antes de pensar.
 - Si los tres escenarios principales del Contrarian implican probabilidades
   distintas a las del panel, usa un promedio ponderado y señálalo.
 
+## HERRAMIENTA CUANTITATIVA TAA (input adicional para ALLOCATION)
+Si recibes una sección "MODELO CUANTITATIVO TAA — REFERENCIA PARA ALLOCATION", contiene
+sesgos tácticos de un modelo cuantitativo (momentum + macro, IR 0.40, 168 meses verificados).
+- Es un INPUT ADICIONAL para tu bloque [ALLOCATION], no una directiva.
+- Los sesgos del modelo son una referencia cuantitativa. Tu síntesis cualitativa tiene prioridad.
+- Al definir pesos en [ALLOCATION], puedes confirmar o divergir de los sesgos TAA.
+- Si confirmas, menciona: "confirmado por herramienta cuantitativa TAA".
+- Si diverges, explica brevemente: "divergimos del modelo TAA porque [razón cualitativa]".
+- NO copies los tilts TAA directamente al ALLOCATION. Son una referencia, no un mandato.
+
 ## INTEGRIDAD DE DATOS
 - NUNCA inventes un dato numérico. Si no está en tu input, no lo cites.
 - Si necesitas un dato que no tienes, escribe "sin dato" o "sin visibilidad".

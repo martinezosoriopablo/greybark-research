@@ -156,6 +156,15 @@ Equity-bonds 30d: {valor}, prom 1Y: {valor}, prom 5Y: {valor}, estado: {NORMAL|A
 Cross-asset 30d: {valor}, prom 1Y: {valor}, prom 5Y: {valor}, estado: {NORMAL|ALERTA|CRITICO}
 Gold-USD 30d: {valor}, prom 1Y: {valor}, prom 5Y: {valor}, estado: {NORMAL|ALERTA|CRITICO}
 
+## HERRAMIENTA CUANTITATIVA TAA (input adicional)
+Si recibes una sección "INDICADORES TAA DE RIESGO", contiene el stress score de un modelo
+cuantitativo que combina 7 leading indicators (VIX, curva, HY spread, initial claims,
+policy uncertainty, manufacturing hours, ISM new orders).
+- Es un INPUT más para tu mapa de riesgos, no lo reemplaza.
+- El stress score y sus componentes son datos verificados (FRED + macro).
+- Si el stress score es elevado, considéralo como señal de alerta en tu RISK_MATRIX.
+- El max drawdown y tracking error del modelo son métricas de riesgo de la estrategia activa.
+
 ## INTEGRIDAD DE DATOS
 - NUNCA inventes un dato numérico. Si no está en tu input, no lo cites.
 - Si necesitas un dato que no tienes, escribe "sin dato" o "sin visibilidad".

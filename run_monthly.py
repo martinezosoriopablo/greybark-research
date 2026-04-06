@@ -195,7 +195,21 @@ class MonthlyPipeline:
             self._print_err(f"Forecasts: {e}")
             self.errors.append(f"Fase 1 - Forecasts: {e}")
 
-        # 1e. Daily intelligence digest
+        # 1e. TAA model (quantitative tactical asset allocation)
+        self._print_step("Modelo cuantitativo TAA (momentum + macro)...")
+        try:
+            from taa_data_collector import TAADataCollector
+            taa_collector = TAADataCollector(verbose=True)
+            data['taa'] = taa_collector.collect_all()
+            taa_path = taa_collector.save(data['taa'])
+            taa_meta = data['taa'].get('metadata', {})
+            self._print_ok(f"TAA: {taa_meta.get('modules_ok', '?')}/7 módulos OK -> {taa_path}")
+        except Exception as e:
+            data['taa'] = {'error': str(e)}
+            self._print_err(f"TAA: {e}")
+            self.errors.append(f"Fase 1 - TAA: {e}")
+
+        # 1f. Daily intelligence digest
         self._print_step("Inteligencia diaria (30 días de reportes)...")
         try:
             if 'collector' not in dir():
@@ -546,6 +560,12 @@ class MonthlyPipeline:
             if forecast_data and 'error' not in forecast_data:
                 runner.data_collector._forecast_data = forecast_data
                 self._print_step("Forecast data inyectada al Council input")
+
+            # Inyectar TAA data (modelo cuantitativo de asset allocation)
+            taa_data = data.get('taa', {})
+            if taa_data and 'error' not in taa_data:
+                runner.data_collector._taa_data = taa_data
+                self._print_step(f"TAA data inyectada al Council input ({taa_data.get('metadata', {}).get('modules_ok', '?')}/7 módulos)")
 
             print()
             report_type = self.reports[0] if self.reports else 'macro'

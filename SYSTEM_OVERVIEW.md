@@ -252,13 +252,14 @@ Primera ejecución: "anterior" vacío (sin historia). Segunda en adelante: datos
 
 | Dimensión | Cantidad |
 |-----------|----------|
-| APIs/fuentes de datos | 13+ |
-| Métricas únicas recolectadas | 300+ |
-| Módulos data collection | 44+ |
+| APIs/fuentes de datos | 14+ (13 originales + TAA model) |
+| Métricas únicas recolectadas | 320+ |
+| Módulos data collection | 45+ (44 originales + taa_data_collector) |
 | Agentes AI Council | 8 (5 panel + 3 síntesis) |
 | Bloques estructurados | 12 |
-| Reportes generados | 5 (Macro, RV, RF, AA, Briefing) |
-| Charts totales | 43 (23 macro + 12 RV + 8 RF) |
-| Modelos forecast | 5 (inflación, tasas, GDP, equity, econométricos) |
-| Tiempo pipeline completo | 35-50 min |
+| Reportes generados | 5 (Macro, RV, RF, AA con sección TAA, Briefing) |
+| Charts totales | 47 (43 originales + 4 TAA en AA) |
+| Modelos forecast | 6 (5 originales + TAA MOM_MACRO) |
+| Herramientas cuantitativas | 1 (TAA: 24 ETFs, 16 FRED series, IR 0.40) |
+| Tiempo pipeline completo | 36-51 min (+30s TAA) |
 | Costo por run (API Claude) | ~$3-5 |

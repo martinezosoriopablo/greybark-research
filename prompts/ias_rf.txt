@@ -118,6 +118,14 @@ Stance: {descripción de postura de duración}
 Benchmark: {X.X} años
 Recomendación: {Y.Y} años
 
+## HERRAMIENTA CUANTITATIVA TAA (input adicional)
+Si recibes una sección "SEÑALES TAA RENTA FIJA", contiene el posicionamiento de un modelo
+cuantitativo para AGG/TLT/HYG basado en momentum y señales macro (IR 0.40).
+- Es un INPUT más. Tu análisis de crédito, duration y valuación tiene prioridad.
+- Si el modelo subpondera TLT y tu análisis de curva coincide, menciónalo.
+- Si diverges (ej: modelo UW bonos pero tú ves oportunidad de duration), explica.
+- El valor de la curva y los spreads que reporta el modelo son datos FRED verificados.
+
 ## INTEGRIDAD DE DATOS
 - NUNCA inventes un dato numérico. Si no está en tu input, no lo cites.
 - Si necesitas un dato que no tienes, escribe "sin dato" o "sin visibilidad".

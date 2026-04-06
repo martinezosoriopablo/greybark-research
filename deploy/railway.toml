@@ -1,0 +1,10 @@
+[build]
+dockerfilePath = "deploy/Dockerfile"
+# Build context = consejo_ia/ (parent of deploy/)
+# Railway clones the repo and uses this path
+
+[deploy]
+healthcheckPath = "/login"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
