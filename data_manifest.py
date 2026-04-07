@@ -50,8 +50,8 @@ MACRO_MANIFEST: List[DataField] = [
     DataField("inflation.cpi_all_yoy", "CPI Headline USA YoY", "FRED:CPIAUCSL", "%", FieldPriority.REQUIRED, min_value=-5.0, max_value=25.0),
     DataField("rates.terminal_rate", "Fed Funds Rate (terminal)", "internal:rate_expectations", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
     DataField("chile.tpm", "TPM Chile", "BCCh:TPM", "%", FieldPriority.REQUIRED, min_value=0.0, max_value=20.0),
-    DataField("chile.imacec", "IMACEC Chile", "BCCh:IMACEC", "%", FieldPriority.REQUIRED, min_value=-20.0, max_value=30.0),
-    DataField("chile.ipc", "IPC Chile YoY", "BCCh:IPC", "%", FieldPriority.REQUIRED, min_value=-5.0, max_value=30.0),
+    DataField("chile.imacec_yoy", "IMACEC Chile YoY", "BCCh:IMACEC", "%", FieldPriority.REQUIRED, min_value=-20.0, max_value=30.0),
+    DataField("chile.ipc_yoy", "IPC Chile YoY", "BCCh:IPC", "%", FieldPriority.REQUIRED, min_value=-5.0, max_value=30.0),
     # --- IMPORTANT ---
     DataField("inflation.breakeven_5y", "Breakeven 5Y USA", "FRED:T5YIE", "%", FieldPriority.IMPORTANT, min_value=-2.0, max_value=10.0),
     DataField("inflation.breakeven_10y", "Breakeven 10Y USA", "FRED:T10YIE", "%", FieldPriority.IMPORTANT, min_value=-1.0, max_value=8.0),
