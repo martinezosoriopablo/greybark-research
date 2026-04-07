@@ -276,15 +276,28 @@ class RFChartsGenerator:
         sov_yields_all = []
         for country in ('alemania', 'japon'):
             cdata = sov.get(country, {})
-            tenor_map = cdata.get('tenors', {})
+            # Sovereign data can be in 'tenors' or 'datos' depending on source
+            tenor_map = cdata.get('tenors', {}) or cdata.get('datos', {})
             if tenor_map and len(tenor_map) >= 3:
-                # Map integer tenors to x-axis years
-                sov_x = [int(t) for t in sorted(tenor_map.keys(), key=lambda k: int(k))]
-                sov_y = [tenor_map[str(t)] for t in sov_x]
-                ax.plot(sov_x, sov_y, color=sov_colors[country], linewidth=1.5,
-                        marker='s', markersize=3, linestyle='--', alpha=0.7,
-                        label=sov_labels[country], zorder=2)
-                sov_yields_all.extend(sov_y)
+                try:
+                    # Map integer tenors to x-axis years, handling both str and int keys
+                    valid_tenors = {}
+                    for k, v in tenor_map.items():
+                        try:
+                            year = int(k)
+                            val = float(v) if not isinstance(v, dict) else float(v.get('yield', v.get('value', 0)))
+                            valid_tenors[year] = val
+                        except (ValueError, TypeError):
+                            continue
+                    if len(valid_tenors) >= 3:
+                        sov_x = sorted(valid_tenors.keys())
+                        sov_y = [valid_tenors[t] for t in sov_x]
+                        ax.plot(sov_x, sov_y, color=sov_colors[country], linewidth=1.5,
+                                marker='s', markersize=3, linestyle='--', alpha=0.7,
+                                label=sov_labels[country], zorder=2)
+                        sov_yields_all.extend(sov_y)
+                except Exception as e:
+                    logger.warning("Sovereign curve %s failed: %s", country, e)
 
         # Y-axis: tight range (don't start at 0)
         all_yields = yields_now[:]

@@ -171,6 +171,18 @@ On next run, loads previous snapshot and injects `_prev` values into quant_data 
 - Output structure: `council_parser.py` (block extraction patterns)
 - **NEVER** reduce data limits, token budgets, or tolerances — always increase if needed
 
+### BUG CRÓNICO RESUELTO: rf_yield_curve (Sprint 45c)
+El chart de yield curve del RF report fallaba recurrentemente (Sprints 11, 23, 45c).
+**Causa raíz:** sovereign curves data en `cdata['datos']` pero chart buscaba en `cdata['tenors']`.
+**Fix:** `rf_chart_generator.py:279` busca en AMBOS con parsing robusto.
+**Prevención:** Siempre testear charts CON sovereign_curves inyectadas, no solo rf_data aislado.
+
+### Preflight/Completeness NO_GO bugs (Sprints 45, 45b, 45c)
+- `DAILY_CONTEXT_LIMIT` debe ser >=15000 (intelligence digest genera 12-14K chars)
+- `data_completeness_validator` NO_GO threshold debe ser 60% (no 95%) — 78% de datos es suficiente
+- `data_manifest.py`: keys deben coincidir EXACTAMENTE con lo que produce el collector (chile.imacec_yoy, no chile.imacec)
+- **PRINCIPIO:** Un council parcial es INFINITAMENTE mejor que reportes con datos inventados
+
 ## Recent Changes (2026-04-04)
 ### Ciclo 9: Herramienta Cuantitativa TAA (Sprint 42)
 1. New module: `taa_data_collector.py` — runs quantitative TAA model (MOM_MACRO: momentum 12-1 + macro signals + stress circuit breaker) and packages results for council

@@ -58,6 +58,28 @@
 
 **Principio:** Un council con datos parciales (78%) produce reportes mejores que un narrative_engine sin council (datos inventados). NUNCA bloquear el council por 2 campos faltantes de 25 módulos.
 
+### Sprint 45c — Fix: rf_yield_curve chart falla recurrente (BUG CRÓNICO)
+
+**Trigger:** El chart `rf_yield_curve` falla en CADA run del pipeline con error `'1'`. Ha sido "arreglado" en Sprint 11 y Sprint 23 pero sigue fallando. Esta vez se encontró la CAUSA RAÍZ REAL.
+
+**Causa raíz:** El chart generator busca datos soberanos en `cdata.get('tenors', {})` pero el módulo `curvas_soberanas.py` los guarda en `cdata.get('datos', {})`. Las keys son `'1'`, `'2'`, `'3'`, `'5'`, `'10'`, etc.
+
+- `cdata['tenors']` → siempre vacío `{}`
+- `cdata['datos']` → tiene los datos reales: `{'1': 2.31, '2': 2.15, '10': 2.52, ...}`
+
+Cuando el chart corría aislado (test), no fallaba porque los sovereign curves no se pasaban. En el pipeline, se pasan pero con la key incorrecta → error críptico `'1'` que es un KeyError al intentar convertir la estructura.
+
+| # | Fix |
+|---|-----|
+| 190 | `rf_chart_generator.py:279` — `cdata.get('tenors', {})` → `cdata.get('tenors', {}) or cdata.get('datos', {})`. Además: parsing robusto con try/except por tenor, maneja tanto int como string keys, maneja valores dict (con 'yield' key) y floats directos |
+
+**POR QUÉ ESTE BUG ES RECURRENTE:**
+El test aislado del chart siempre pasa porque no incluye sovereign_curves en el test data. El bug solo se manifiesta DENTRO del pipeline cuando sovereign_curves se inyectan desde council_input. Los "arreglos" anteriores (Sprint 11, 23) verificaron que el chart genera OK en test pero no en contexto pipeline.
+
+**Prevención futura:** Siempre testear charts CON sovereign_curves inyectadas, no solo con rf_data aislado.
+
+**Validación:** 8/8 RF charts generan OK (incluyendo rf_yield_curve con 143K chars). Sovereign curves Alemania (9 tenors) y Japón (11 tenors) correctamente overlay-eadas.
+
 ---
 
 ## Ciclo 8 — 2026-04-03: Auditoría de Calidad del AI Council
