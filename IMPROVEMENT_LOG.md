@@ -52,8 +52,11 @@
 | # | Hallazgo | Fix |
 |---|----------|-----|
 | 188 | `council_preflight_validator.py:65` — `DAILY_CONTEXT_LIMIT = 4000` demasiado bajo para el intelligence digest actual (12-14K chars). Causó issue que la completeness validator escaló a NO_GO | **FIXEADO:** `DAILY_CONTEXT_LIMIT = 15000`. El digest de 12-14K es correcto y necesario para los agentes |
+| 189 | `data_completeness_validator.py:290` — `required_coverage < 0.95` → NO_GO. Macro tenía 78% (7/9 required fields) y bloqueó todo el council. Reportes se generaron con datos INVENTADOS del LLM | **FIXEADO:** Threshold NO_GO bajado de 95% a 60%. Con 78% de required fields el council corre con CAUTION (no abort). Un council con 78% de datos es infinitamente mejor que reportes con datos inventados |
 
-**Impacto:** Council abortado → 4 reportes generados sin narrativas del council → resumen ejecutivo con datos genéricos/stale del narrative_engine → reportes de mala calidad.
+**Impacto:** Council abortado → 4 reportes generados sin narrativas del council → resumen ejecutivo con datos genéricos/stale del narrative_engine (ej: "fed funds 5.25%" cuando real es 3.64%) → reportes de mala calidad.
+
+**Principio:** Un council con datos parciales (78%) produce reportes mejores que un narrative_engine sin council (datos inventados). NUNCA bloquear el council por 2 campos faltantes de 25 módulos.
 
 ---
 

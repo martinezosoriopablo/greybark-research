@@ -7,10 +7,12 @@ Field-by-field validation of council input data against the data manifest.
 Replaces the module-level preflight with granular per-field checks.
 
 Gate logic:
-- Required coverage < 95% for ANY agent → NO_GO (abort)
+- Required coverage < 60% for ANY agent → NO_GO (abort)
 - Required coverage < 100% → CAUTION (continue but document)
-- Important coverage < 70% → CAUTION
+- Important coverage < 50% → CAUTION
 - Else → GO
+NOTE: Thresholds must be LOW enough to not block the council when most data is available.
+A blocked council produces reports with INVENTED data — worse than missing 2 fields.
 """
 
 import json
@@ -287,14 +289,15 @@ class DataCompletenessValidator:
         verdict = 'GO'
 
         for agent_name, ac in agents.items():
-            if ac.required_coverage < 0.95:
+            if ac.required_coverage < 0.60:
                 verdict = 'NO_GO'
-                self._print(f"  [NO_GO] {agent_name}: required coverage {ac.required_coverage*100:.0f}% < 95%")
+                self._print(f"  [NO_GO] {agent_name}: required coverage {ac.required_coverage*100:.0f}% < 60%")
                 break
             if ac.required_coverage < 1.0:
                 if verdict != 'NO_GO':
                     verdict = 'CAUTION'
-            if ac.important_coverage < 0.70:
+                    self._print(f"  [CAUTION] {agent_name}: required coverage {ac.required_coverage*100:.0f}%")
+            if ac.important_coverage < 0.50:
                 if verdict != 'NO_GO':
                     verdict = 'CAUTION'
             # Out-of-range on any field triggers CAUTION
