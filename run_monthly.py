@@ -760,10 +760,16 @@ class MonthlyPipeline:
 
         elif report_name == 'rf':
             from rf_report_renderer import RFReportRenderer
-            # Get RF quant data
+            # Get RF quant data + inject sovereign curves from macro_quant
             rf_data = self.data.get('rf')
             if isinstance(rf_data, dict) and 'error' in rf_data:
                 rf_data = None
+            if rf_data and isinstance(rf_data, dict):
+                quant = self.data.get('macro_quant', {})
+                if isinstance(quant, dict):
+                    sov = quant.get('sovereign_curves')
+                    if sov and isinstance(sov, dict) and 'error' not in sov:
+                        rf_data['sovereign_curves'] = sov
             renderer = RFReportRenderer(
                 council_result=council_result,
                 market_data=rf_data,
