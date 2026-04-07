@@ -100,6 +100,21 @@ El test aislado del chart siempre pasa porque no incluye sovereign_curves en el 
 - RV: 12/12 OK
 - RF: 8/8 OK (incluyendo yield curve con Bund + JGB overlay)
 
+### Sprint 46 — Auditoría de reportes generados (4 fixes)
+
+**Trigger:** Auditoría post-run de los 5 reportes del 6 abril reveló 4 issues.
+
+| # | Sev | Hallazgo | Archivo | Fix |
+|---|-----|----------|---------|-----|
+| 192 | ALTO | **AA: TAA data no llega al renderer** — `taa` se almacena en `self.data['taa']` pero nunca se inyecta en `aa_data` | `run_monthly.py:803` | **FIXEADO:** Agrega `aa_data['taa'] = self.data.get('taa')` antes de crear el renderer |
+| 193 | ALTO | **RV: 16 stocks .SN sin rationale** — `rationale_map` solo tenía 5 ADRs. Los 16 tickers Santiago Exchange retornaban 'N/D' | `rv_content_generator.py:2316` | **FIXEADO:** Expandido `rationale_map` con los 16 tickers .SN (Cencosud, Falabella, BCI, Copec, etc.) con tesis por sector |
+| MEDIO | **Alemania GDP = N/D** — ECB client solo fetcheaba 5 series (DFR, HICP, 10Y, EUR/USD, M3). Sin GDP de Alemania, Francia, Eurozona | `ecb_client.py:37-74` | **FIXEADO:** 3 nuevas series ECB: `gdp_ea_qoq`, `gdp_de_qoq`, `gdp_fr_qoq` (Eurostat via ECB MNA dataset) |
+| 194 | MEDIO | **Council deliberation: "0/25 Módulos OK"** — `quantitative_modules` es lista de strings pero renderer esperaba lista de dicts con `status: OK` | `council_deliberation_renderer.py:224-226` | **FIXEADO:** Si lista de strings, `ok_count = len(quant_modules)` (cada string = módulo OK) |
+
+**Nota sobre CAUSAL_TREE (Section 10):** El JSON SÍ existe en el council output (3,329 chars). El parser lo extrae correctamente. La sección debería renderizar en el próximo run — si no aparece, verificar que `council_result` pasado al renderer contiene `final_recommendation` con el JSON.
+
+**Validación:** 4/4 archivos compilan OK.
+
 ---
 
 ## Ciclo 8 — 2026-04-03: Auditoría de Calidad del AI Council

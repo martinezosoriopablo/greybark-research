@@ -71,6 +71,28 @@ ECB_SERIES = {
         'description': 'Euro Area M3 (EUR mn)',
         'unit': 'EUR mn',
     },
+    # GDP growth — Eurostat via ECB (QoQ, seasonally adjusted)
+    'gdp_ea_qoq': {
+        'dataset': 'MNA',
+        'key': 'Q.Y.I8.W2.S1.S1.B.B1GQ._Z._Z._Z.EUR.LR.GY',
+        'last_n': 4,
+        'description': 'Euro Area GDP QoQ',
+        'unit': '%',
+    },
+    'gdp_de_qoq': {
+        'dataset': 'MNA',
+        'key': 'Q.Y.DE.W2.S1.S1.B.B1GQ._Z._Z._Z.EUR.LR.GY',
+        'last_n': 4,
+        'description': 'Germany GDP QoQ',
+        'unit': '%',
+    },
+    'gdp_fr_qoq': {
+        'dataset': 'MNA',
+        'key': 'Q.Y.FR.W2.S1.S1.B.B1GQ._Z._Z._Z.EUR.LR.GY',
+        'last_n': 4,
+        'description': 'France GDP QoQ',
+        'unit': '%',
+    },
 }
 
 # Human-readable descriptions for metadata injection

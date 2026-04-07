@@ -222,7 +222,11 @@ def render_deliberation_report(
             ok_count = sum(1 for v in quant_modules.values() if v == 'OK')
             total = len(quant_modules)
         elif isinstance(quant_modules, list):
-            ok_count = sum(1 for v in quant_modules if isinstance(v, dict) and v.get('status') == 'OK')
+            # List of module names (strings) = all OK; list of dicts = check status
+            if quant_modules and isinstance(quant_modules[0], str):
+                ok_count = len(quant_modules)
+            else:
+                ok_count = sum(1 for v in quant_modules if isinstance(v, dict) and v.get('status') == 'OK')
             total = len(quant_modules)
         else:
             ok_count, total = 0, 0

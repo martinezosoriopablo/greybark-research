@@ -211,6 +211,10 @@ El chart de yield curve del RF report fallaba recurrentemente (Sprints 11, 23, 4
 7. TAA project lives at `greybark-asset-allocation/` (sibling of `Wealth/`). Model: 24 ETFs, 16 FRED series, IR 0.40, 168 months backtest. Runs in ~30s using cached data.
 8. Bug fix: `taa_data_collector.py` now loads data once (was 4x). NEWORDER series correctly displayed as $B with YoY change (was showing raw $M as if PMI). Added `save()` method for cache/audit (outputs `taa_data_{date}.json`).
 9. Analyst calls: `analyst_calls_reader.py` reads analyst recommendations from `greybark-intelligence/data/` (Telegram + Substack). 22 calls/week with BUY/SELL direction, asset, thesis, conviction. Distributed to agents by asset_class, CIO gets full summary.
+10. TAA data injection: `run_monthly.py` now passes `self.data['taa']` to AA renderer via `aa_data['taa']`
+11. RV Chile rationale: 21 stocks now have sector-specific rationale (was 5 ADRs only)
+12. ECB GDP: Added Germany, France, Eurozone GDP QoQ from ECB/Eurostat MNA dataset
+13. Council deliberation: "0/25 Módulos OK" fixed — renderer now correctly counts string list as all-OK
 9. Bug fix: `feature_engineering.py` NEWORDER changed from absolute level to `pct_change(12)` (YoY). `optimizer.py` stress score NEWORDER component uses YoY decline >5% threshold (was comparing $M value vs 50).
 
 ### Ciclo 8: AI Council Quality (Sprint 41)

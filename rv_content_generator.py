@@ -2314,11 +2314,29 @@ class RVContentGenerator:
         """Construye top picks de Chile con datos reales o fallback hardcoded."""
         # Rationale por ticker
         rationale_map = {
+            # ADRs
             'BCH': 'Mejor calidad crediticia, dividend',
             'BSAC': 'Banca retail líder, escala',
             'SQM': 'Litio + cobre, commodities',
             'LTM': 'Recovery aéreo, restructuración',
             'CCU': 'Consumo defensivo, dividend',
+            # Santiago Exchange (.SN)
+            'CENCOSUD': 'Retail regional, exposición LatAm',
+            'FALABELLA': 'Retail + financiero, ciclo consumo',
+            'COPEC': 'Forestal + energía, diversificado',
+            'BCI': 'Banca corporativa, spread crediticio',
+            'ENELCHILE': 'Generación eléctrica, renovables',
+            'ENELAM': 'Distribución LatAm, regulado',
+            'CMPC': 'Celulosa + packaging, ciclo global',
+            'VAPORES': 'Naviera, fletes + dividendo',
+            'COLBUN': 'Generación hídrica, base estable',
+            'ITAUCORP': 'Banca + seguros, diversificado',
+            'CAP': 'Acero + minería, ciclo industrial',
+            'RIPLEY': 'Retail + financiero, Chile + Perú',
+            'PARAUCO': 'Centros comerciales, renta inmobiliaria',
+            'SECURITY': 'Servicios financieros, nicho',
+            'SONDA': 'Tecnología, servicios IT LatAm',
+            'AGUAS-A': 'Utilities regulado, flujo estable',
         }
 
         if chile_picks_data:

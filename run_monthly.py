@@ -800,6 +800,10 @@ class MonthlyPipeline:
                         for sub_k, sub_v in v.items():
                             if sub_k not in aa_data[k]:
                                 aa_data[k][sub_k] = sub_v
+            # Inject TAA data for Section 11
+            taa = self.data.get('taa')
+            if taa and isinstance(taa, dict) and 'error' not in taa:
+                aa_data['taa'] = taa
             renderer = AssetAllocationRenderer(
                 council_result=council_result,
                 market_data=aa_data if aa_data else None,
