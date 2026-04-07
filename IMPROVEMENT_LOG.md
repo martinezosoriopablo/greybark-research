@@ -80,6 +80,26 @@ El test aislado del chart siempre pasa porque no incluye sovereign_curves en el 
 
 **Validación:** 8/8 RF charts generan OK (incluyendo rf_yield_curve con 143K chars). Sovereign curves Alemania (9 tenors) y Japón (11 tenors) correctamente overlay-eadas.
 
+### Sprint 45d — Inyectar sovereign_curves al RF renderer (patrón sistémico)
+
+**Trigger:** Auditoría post-fix del yield curve reveló que `sovereign_curves` nunca llegaban al RF renderer — `run_monthly.py` solo pasaba `rf_data` (del JSON cacheado).
+
+| # | Fix |
+|---|-----|
+| 191 | `run_monthly.py` — inyecta `sovereign_curves` desde `macro_quant` en `rf_data` antes de pasar al `RFReportRenderer`. Mismo patrón que Sprint 37 (AA macro_quant) y Sprint 39 (AA deep merge) |
+
+**Patrón sistémico identificado:** "Datos recolectados pero no pasados al renderer"
+- Sprint 37: AA no recibía `macro_quant` → persist council_input
+- Sprint 39: AA perdía `inflation.cpi_core_yoy` por colisión RF → deep merge
+- Sprint 45d: RF no recibía `sovereign_curves` → inject desde macro_quant
+
+**Prevención:** Al agregar nuevos datos al pipeline, verificar SIEMPRE que `run_monthly.py._generate_single_report()` los inyecta al renderer correspondiente.
+
+**Validación completa de charts:**
+- Macro: requiere content arg (OK por diseño)
+- RV: 12/12 OK
+- RF: 8/8 OK (incluyendo yield curve con Bund + JGB overlay)
+
 ---
 
 ## Ciclo 8 — 2026-04-03: Auditoría de Calidad del AI Council

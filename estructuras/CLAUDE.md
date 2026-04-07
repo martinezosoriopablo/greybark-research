@@ -171,13 +171,30 @@ On next run, loads previous snapshot and injects `_prev` values into quant_data 
 - Output structure: `council_parser.py` (block extraction patterns)
 - **NEVER** reduce data limits, token budgets, or tolerances — always increase if needed
 
+### MEJORA CRÍTICA: Datos recolectados que no llegaban a los renderers
+**Patrón sistémico** encontrado en 3 reportes: los datos SE RECOLECTAN correctamente pero NO SE
+PASAN al renderer porque `run_monthly.py` no los inyecta en el dict de datos del renderer.
+
+| Reporte | Dato faltante | Dónde existía | Dónde faltaba | Fix |
+|---------|--------------|---------------|---------------|-----|
+| **AA** | macro_quant completo (GDP, CPI, TPM, VIX, etc.) | `council_input.quantitative` | `aa_data` (renderer) | Sprint 37: persist `council_input`, Sprint 39: deep merge |
+| **AA** | CPI core (colisión RF vs macro_quant) | `macro_quant.inflation.cpi_core_yoy` | `aa_data.inflation` (RF overwrote it) | Sprint 39: deep merge sub-keys |
+| **RF** | sovereign_curves (Bund, JGB) | `macro_quant.sovereign_curves` | `rf_data` (renderer) | Sprint 45d: inject from macro_quant |
+
+**Regla:** Cuando un renderer necesita datos que no están en su JSON cacheado (rf_data, equity_data),
+`run_monthly.py._generate_single_report()` debe inyectarlos desde `self.data['macro_quant']`.
+Verificar SIEMPRE que los datos llegan al renderer, no solo que se recolectan.
+
 ### BUG CRÓNICO RESUELTO: rf_yield_curve (Sprint 45c)
 El chart de yield curve del RF report fallaba recurrentemente (Sprints 11, 23, 45c).
-**Causa raíz:** sovereign curves data en `cdata['datos']` pero chart buscaba en `cdata['tenors']`.
-**Fix:** `rf_chart_generator.py:279` busca en AMBOS con parsing robusto.
-**Prevención:** Siempre testear charts CON sovereign_curves inyectadas, no solo rf_data aislado.
+**Causa raíz DOBLE:**
+1. `rf_chart_generator.py:279` buscaba `cdata['tenors']` pero los datos están en `cdata['datos']`
+2. `run_monthly.py` no inyectaba `sovereign_curves` al RF renderer — datos solo en `macro_quant`
 
-### Preflight/Completeness NO_GO bugs (Sprints 45, 45b, 45c)
+**Fixes:** (1) Chart busca en AMBOS `tenors` OR `datos` con parsing robusto. (2) `run_monthly.py` inyecta `sovereign_curves` en `rf_data` antes de pasar al renderer.
+**Prevención:** Siempre testear charts CON sovereign_curves inyectadas. Siempre verificar que `run_monthly.py` pasa TODOS los datos al renderer.
+
+### Preflight/Completeness NO_GO bugs (Sprints 45, 45b)
 - `DAILY_CONTEXT_LIMIT` debe ser >=15000 (intelligence digest genera 12-14K chars)
 - `data_completeness_validator` NO_GO threshold debe ser 60% (no 95%) — 78% de datos es suficiente
 - `data_manifest.py`: keys deben coincidir EXACTAMENTE con lo que produce el collector (chile.imacec_yoy, no chile.imacec)

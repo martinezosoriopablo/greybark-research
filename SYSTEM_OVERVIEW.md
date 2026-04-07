@@ -226,6 +226,17 @@ Documento pre-council con datos verificados:
 | **Crisis reference** | `crisis_reference.py` — 8 episodios verificados inyectados en todos los agentes |
 | **Bloomberg percentiles** | Cada serie muestra `p5Y: XX` (percentil vs 5 años) |
 
+### MEJORA CRÍTICA: Pipeline de datos a renderers
+
+Patrón sistémico corregido: datos recolectados en `macro_quant` pero no pasados a los renderers.
+`run_monthly.py._generate_single_report()` ahora inyecta explícitamente:
+- **AA:** `macro_quant` completo (deep merge con rf_data para evitar colisiones de keys)
+- **RF:** `sovereign_curves` (Bund/JGB para overlay en yield curve chart)
+- **Todos:** `council_input` se persiste como JSON para re-uso en `--skip-collect`
+
+**Regla:** Si un renderer necesita datos que no están en su JSON cacheado, `run_monthly.py` los inyecta
+desde `self.data['macro_quant']`. Verificar SIEMPRE que los datos llegan al renderer.
+
 ### ALERTA: Datos Inventados cuando Council No Corre
 
 Si el preflight bloquea el council (NO_GO), los reportes se generan con narrativas GENÉRICAS
