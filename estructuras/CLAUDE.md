@@ -204,7 +204,8 @@ El chart de yield curve del RF report fallaba recurrentemente (Sprints 11, 23, 4
 **Tier 1 (bugs, fixeados Sprint 47):** HTML roto en narrativas, secciones vacías ocultas, "Puntos Clave" en español, RF probabilidades obligatorias
 **Tier 2 (implementados Sprint 48):** "Qué Cambió" tabla, "Qué Está Priceado", conviction ★★★, cross-asset matrix, "Dónde Podemos Estar Equivocados", "Foco del Período" (tema dominante del mes), copper sensitivity Chile, callout boxes (4 tipos)
 **Tier 2 (pendiente):** quant signal dashboard, z-score table, expected value table por escenario
-**Tier 3 (pendiente diseño):** Traffic-light conviction grid, sparklines en tablas, pull quotes del CIO, annotated charts
+**Tier 3 (implementados Sprint 48f):** Traffic-light conviction grid, pull quote CIO, sparkline SVG helper
+**Tier 3 (pendiente):** Annotated charts (requiere cambios en matplotlib chart_generator)
 
 ## Recent Changes (2026-04-08)
 ### Sprint 47: Report Quality — Tier 1 Fixes

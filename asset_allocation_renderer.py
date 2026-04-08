@@ -274,6 +274,40 @@ class AssetAllocationRenderer:
                 </div>'''
             replacements[f'{{{{{placeholder}}}}}'] = rows_html
 
+        # 1b. TRAFFIC-LIGHT GRID + PULL QUOTE
+        try:
+            from report_enhancements import generate_traffic_light_grid_html, generate_pull_quote_html
+
+            # Build traffic-light from dashboard views
+            tl_views = {}
+            for item in dashboard.get('renta_variable', []) + dashboard.get('renta_fija', []) + dashboard.get('commodities_fx', []):
+                asset = item.get('asset', '')
+                view = item.get('view', 'N')
+                conv = item.get('conviccion', '')
+                tl_views[asset] = {
+                    'tactical': {'view': view, 'conviction': conv},
+                    'strategic': {'view': view, 'conviction': conv},
+                }
+            replacements['{{traffic_light_html}}'] = generate_traffic_light_grid_html(tl_views)
+
+            # Pull quote from council final recommendation (first strong statement)
+            final_rec = self.council_result.get('final_recommendation', '') if self.council_result else ''
+            pull_text = ''
+            if final_rec:
+                # Find first sentence that contains a strong view
+                import re
+                sentences = re.split(r'[.!]\s+', final_rec[:2000])
+                for s in sentences:
+                    if any(word in s.lower() for word in ['creemos', 'vemos', 'nuestra lectura', 'adoptamos', 'mantenemos', 'recomendamos']):
+                        pull_text = s.strip().rstrip('.')
+                        break
+            replacements['{{pull_quote_html}}'] = generate_pull_quote_html(pull_text) if pull_text else ''
+        except Exception as e:
+            if self.verbose:
+                print(f"  [WARN] Traffic light/pull quote: {e}")
+            replacements['{{traffic_light_html}}'] = ''
+            replacements['{{pull_quote_html}}'] = ''
+
         # 2a. QUANT SIGNAL DASHBOARD + Z-SCORE TABLE
         try:
             from report_enhancements import generate_quant_signal_dashboard_html, generate_zscore_table_html

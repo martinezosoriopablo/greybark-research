@@ -869,6 +869,18 @@
         <p><strong>Principal catalizador a monitorear:</strong> {{catalizador}}</p>
     </section>
 
+    <!-- TRAFFIC-LIGHT CONVICTION GRID -->
+    {% if traffic_light_html %}
+    <section class="section">
+        {{ traffic_light_html }}
+    </section>
+    {% endif %}
+
+    <!-- PULL QUOTE -->
+    {% if pull_quote_html %}
+    {{ pull_quote_html }}
+    {% endif %}
+
     <!-- TEMA CENTRAL DEL MES -->
     {% if tema_central_html %}
     <section class="section">

@@ -647,6 +647,128 @@ def generate_zscore_table_html(metrics: list) -> str:
     '''
 
 
+def generate_traffic_light_grid_html(views: dict) -> str:
+    """Generate traffic-light conviction grid — entire house view on one glance.
+
+    Goldman Sachs style: rows = asset classes, columns = time horizons.
+    Each cell colored green (OW) / yellow (N) / red (UW) with conviction stars.
+
+    Args:
+        views: dict of asset_class → {tactical: {view, conviction}, strategic: {view, conviction}}
+    """
+    if not views:
+        return ''
+
+    def _cell(v):
+        if not v:
+            return '<td style="text-align:center; padding:8px; background:#f7f7f7;">—</td>'
+        view = (v.get('view', '') or '').upper()
+        conv = v.get('conviction', '')
+
+        if view in ('OW', 'SOBREPONDERAR'):
+            bg = '#f0fff4'
+            border = '#276749'
+            text = 'OW'
+        elif view in ('UW', 'SUBPONDERAR'):
+            bg = '#fff5f5'
+            border = '#c53030'
+            text = 'UW'
+        else:
+            bg = '#fffff0'
+            border = '#dd6b20'
+            text = 'N'
+
+        stars = conviction_stars(conv)
+        return (f'<td style="text-align:center; padding:8px 12px; background:{bg}; '
+                f'border-left:3px solid {border};">'
+                f'<div style="font-weight:700; font-size:11pt;">{text}</div>'
+                f'<div>{stars}</div></td>')
+
+    rows = ''
+    for asset, horizons in views.items():
+        tactical = _cell(horizons.get('tactical'))
+        strategic = _cell(horizons.get('strategic'))
+        rows += f'''<tr>
+            <td style="font-weight:600; padding:8px;">{asset}</td>
+            {tactical}
+            {strategic}
+        </tr>'''
+
+    return f'''
+    <div style="margin:20px 0; page-break-inside:avoid;">
+        <h3 style="color:var(--accent); margin-bottom:10px;">Visión del Comité — Resumen</h3>
+        <table style="width:100%; border-collapse:collapse; font-size:10pt;">
+            <thead>
+                <tr style="background:#1a1a1a; color:white;">
+                    <th style="text-align:left; padding:10px; width:40%;">Clase de Activo</th>
+                    <th style="text-align:center; padding:10px; width:30%;">Táctico (1-3m)</th>
+                    <th style="text-align:center; padding:10px; width:30%;">Estratégico (6-12m)</th>
+                </tr>
+            </thead>
+            <tbody>{rows}</tbody>
+        </table>
+        <p style="font-size:8pt; color:#a0aec0; margin-top:5px;">
+            Verde = Sobreponderar (OW) | Amarillo = Neutral (N) | Rojo = Subponderar (UW).
+            Estrellas indican nivel de convicción: ★★★ Alta, ★★ Media, ★ Baja.
+        </p>
+    </div>
+    '''
+
+
+def generate_pull_quote_html(text: str, attribution: str = 'Comité de Inversiones') -> str:
+    """Generate pull quote — key CIO statement in large format.
+
+    Magazine-style editorial element between sections.
+    """
+    if not text:
+        return ''
+
+    return f'''
+    <div style="margin:30px 40px; padding:20px 30px; border-left:4px solid #dd6b20;
+                background:linear-gradient(135deg, #fffaf5 0%, #fff 100%);
+                page-break-inside:avoid;">
+        <p style="font-size:14pt; font-style:italic; color:#2d3748; line-height:1.6; margin:0;">
+            "{text}"
+        </p>
+        <p style="font-size:9pt; color:#a0aec0; margin:10px 0 0; text-align:right;">
+            — {attribution}, Greybark Research
+        </p>
+    </div>
+    '''
+
+
+def generate_sparkline_svg(values: list, width: int = 60, height: int = 16,
+                           color: str = '#dd6b20') -> str:
+    """Generate inline SVG sparkline from a list of values.
+
+    Tiny trend chart for embedding in table cells.
+    """
+    if not values or len(values) < 3:
+        return ''
+
+    # Normalize values to SVG coordinates
+    min_v = min(values)
+    max_v = max(values)
+    v_range = max_v - min_v if max_v != min_v else 1
+
+    points = []
+    for i, v in enumerate(values):
+        x = (i / (len(values) - 1)) * width
+        y = height - ((v - min_v) / v_range) * (height - 2) - 1
+        points.append(f'{x:.1f},{y:.1f}')
+
+    polyline = ' '.join(points)
+
+    # Color the last segment based on direction
+    last_color = '#276749' if values[-1] > values[-2] else ('#c53030' if values[-1] < values[-2] else color)
+
+    return (f'<svg width="{width}" height="{height}" style="display:inline-block; vertical-align:middle;">'
+            f'<polyline points="{polyline}" fill="none" stroke="{color}" stroke-width="1.2" opacity="0.6"/>'
+            f'<circle cx="{width}" cy="{height - ((values[-1] - min_v) / v_range) * (height - 2) - 1:.1f}" '
+            f'r="2" fill="{last_color}"/>'
+            f'</svg>')
+
+
 def _view_score(view: str) -> int:
     """Convert view to numeric score for comparison."""
     view = (view or '').upper().strip()
