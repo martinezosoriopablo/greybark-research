@@ -274,6 +274,24 @@ class AssetAllocationRenderer:
                 </div>'''
             replacements[f'{{{{{placeholder}}}}}'] = rows_html
 
+        # 2a. TEMA CENTRAL DEL MES
+        try:
+            from report_enhancements import generate_tema_central_html
+            intel = self.council_result.get('intelligence', {}) if self.council_result else {}
+            themes = intel.get('themes', {})
+            # Get analyst calls if available
+            try:
+                from analyst_calls_reader import AnalystCallsReader
+                acr = AnalystCallsReader(verbose=False)
+                calls = acr.get_recent_calls(days=7)
+            except Exception:
+                calls = []
+            replacements['{{tema_central_html}}'] = generate_tema_central_html(themes, calls, variant='full')
+        except Exception as e:
+            if self.verbose:
+                print(f"  [WARN] Tema central: {e}")
+            replacements['{{tema_central_html}}'] = ''
+
         # 2b. TIER 2 ENHANCEMENTS: "Qué Cambió" + "Qué Está Priceado"
         try:
             from report_enhancements import generate_what_changed_html, generate_whats_priced_in_html

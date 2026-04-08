@@ -274,6 +274,151 @@ def generate_where_wrong_html(risks: list) -> str:
     '''
 
 
+def generate_tema_central_html(themes: dict, analyst_calls: list = None,
+                                variant: str = 'full') -> str:
+    """Generate "Tema Central del Mes" section from intelligence digest.
+
+    Identifies the dominant theme of the period and builds a rich narrative
+    with evolution, analyst consensus, and implications.
+
+    Args:
+        themes: dict from intelligence_digest (theme_id → {category, trend, report_days, recent_contexts})
+        analyst_calls: list of analyst call dicts (optional)
+        variant: 'full' (for Macro/AA) or 'compact' (for RV/RF)
+    """
+    if not themes:
+        return ''
+
+    # Find dominant theme (most report_days, prefer 'creciente' trend)
+    ranked = sorted(
+        themes.items(),
+        key=lambda x: (
+            x[1].get('report_days', 0) * (1.5 if x[1].get('trend') == 'creciente' else 1.0),
+        ),
+        reverse=True
+    )
+
+    if not ranked:
+        return ''
+
+    top_id, top = ranked[0]
+    category = top.get('category', '')
+    trend = top.get('trend', 'estable')
+    report_days = top.get('report_days', 0)
+    contexts = top.get('recent_contexts', [])
+
+    # Trend icon
+    trend_icons = {'creciente': '&#9650;', 'decreciente': '&#9660;', 'estable': '→', 'nuevo': '&#9733;'}
+    trend_colors = {'creciente': '#c53030', 'decreciente': '#276749', 'estable': '#718096', 'nuevo': '#dd6b20'}
+    trend_icon = trend_icons.get(trend, '→')
+    trend_color = trend_colors.get(trend, '#718096')
+
+    # Format title from theme_id
+    title = top_id.replace('_', ' ').title()
+
+    # Build context bullets
+    context_html = ''
+    for ctx in contexts[:4]:
+        context_html += f'<li style="margin-bottom:4px; font-size:9pt; color:#4a5568;">{ctx}</li>'
+
+    # Analyst consensus on this theme (if available)
+    analyst_html = ''
+    if analyst_calls:
+        # Filter calls related to this theme's category
+        cat_map = {
+            'Geopolítica': ['commodities', 'fx', 'renta_variable'],
+            'Política Monetaria': ['renta_fija', 'fx'],
+            'Inflación': ['renta_fija', 'commodities'],
+            'Commodities': ['commodities'],
+            'Crecimiento': ['renta_variable', 'macro'],
+        }
+        relevant_classes = cat_map.get(category, ['macro'])
+        relevant_calls = [c for c in analyst_calls
+                          if c.get('asset_class', '') in relevant_classes][:5]
+
+        if relevant_calls:
+            buy_count = sum(1 for c in relevant_calls if c.get('direction', '').upper() in ('BUY', 'LONG'))
+            sell_count = sum(1 for c in relevant_calls if c.get('direction', '').upper() in ('SELL', 'SHORT'))
+            consensus = 'Bullish' if buy_count > sell_count else ('Bearish' if sell_count > buy_count else 'Mixto')
+            cons_color = '#276749' if consensus == 'Bullish' else ('#c53030' if consensus == 'Bearish' else '#718096')
+
+            top_call = relevant_calls[0]
+            analyst_html = f'''
+            <div style="margin-top:10px; padding:10px; background:#f7fafc; border-radius:6px; border:1px solid #e2e8f0;">
+                <div style="font-size:9pt; font-weight:600; color:#2d3748;">
+                    Consenso Analistas: <span style="color:{cons_color};">{consensus}</span>
+                    ({buy_count} bullish, {sell_count} bearish de {len(relevant_calls)} calls)
+                </div>
+                <p style="font-size:9pt; color:#718096; margin:4px 0 0;">
+                    Top call: {top_call.get('analyst', '?')} ({top_call.get('firm', '?')}) —
+                    {top_call.get('direction', '?')} {top_call.get('asset', '?')}:
+                    {top_call.get('thesis', '')[:120]}
+                </p>
+            </div>'''
+
+    # Secondary themes
+    secondary_html = ''
+    if len(ranked) > 1 and variant == 'full':
+        secondary_items = []
+        for tid, t in ranked[1:4]:
+            t_trend = trend_icons.get(t.get('trend', 'estable'), '→')
+            t_color = trend_colors.get(t.get('trend', 'estable'), '#718096')
+            t_title = tid.replace('_', ' ').title()
+            secondary_items.append(
+                f'<span style="display:inline-block; margin-right:12px; font-size:9pt;">'
+                f'<span style="color:{t_color};">{t_trend}</span> {t_title} '
+                f'<span style="color:#a0aec0;">({t.get("report_days", 0)}d)</span></span>'
+            )
+        if secondary_items:
+            secondary_html = f'''
+            <div style="margin-top:10px; padding-top:8px; border-top:1px solid #e2e8f0;">
+                <span style="font-size:8pt; color:#a0aec0; text-transform:uppercase; letter-spacing:0.05em;">Otros temas:</span>
+                <div style="margin-top:4px;">{''.join(secondary_items)}</div>
+            </div>'''
+
+    # Compact variant (for RV/RF)
+    if variant == 'compact':
+        return f'''
+        <div style="margin:15px 0; padding:12px 16px; border-left:3px solid #dd6b20; background:#fffaf5; border-radius:0 6px 6px 0;">
+            <div style="display:flex; align-items:baseline; gap:8px;">
+                <span style="font-size:10pt; font-weight:700; color:#2d3748;">Foco del Período:</span>
+                <span style="font-size:10pt; color:#4a5568;">{title}</span>
+                <span style="color:{trend_color}; font-size:11pt;">{trend_icon}</span>
+                <span style="font-size:8pt; color:#a0aec0;">({report_days} días en reportes)</span>
+            </div>
+            {f'<p style="font-size:9pt; color:#718096; margin:4px 0 0;">{contexts[0][:150]}</p>' if contexts else ''}
+        </div>
+        '''
+
+    # Full variant (for Macro/AA)
+    return f'''
+    <div style="margin:20px 0; page-break-inside:avoid;">
+        <div style="border-left:4px solid #dd6b20; padding:16px 20px; background:linear-gradient(135deg, #fffaf5 0%, #fff 100%); border-radius:0 8px 8px 0; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px;">
+                <div>
+                    <p style="font-size:8pt; color:#a0aec0; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 2px;">Foco del Período</p>
+                    <h3 style="font-size:14pt; font-weight:700; color:#1a2332; margin:0;">
+                        {title}
+                        <span style="color:{trend_color}; font-size:14pt; margin-left:6px;">{trend_icon}</span>
+                    </h3>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:9pt; color:#718096;">{report_days} días en reportes</span>
+                    <br><span style="font-size:8pt; color:#a0aec0;">{category}</span>
+                </div>
+            </div>
+
+            <ul style="margin:0; padding-left:20px;">
+                {context_html}
+            </ul>
+
+            {analyst_html}
+            {secondary_html}
+        </div>
+    </div>
+    '''
+
+
 def _view_score(view: str) -> int:
     """Convert view to numeric score for comparison."""
     view = (view or '').upper().strip()

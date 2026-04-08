@@ -44,6 +44,7 @@
 | 201 | **Conviction tiers ★★★/★★/★** — reemplaza texto "ALTA/MEDIA/BAJA" por estrellas naranjas en el dashboard de posicionamiento. Ortogonal a OW/N/UW: "cuánto apostar" vs "en qué dirección" | `report_enhancements.py:conviction_stars()`, `asset_allocation_renderer.py` | Morgan Stanley: 3-tier conviction system |
 | 202 | **"Dónde Podemos Estar Equivocados"** — sección con condiciones falsificables, triggers cuantificados, probabilidad e impacto. Cards rojos con borde izquierdo. Extraído de top_risks del council | `report_enhancements.py:generate_where_wrong_html()`, template AA | Bridgewater: pre-mortem analysis |
 | 203 | **Cross-asset implications matrix** — "Si nuestra tesis es correcta → equities X, bonds Y, FX Z". Tabla con flechas direccionales y fundamento | `report_enhancements.py:generate_cross_asset_matrix_html()`, template AA | JP Morgan: coherence check at a glance |
+| 204 | **"Foco del Período"** — tema central del mes extraído del intelligence digest (23+ temas). Muestra: título, tendencia (↑↓→), días en reportes, contextos recientes, consenso analistas (bullish/bearish), temas secundarios. Versión full (Macro/AA) y compact (RV/RF). Usa analyst calls de Telegram/Substack para consenso | `report_enhancements.py:generate_tema_central_html()`, AA renderer + template | Goldman: every report leads with the dominant narrative |
 
 **Nuevo módulo:** `report_enhancements.py` — funciones independientes que retornan HTML snippets para inyección en renderers. Diseñado para ser reutilizable en otros reportes.
 
