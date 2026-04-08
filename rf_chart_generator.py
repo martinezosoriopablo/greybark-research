@@ -345,6 +345,13 @@ class RFChartsGenerator:
             ax2.text(dates[0], min_val - 0.05, f'Min: {min_val:.2f}%', fontsize=6.5,
                      color=self.COLORS['text_light'], va='top')
 
+            # Annotate market events on time series
+            try:
+                from chart_generator import ChartGenerator
+                ChartGenerator.annotate_events(ax2, dates)
+            except Exception:
+                pass
+
             ax2.set_ylabel('Yield (%)', fontsize=9)
             ax2.set_title('Treasury 10Y (10 Anos)', fontsize=12, fontweight='bold',
                            color=self.COLORS['primary'], pad=10)

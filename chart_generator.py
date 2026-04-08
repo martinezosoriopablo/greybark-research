@@ -71,6 +71,71 @@ class ChartGenerator:
         '#e53e3e',  # Light red
     ]
 
+    # Known market events for automatic chart annotations
+    MARKET_EVENTS = [
+        {'date': '2020-03', 'label': 'COVID', 'color': '#c53030'},
+        {'date': '2022-02', 'label': 'Rusia-Ucrania', 'color': '#c53030'},
+        {'date': '2022-06', 'label': 'Fed +75bp', 'color': '#dd6b20'},
+        {'date': '2023-03', 'label': 'SVB', 'color': '#c53030'},
+        {'date': '2023-10', 'label': 'UST 5%', 'color': '#dd6b20'},
+        {'date': '2024-09', 'label': 'Fed corta', 'color': '#276749'},
+        {'date': '2026-03', 'label': 'Irán-Hormuz', 'color': '#c53030'},
+    ]
+
+    @staticmethod
+    def annotate_events(ax, date_index, events=None, y_position='top'):
+        """Add contextual event annotations to a time-series chart.
+
+        Draws vertical dashed lines with labels at known market events
+        that fall within the chart's date range.
+
+        Args:
+            ax: matplotlib axes
+            date_index: DatetimeIndex of the chart's x-axis
+            events: list of {date, label, color} dicts (default: MARKET_EVENTS)
+            y_position: 'top' or 'bottom' for label placement
+        """
+        import pandas as pd
+
+        if events is None:
+            events = ChartGenerator.MARKET_EVENTS
+
+        if date_index is None or len(date_index) == 0:
+            return
+
+        x_min = date_index[0]
+        x_max = date_index[-1]
+        y_min, y_max = ax.get_ylim()
+
+        for event in events:
+            try:
+                event_date = pd.Timestamp(event['date'])
+                if event_date < x_min or event_date > x_max:
+                    continue
+
+                color = event.get('color', '#a0aec0')
+                label = event.get('label', '')
+
+                # Vertical dashed line
+                ax.axvline(x=event_date, color=color, linewidth=0.8,
+                           linestyle='--', alpha=0.5, zorder=1)
+
+                # Label
+                if y_position == 'top':
+                    y_label = y_max - (y_max - y_min) * 0.05
+                    va = 'top'
+                else:
+                    y_label = y_min + (y_max - y_min) * 0.05
+                    va = 'bottom'
+
+                ax.text(event_date, y_label, f' {label}',
+                        fontsize=6.5, color=color, alpha=0.8,
+                        va=va, ha='left', rotation=0,
+                        bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                                  alpha=0.7, edgecolor='none'))
+            except Exception:
+                continue
+
     @staticmethod
     def _safe_float(val, default: float = 0.0) -> float:
         """Safely convert a value to float, handling 'N/D', '%', '+' etc."""
@@ -888,6 +953,28 @@ class ChartGenerator:
                          color=self.COLORS['primary_blue'])
             ax.set_ylabel(panel.get('ylabel', ''), fontsize=7)
             ax.legend(fontsize=6, framealpha=0.9)
+
+            # Add event annotations if panel spans enough time (>24 months)
+            if n_dates > 24:
+                try:
+                    import pandas as pd
+                    date_index = pd.DatetimeIndex([pd.Timestamp(d) for d in first_dates])
+                    # Map events to numeric x-axis positions
+                    for event in self.MARKET_EVENTS:
+                        evt_date = pd.Timestamp(event['date'])
+                        if evt_date < date_index[0] or evt_date > date_index[-1]:
+                            continue
+                        # Find closest index
+                        diffs = abs(date_index - evt_date)
+                        closest_idx = diffs.argmin()
+                        ax.axvline(x=closest_idx, color=event.get('color', '#a0aec0'),
+                                   linewidth=0.6, linestyle='--', alpha=0.4, zorder=1)
+                        y_top = ax.get_ylim()[1]
+                        ax.text(closest_idx, y_top, f' {event["label"]}', fontsize=5.5,
+                                color=event.get('color', '#a0aec0'), alpha=0.7,
+                                va='top', ha='left', rotation=0)
+                except Exception:
+                    pass
 
         # Hide unused panels
         for idx in range(len(panels), len(axes_flat)):
