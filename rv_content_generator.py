@@ -2347,9 +2347,9 @@ class RVContentGenerator:
                 top_picks.append({
                     'empresa': p['name'],
                     'ticker': p['ticker'],
-                    'pe': f"{pe:.1f}x" if pe and pe < 80 else 'N/D',
-                    'div_yield': f"{div_y:.1f}%" if div_y else 'N/D',
-                    'rationale': rationale_map.get(p['ticker'], 'N/D'),
+                    'pe': f"{pe:.1f}x" if pe and pe < 80 else '',
+                    'div_yield': f"{div_y:.1f}%" if div_y else '',
+                    'rationale': rationale_map.get(p['ticker'], p.get('sector', '')),
                 })
             return top_picks
 

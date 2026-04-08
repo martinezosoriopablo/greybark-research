@@ -724,10 +724,10 @@ class RFContentGenerator:
         gilt_bbg = bbg_curves.get('gilt', {})
         gilt_row = {
             'mercado': 'UK Gilt',
-            'y2': self._fmt_pct(gilt_bbg.get('2y')) if gilt_bbg.get('2y') is not None else 'N/D',
-            'y5': self._fmt_pct(gilt_bbg.get('5y')) if gilt_bbg.get('5y') is not None else 'N/D',
+            'y2': self._fmt_pct(gilt_bbg.get('2y')) if gilt_bbg.get('2y') is not None else '',
+            'y5': self._fmt_pct(gilt_bbg.get('5y')) if gilt_bbg.get('5y') is not None else '',
             'y10': self._fmt_pct(uk_10y) if uk_10y else (self._fmt_pct(gilt_bbg.get('10y')) if gilt_bbg.get('10y') else 'N/D'),
-            'y30': self._fmt_pct(gilt_bbg.get('30y')) if gilt_bbg.get('30y') is not None else 'N/D',
+            'y30': self._fmt_pct(gilt_bbg.get('30y')) if gilt_bbg.get('30y') is not None else '',
             'vs_1m': uk_vs1m if uk_vs1m else '-',
         }
         if uk_10y or gilt_bbg:
