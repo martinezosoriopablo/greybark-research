@@ -29,6 +29,25 @@ def _esc(val, default='') -> str:
     return _html_escape(str(val))
 
 
+def _esc_narrative(val, default='') -> str:
+    """HTML-escape but preserve <strong>/<em> tags and convert **markdown** bold.
+
+    For narrative text from council that may contain legitimate formatting.
+    """
+    if val is None:
+        return default
+    text = _html_escape(str(val))
+    # Restore escaped <strong> and <em> tags
+    text = text.replace('&lt;strong&gt;', '<strong>').replace('&lt;/strong&gt;', '</strong>')
+    text = text.replace('&lt;em&gt;', '<em>').replace('&lt;/em&gt;', '</em>')
+    text = text.replace('&lt;br&gt;', '<br>').replace('&lt;br/&gt;', '<br>')
+    # Convert markdown bold/italic
+    import re
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    return text
+
+
 def _md_to_html_inline(text: str) -> str:
     """Convert markdown bold/italic to HTML inline, preserving <style> blocks."""
     if not text or not isinstance(text, str):
@@ -349,7 +368,7 @@ class RVReportRenderer:
                     <span class="view-badge badge-ow">{_esc(s.get('view', 'OW'))} | Upside: {_esc(s.get('upside', 'N/D'))}</span>
                 </div>
                 <div class="sector-card-body">
-                    <p>{_esc(s.get('tesis', ''))}</p>
+                    <p>{_esc_narrative(s.get('tesis', ''))}</p>
                     <div class="sector-tags">
                         <strong style="font-size:8pt;">Preferidos:</strong> {subsectors}
                     </div>
@@ -370,8 +389,8 @@ class RVReportRenderer:
                     <span class="view-badge badge-uw">{_esc(s.get('view', 'UW'))}</span>
                 </div>
                 <div class="sector-card-body">
-                    <p>{_esc(s.get('razon', ''))}</p>
-                    <p style="font-size:9pt; color: var(--text-light);"><strong>¿Qué cambiaría?</strong> {_esc(s.get('que_cambiaria', ''))}</p>
+                    <p>{_esc_narrative(s.get('razon', ''))}</p>
+                    <p style="font-size:9pt; color: var(--text-light);"><strong>¿Qué cambiaría?</strong> {_esc_narrative(s.get('que_cambiaria', ''))}</p>
                 </div>
             </div>'''
         replacements['{{avoid_sectors_html}}'] = avoid_html
@@ -439,7 +458,7 @@ class RVReportRenderer:
                             <div class="metric-value">{r.get('cambio', '')}</div>
                         </div>
                     </div>
-                    <p style="color: var(--text-medium);">{_esc(r.get('narrativa', ''))}</p>
+                    <p style="color: var(--text-medium);">{_esc_narrative(r.get('narrativa', ''))}</p>
                 </div>
             </div>'''
         replacements['{{regional_views_html}}'] = regional_html
@@ -508,8 +527,8 @@ class RVReportRenderer:
                         <span>Impacto: <strong>{_esc(r.get('impacto', 'N/D'))}</strong></span>
                     </span>
                 </div>
-                <p style="margin: 10px 0; color: var(--text-medium);">{_esc(r.get('descripcion', ''))}</p>
-                <p style="font-size: 9pt; color: var(--text-light);"><strong>Hedge:</strong> {_esc(r.get('hedge', ''))}</p>
+                <p style="margin: 10px 0; color: var(--text-medium);">{_esc_narrative(r.get('descripcion', ''))}</p>
+                <p style="font-size: 9pt; color: var(--text-light);"><strong>Hedge:</strong> {_esc_narrative(r.get('hedge', ''))}</p>
             </div>'''
         replacements['{{risks_html}}'] = risks_html
 

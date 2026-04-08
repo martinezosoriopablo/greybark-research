@@ -30,6 +30,20 @@ def _esc(val, default='') -> str:
     return _html_escape(str(val))
 
 
+def _esc_narrative(val, default='') -> str:
+    """HTML-escape but preserve <strong>/<em> tags and convert **markdown** bold."""
+    if val is None:
+        return default
+    text = _html_escape(str(val))
+    text = text.replace('&lt;strong&gt;', '<strong>').replace('&lt;/strong&gt;', '</strong>')
+    text = text.replace('&lt;em&gt;', '<em>').replace('&lt;/em&gt;', '</em>')
+    text = text.replace('&lt;br&gt;', '<br>').replace('&lt;br/&gt;', '<br>')
+    import re
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    return text
+
+
 def _md_to_html_inline(text: str) -> str:
     """Convert markdown bold/italic to HTML inline, preserving <style> blocks."""
     if not text or not isinstance(text, str):
@@ -281,12 +295,16 @@ class MacroReportRenderer:
         replacements['{{vs_previous_rows}}'] = vs_prev_rows
 
         track = vs_prev.get('track_record', {})
-        replacements['{{track_record_aciertos}}'] = ''.join(
-            f'<li>{a}</li>' for a in track.get('aciertos', [])
-        )
-        replacements['{{track_record_errores}}'] = ''.join(
-            f'<li>{e}</li>' for e in track.get('errores', [])
-        )
+        aciertos = track.get('aciertos', [])
+        errores = track.get('errores', [])
+        if aciertos or errores:
+            replacements['{{track_record_aciertos}}'] = ''.join(f'<li>{a}</li>' for a in aciertos)
+            replacements['{{track_record_errores}}'] = ''.join(f'<li>{e}</li>' for e in errores)
+            replacements['{{track_record_visible}}'] = ''
+        else:
+            replacements['{{track_record_aciertos}}'] = ''
+            replacements['{{track_record_errores}}'] = ''
+            replacements['{{track_record_visible}}'] = 'style="display:none"'
 
         # 2. ESTADOS UNIDOS
         usa = content.get('estados_unidos', {})

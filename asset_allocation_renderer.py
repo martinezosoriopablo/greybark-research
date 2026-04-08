@@ -29,6 +29,20 @@ def _esc(val, default='') -> str:
     return _html_escape(str(val))
 
 
+def _esc_narrative(val, default='') -> str:
+    """HTML-escape but preserve <strong>/<em> tags and convert **markdown** bold."""
+    if val is None:
+        return default
+    text = _html_escape(str(val))
+    text = text.replace('&lt;strong&gt;', '<strong>').replace('&lt;/strong&gt;', '</strong>')
+    text = text.replace('&lt;em&gt;', '<em>').replace('&lt;/em&gt;', '</em>')
+    text = text.replace('&lt;br&gt;', '<br>').replace('&lt;br/&gt;', '<br>')
+    import re
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    return text
+
+
 def _md_to_html_inline(text: str) -> str:
     """Convert markdown bold/italic to HTML inline, preserving <style> blocks."""
     if not text or not isinstance(text, str):
@@ -305,7 +319,7 @@ class AssetAllocationRenderer:
             <div class="scenario-card {is_base}">
                 <div class="scenario-name">{_esc(e_nombre)}</div>
                 <div class="scenario-prob">{_esc(e.get('probabilidad', ''))}%</div>
-                <div class="scenario-desc">{_esc(e.get('descripcion', ''))}</div>
+                <div class="scenario-desc">{_esc_narrative(e.get('descripcion', ''))}</div>
                 <div style="font-size: 9pt; color: #718096;"><strong>Qué comprar:</strong> {_esc(e.get('que_comprar', ''))}</div>
             </div>
             '''
@@ -354,7 +368,7 @@ class AssetAllocationRenderer:
                     <span class="view-badge {badge_class}">{_esc(view_val)} | Conviccion: {_esc(view.get('conviccion', ''))}</span>
                 </div>
                 <div class="view-body">
-                    <div class="view-tesis">{_esc(view.get('tesis', ''))}</div>
+                    <div class="view-tesis">{_esc_narrative(view.get('tesis', ''))}</div>
                     <div class="arguments-grid">
                         <div class="arguments-column pro">
                             <h4>Argumentos a Favor</h4>
@@ -381,7 +395,7 @@ class AssetAllocationRenderer:
         eq = ac.get('renta_variable', {})
         replacements['{{equity_view_global}}'] = eq.get('view_global', '')
         eq_rows = ''.join([
-            f"<tr><td>{_esc(r.get('region', ''))}</td><td><span class='view-badge badge-{self._sanitize_css_class(r.get('view', 'N'))}'>{_esc(r.get('view', 'N'))}</span></td><td>{_esc(r.get('rationale', ''))}</td></tr>"
+            f"<tr><td>{_esc(r.get('region', ''))}</td><td><span class='view-badge badge-{self._sanitize_css_class(r.get('view', 'N'))}'>{_esc(r.get('view', 'N'))}</span></td><td>{_esc_narrative(r.get('rationale', ''))}</td></tr>"
             for r in eq.get('por_region', [])
         ])
         replacements['{{equity_regions_table}}'] = eq_rows
@@ -395,7 +409,7 @@ class AssetAllocationRenderer:
         replacements['{{rf_view_duration}}'] = rf.get('view_duration', '')
         replacements['{{rf_view_credito}}'] = rf.get('view_credito', '')
         rf_rows = ''.join([
-            f"<tr><td>{_esc(c.get('tramo', ''))}</td><td><span class='view-badge badge-{self._sanitize_css_class(c.get('view', 'N'))}'>{_esc(c.get('view', 'N'))}</span></td><td>{_esc(c.get('rationale', ''))}</td></tr>"
+            f"<tr><td>{_esc(c.get('tramo', ''))}</td><td><span class='view-badge badge-{self._sanitize_css_class(c.get('view', 'N'))}'>{_esc(c.get('view', 'N'))}</span></td><td>{_esc_narrative(c.get('rationale', ''))}</td></tr>"
             for c in rf.get('curva', [])
         ])
         replacements['{{rf_curva_table}}'] = rf_rows
@@ -409,7 +423,7 @@ class AssetAllocationRenderer:
         fx = ac.get('monedas', {})
         replacements['{{fx_view_usd}}'] = fx.get('view_usd', '')
         fx_rows = ''.join([
-            f"<tr><td>{_esc(p.get('par', ''))}</td><td>{_esc(p.get('view', ''))}</td><td>{_esc(p.get('target_3m', ''))}</td><td>{_esc(p.get('target_12m', ''))}</td><td>{_esc(p.get('rationale', ''))}</td></tr>"
+            f"<tr><td>{_esc(p.get('par', ''))}</td><td>{_esc(p.get('view', ''))}</td><td>{_esc(p.get('target_3m', ''))}</td><td>{_esc(p.get('target_12m', ''))}</td><td>{_esc_narrative(p.get('rationale', ''))}</td></tr>"
             for p in fx.get('pares', [])
         ])
         replacements['{{fx_table}}'] = fx_rows
@@ -417,7 +431,7 @@ class AssetAllocationRenderer:
         # Commodities
         comm = ac.get('commodities', {})
         comm_rows = ''.join([
-            f"<tr><td>{_esc(c.get('nombre', ''))}</td><td>{_esc(c.get('view', ''))}</td><td>{_esc(c.get('target', ''))}</td><td>{_esc(c.get('rationale', ''))}</td></tr>"
+            f"<tr><td>{_esc(c.get('nombre', ''))}</td><td>{_esc(c.get('view', ''))}</td><td>{_esc(c.get('target', ''))}</td><td>{_esc_narrative(c.get('rationale', ''))}</td></tr>"
             for c in comm.get('commodities', [])
         ])
         replacements['{{commodities_table}}'] = comm_rows
@@ -438,11 +452,11 @@ class AssetAllocationRenderer:
                     </span>
                 </div>
                 <div class="risk-body">
-                    <p>{_esc(r.get('descripcion', ''))}</p>
+                    <p>{_esc_narrative(r.get('descripcion', ''))}</p>
                     <p style="font-size: 9pt; color: #718096;"><strong>Señal temprana:</strong> {_esc(r.get('senal_temprana', ''))}</p>
                     <div class="risk-hedge">
                         <strong>Hedge recomendado:</strong><br>
-                        {_esc(r.get('hedge', ''))}
+                        {_esc_narrative(r.get('hedge', ''))}
                     </div>
                 </div>
             </div>
@@ -526,7 +540,7 @@ class AssetAllocationRenderer:
                     <td><span class="focus-ticker">{_esc(item.get('ticker', ''))}</span></td>
                     <td><span class="focus-name">{_esc(item.get('nombre', ''))}</span></td>
                     <td><span class="view-badge {badge_class}">{_esc(item_view)}</span></td>
-                    <td>{_esc(item.get('rationale', ''))}</td>
+                    <td>{_esc_narrative(item.get('rationale', ''))}</td>
                 </tr>'''
             focus_html += '''</tbody>
                 </table>
