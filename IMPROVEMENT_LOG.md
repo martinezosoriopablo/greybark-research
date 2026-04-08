@@ -33,6 +33,21 @@
 
 **Track record del modelo:** IR 0.40, hit rate 52.4%, excess return +0.62% ann, 168 meses (2012-2026).
 
+### Sprint 48 — Tier 2: "Qué Cambió" + "Qué Está Priceado" (Goldman Sachs elements)
+
+**Trigger:** Auditoría de calidad identificó que los reportes carecen de elementos estándar de research institucional.
+
+| # | Feature | Archivo | Referencia |
+|---|---------|---------|-----------|
+| 199 | **"Qué Cambió vs Reporte Anterior"** — tabla estructurada Previous View → Current View con flechas (↑↓→). Muestra solo cambios de posición. Usa dashboard views como current y historical store como previous | `report_enhancements.py`, `asset_allocation_renderer.py`, template AA | Goldman Sachs "Global Markets Analyst" abre con delta table |
+| 200 | **"Qué Está Priceado vs Nuestra Visión"** — tabla Fed cuts priced vs nuestros, TPM implied vs nuestro, S&P earnings yield vs UST 10Y. Muestra delta entre consenso de mercado y visión Greybark | `report_enhancements.py`, `asset_allocation_renderer.py`, template AA | Goldman/JP Morgan: "What's priced in" is the delta that generates alpha |
+
+**Nuevo módulo:** `report_enhancements.py` — funciones independientes que retornan HTML snippets para inyección en renderers. Diseñado para ser reutilizable en otros reportes.
+
+**Ubicación en AA report:** Después de Dashboard (sección 2) y antes de "El Mes en Revisión" (sección 3). Con `{% if %}` guards — no aparecen si no hay datos.
+
+**Validación:** 2/2 archivos compilan OK. Secciones condicionales (backward compatible).
+
 ### Sprint 47 — Tier 1 Fixes: HTML, secciones vacías, probabilidades (4 fixes)
 
 | # | Fix | Archivo |

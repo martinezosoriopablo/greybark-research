@@ -107,6 +107,22 @@ class AssetAllocationRenderer:
         if self.verbose:
             print(msg)
 
+    def _safe_q(self, *keys):
+        """Navigate market_data by key path, return None if missing."""
+        d = self.market_data
+        if not d:
+            return None
+        for k in keys:
+            if not isinstance(d, dict) or k not in d:
+                return None
+            d = d[k]
+        if isinstance(d, dict) and ('value' in d or 'current' in d):
+            d = d.get('value') or d.get('current')
+        try:
+            return float(d) if d is not None else None
+        except (ValueError, TypeError):
+            return None
+
     @staticmethod
     def _sanitize_css_class(value: str) -> str:
         """Sanitize a string for use as a CSS class name."""
@@ -255,6 +271,49 @@ class AssetAllocationRenderer:
                     <span class="dash-conviction">{item.get('conviccion', '')}</span>
                 </div>'''
             replacements[f'{{{{{placeholder}}}}}'] = rows_html
+
+        # 2b. TIER 2 ENHANCEMENTS: "Qué Cambió" + "Qué Está Priceado"
+        try:
+            from report_enhancements import generate_what_changed_html, generate_whats_priced_in_html
+
+            # Build current views for "What Changed"
+            current_views = {}
+            for item in dashboard.get('renta_variable', []) + dashboard.get('renta_fija', []) + dashboard.get('commodities_fx', []):
+                current_views[item.get('asset', '')] = {
+                    'view': item.get('view', ''),
+                    'level': item.get('nivel', ''),
+                    'label': item.get('asset', ''),
+                }
+
+            # Get previous views from historical store
+            prev_views = {}
+            try:
+                from historical_store import HistoricalStore
+                store = HistoricalStore()
+                prev = store.get_previous()
+                # Map historical metrics to views (simplified)
+                if prev:
+                    prev_views = {k: {'view': '', 'level': str(v)} for k, v in prev.items()}
+            except Exception:
+                pass
+
+            replacements['{{what_changed_html}}'] = generate_what_changed_html(current_views, prev_views)
+
+            # Build rate data for "What's Priced In"
+            rate_data = {
+                'fed_funds_current': self._safe_q('rates', 'fed_funds', 'current'),
+                'fed_terminal': self._safe_q('rates', 'terminal_rate'),
+                'tpm_current': self._safe_q('chile', 'tpm'),
+                'tpm_terminal': self._safe_q('chile_extended', 'eof_expectations', 'tpm_12m'),
+                'sp500_pe': self._safe_q('equity', 'valuations', 'us', 'pe_forward') or self._safe_q('equity', 'valuations', 'us', 'pe_trailing'),
+                'ust_10y': self._safe_q('yield_curve', 'current_curve', '10Y'),
+            }
+            replacements['{{whats_priced_in_html}}'] = generate_whats_priced_in_html(rate_data)
+        except Exception as e:
+            if self.verbose:
+                print(f"  [WARN] Tier 2 enhancements: {e}")
+            replacements['{{what_changed_html}}'] = ''
+            replacements['{{whats_priced_in_html}}'] = ''
 
         # 3. MES EN REVISION
         mes = content.get('mes_en_revision', {})
