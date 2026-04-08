@@ -904,6 +904,19 @@
         </div>
     </section>
 
+    <!-- QUANT SIGNALS + Z-SCORE -->
+    {% if quant_signals_html %}
+    <section class="section">
+        {{ quant_signals_html }}
+    </section>
+    {% endif %}
+
+    {% if zscore_table_html %}
+    <section class="section">
+        {{ zscore_table_html }}
+    </section>
+    {% endif %}
+
     <!-- 2b. QUÉ CAMBIÓ + QUÉ ESTÁ PRICEADO -->
     {% if what_changed_html %}
     <section class="section">

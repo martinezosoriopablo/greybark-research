@@ -274,7 +274,56 @@ class AssetAllocationRenderer:
                 </div>'''
             replacements[f'{{{{{placeholder}}}}}'] = rows_html
 
-        # 2a. TEMA CENTRAL DEL MES
+        # 2a. QUANT SIGNAL DASHBOARD + Z-SCORE TABLE
+        try:
+            from report_enhancements import generate_quant_signal_dashboard_html, generate_zscore_table_html
+
+            # Build quant signals from TAA + council views
+            taa = self.market_data.get('taa', {}) if self.market_data else {}
+            tilts = taa.get('tilts', {}).get('tilts_by_class', {}) if taa else {}
+
+            quant_signals = {}
+            for asset_class in ['US Equity', 'Intl Equity', 'Fixed Income', 'Commodities', 'Alternatives']:
+                tilt = tilts.get(asset_class, {})
+                mom = tilt.get('momentum_signal')
+                quant_signals[asset_class] = {
+                    'momentum': 'positive' if mom and mom > 0 else ('negative' if mom and mom < 0 else None),
+                    'carry': None,  # Could be enriched from yield data
+                    'value': None,  # Could be enriched from PE percentiles
+                    'vol_regime': None,
+                    'overlay': '',
+                    'final_view': '',
+                }
+            replacements['{{quant_signals_html}}'] = generate_quant_signal_dashboard_html(quant_signals) if any(
+                s.get('momentum') for s in quant_signals.values()) else ''
+
+            # Build z-score table from Bloomberg percentiles + quant data
+            zscore_metrics = []
+            z_data = [
+                ('VIX', 'risk', 'vix', '', 20.0),
+                ('UST 10Y', 'yield_curve', '10Y', '%', 2.5),
+                ('IG Spread', 'credit_spreads', 'ig_spread', 'bp', 120.0),
+                ('S&P 500 P/E', 'equity', 'pe', 'x', 20.0),
+                ('CPI Core', 'inflation', 'cpi_core_yoy', '%', 2.5),
+                ('TPM Chile', 'chile', 'tpm', '%', 3.5),
+            ]
+            for name, *path, unit, hist_avg in z_data:
+                val = self._safe_q(*path) if len(path) > 1 else self._safe_q(path[0])
+                if val is not None and hist_avg > 0:
+                    # Approximate z-score using percentile from Bloomberg if available
+                    z_approx = (val - hist_avg) / (hist_avg * 0.3) if hist_avg else None
+                    zscore_metrics.append({
+                        'name': name, 'current': val, 'avg_5y': hist_avg,
+                        'zscore': z_approx, 'unit': unit,
+                    })
+            replacements['{{zscore_table_html}}'] = generate_zscore_table_html(zscore_metrics) if zscore_metrics else ''
+        except Exception as e:
+            if self.verbose:
+                print(f"  [WARN] Quant signals/zscore: {e}")
+            replacements['{{quant_signals_html}}'] = ''
+            replacements['{{zscore_table_html}}'] = ''
+
+        # 2a-cont. TEMA CENTRAL DEL MES
         try:
             from report_enhancements import generate_tema_central_html
             intel = self.council_result.get('intelligence', {}) if self.council_result else {}

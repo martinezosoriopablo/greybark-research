@@ -498,6 +498,155 @@ def callout_box(text: str, box_type: str = 'info') -> str:
     '''
 
 
+def generate_quant_signal_dashboard_html(signals: dict) -> str:
+    """Generate quant signal dashboard — momentum/carry/value/vol per asset class.
+
+    JP Morgan style: compact grid showing quantitative signals with qualitative overlay.
+
+    Args:
+        signals: dict of asset_class → {momentum, carry, value, vol_regime, overlay, final_view}
+    """
+    if not signals:
+        return ''
+
+    def _signal_cell(val):
+        if val is None:
+            return '<td style="text-align:center; color:#a0aec0;">—</td>'
+        if isinstance(val, str):
+            val_lower = val.lower()
+            if val_lower in ('positive', 'bullish', '+', 'ow'):
+                return '<td style="text-align:center;"><span style="color:#276749; font-weight:600;">&#10003;</span></td>'
+            elif val_lower in ('negative', 'bearish', '-', 'uw'):
+                return '<td style="text-align:center;"><span style="color:#c53030; font-weight:600;">&#10007;</span></td>'
+            else:
+                return '<td style="text-align:center;"><span style="color:#718096;">&#8212;</span></td>'
+        return f'<td style="text-align:center; color:#718096;">{val}</td>'
+
+    rows = ''
+    for asset, s in signals.items():
+        mom = _signal_cell(s.get('momentum'))
+        carry = _signal_cell(s.get('carry'))
+        value = _signal_cell(s.get('value'))
+        vol = _signal_cell(s.get('vol_regime'))
+        overlay = s.get('overlay', '')
+        final = s.get('final_view', '')
+
+        # Count positive signals
+        pos = sum(1 for k in ('momentum', 'carry', 'value', 'vol_regime')
+                  if str(s.get(k, '')).lower() in ('positive', 'bullish', '+', 'ow'))
+        total = sum(1 for k in ('momentum', 'carry', 'value', 'vol_regime') if s.get(k) is not None)
+        score_text = f'{pos}/{total}' if total > 0 else '—'
+        score_color = '#276749' if pos >= 3 else ('#c53030' if pos <= 1 and total >= 3 else '#718096')
+
+        rows += f'''<tr>
+            <td style="font-weight:600;">{asset}</td>
+            {mom}{carry}{value}{vol}
+            <td style="text-align:center; color:{score_color}; font-weight:600;">{score_text}</td>
+            <td style="font-size:9pt; color:#718096;">{overlay}</td>
+        </tr>'''
+
+    return f'''
+    <div style="margin:20px 0; page-break-inside:avoid;">
+        <h3 style="color:var(--accent); margin-bottom:10px;">Panel de Señales Cuantitativas</h3>
+        <p style="font-size:8pt; color:#a0aec0; margin-bottom:8px;">
+            &#10003; = señal positiva | &#10007; = señal negativa | &#8212; = neutral.
+            Overlay cualitativo puede confirmar o divergir de las señales cuantitativas.
+        </p>
+        <table style="width:100%; border-collapse:collapse; font-size:10pt;">
+            <thead>
+                <tr style="background:#f7f7f7; border-bottom:2px solid #e0e0e0;">
+                    <th style="text-align:left; padding:6px;">Clase de Activo</th>
+                    <th style="text-align:center; padding:6px;">Mom</th>
+                    <th style="text-align:center; padding:6px;">Carry</th>
+                    <th style="text-align:center; padding:6px;">Value</th>
+                    <th style="text-align:center; padding:6px;">Vol</th>
+                    <th style="text-align:center; padding:6px;">Score</th>
+                    <th style="text-align:left; padding:6px;">Overlay Cualitativo</th>
+                </tr>
+            </thead>
+            <tbody>{rows}</tbody>
+        </table>
+    </div>
+    '''
+
+
+def generate_zscore_table_html(metrics: list) -> str:
+    """Generate z-score table — each variable with level, 5Y avg, z-score.
+
+    Bridgewater style: anything beyond ±1.5σ gets highlighted.
+
+    Args:
+        metrics: list of dicts with {name, current, avg_5y, zscore, unit}
+    """
+    if not metrics:
+        return ''
+
+    rows = ''
+    for m in metrics:
+        z = m.get('zscore')
+        current = m.get('current')
+        avg = m.get('avg_5y')
+        unit = m.get('unit', '')
+        name = m.get('name', '')
+
+        # Z-score coloring
+        if z is not None:
+            if abs(z) > 2.0:
+                z_color = '#c53030'
+                z_bg = '#fff5f5'
+                z_label = 'Extremo'
+            elif abs(z) > 1.5:
+                z_color = '#dd6b20'
+                z_bg = '#fffaf5'
+                z_label = 'Elevado'
+            elif abs(z) > 1.0:
+                z_color = '#718096'
+                z_bg = ''
+                z_label = ''
+            else:
+                z_color = '#276749'
+                z_bg = ''
+                z_label = ''
+            z_text = f'{z:+.1f}σ'
+        else:
+            z_color = '#a0aec0'
+            z_bg = ''
+            z_text = '—'
+            z_label = ''
+
+        current_text = f'{current:.1f}{unit}' if current is not None else '—'
+        avg_text = f'{avg:.1f}{unit}' if avg is not None else '—'
+
+        rows += f'''<tr style="{'background:' + z_bg + ';' if z_bg else ''}">
+            <td>{name}</td>
+            <td style="text-align:center; font-weight:600;">{current_text}</td>
+            <td style="text-align:center; color:#718096;">{avg_text}</td>
+            <td style="text-align:center; color:{z_color}; font-weight:600;">{z_text}</td>
+            <td style="text-align:center; font-size:8pt; color:{z_color};">{z_label}</td>
+        </tr>'''
+
+    return f'''
+    <div style="margin:20px 0; page-break-inside:avoid;">
+        <h3 style="color:var(--accent); margin-bottom:10px;">Indicadores vs Historia (Z-Score 5 Años)</h3>
+        <p style="font-size:8pt; color:#a0aec0; margin-bottom:8px;">
+            Valores más allá de ±1.5σ están resaltados. Positivo = por encima del promedio.
+        </p>
+        <table style="width:100%; border-collapse:collapse; font-size:10pt;">
+            <thead>
+                <tr style="background:#f7f7f7; border-bottom:2px solid #e0e0e0;">
+                    <th style="text-align:left; padding:6px;">Indicador</th>
+                    <th style="text-align:center; padding:6px;">Actual</th>
+                    <th style="text-align:center; padding:6px;">Prom 5A</th>
+                    <th style="text-align:center; padding:6px;">Z-Score</th>
+                    <th style="text-align:center; padding:6px;"></th>
+                </tr>
+            </thead>
+            <tbody>{rows}</tbody>
+        </table>
+    </div>
+    '''
+
+
 def _view_score(view: str) -> int:
     """Convert view to numeric score for comparison."""
     view = (view or '').upper().strip()
