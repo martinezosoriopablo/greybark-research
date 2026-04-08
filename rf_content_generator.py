@@ -2569,9 +2569,9 @@ class RFContentGenerator:
 
         if riesgo_panel or rf_panel or final:
             council_ctx = (
-                f"RISK PANEL:\n{riesgo_panel[:1500]}\n\n"
-                f"RF PANEL:\n{rf_panel[:1000]}\n\n"
-                f"FINAL:\n{final[:1000]}"
+                f"RISK PANEL:\n{riesgo_panel[:2500]}\n\n"
+                f"RF PANEL:\n{rf_panel[:1500]}\n\n"
+                f"FINAL:\n{final[:1500]}"
             )
             result = generate_narrative(
                 section_name="rf_risks",
@@ -2580,7 +2580,9 @@ class RFContentGenerator:
                     "Devuelve un JSON array donde cada elemento tiene: "
                     '{"riesgo": "nombre corto", "probabilidad": "XX%", "impacto": "Alto/Medio-Alto/Medio", '
                     '"descripcion": "1 oracion", "hedge": "cobertura sugerida"}. '
-                    "Usa riesgos que el council identifica. NO inventes probabilidades."
+                    "OBLIGATORIO: cada riesgo DEBE tener una probabilidad (ej: 15-20%, 25-30%). "
+                    "Usa las probabilidades del RISK_MATRIX si están en el contexto. "
+                    "Si no hay probabilidad exacta, estima un rango basado en el análisis."
                 ),
                 council_context=council_ctx,
                 company_name=self.company_name,

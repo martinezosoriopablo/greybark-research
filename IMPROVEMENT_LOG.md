@@ -33,6 +33,15 @@
 
 **Track record del modelo:** IR 0.40, hit rate 52.4%, excess return +0.62% ann, 168 meses (2012-2026).
 
+### Sprint 47 — Tier 1 Fixes: HTML, secciones vacías, probabilidades (4 fixes)
+
+| # | Fix | Archivo |
+|---|-----|---------|
+| 195 | **HTML roto en narrativas** — `<strong>` renderizaba como texto literal `&lt;strong&gt;`. Nuevo `_esc_narrative()` en 3 renderers (rv, macro, aa) preserva tags HTML + convierte **markdown** | `rv/macro/aa_report_renderer.py` |
+| 196 | **"Aciertos/Errores" vacíos** — sección visible pero sin contenido en Macro. Ahora se oculta si vacía (`display:none`) | `macro_report_renderer.py` + template |
+| 197 | **"Key Takeaways" en inglés** → "Puntos Clave" | `templates/macro_report_professional.html` |
+| 198 | **Probabilidades vacías en riesgos RF** — prompt decía "NO inventes probabilidades" → Claude devolvía "—". Cambiado a "OBLIGATORIO: estima un rango". Más contexto del RISK_MATRIX (2500 chars vs 1500) | `rf_content_generator.py:2570-2589` |
+
 ### Experimento: MOM_MACRO_V2 (Vol Scaling + Crash Protection) — REVERTIDO
 
 **Trigger:** Investigación sobre regime-aware trading models sugirió agregar vol scaling (Barroso & Santa-Clara 2015) y momentum crash protection (Daniel & Moskowitz 2016) al modelo TAA.
