@@ -33,6 +33,23 @@
 
 **Track record del modelo:** IR 0.40, hit rate 52.4%, excess return +0.62% ann, 168 meses (2012-2026).
 
+### Experimento: MOM_MACRO_V2 (Vol Scaling + Crash Protection) — REVERTIDO
+
+**Trigger:** Investigación sobre regime-aware trading models sugirió agregar vol scaling (Barroso & Santa-Clara 2015) y momentum crash protection (Daniel & Moskowitz 2016) al modelo TAA.
+
+**Proceso:**
+1. Investigación académica + practitioner (AQR, Man AHL, Bridgewater, Research Affiliates)
+2. Implementación de `_mom_macro_v2_tilts()` con vol scaling (target 10%) + crash protection (-15% threshold)
+3. Backtest: 168 meses, 24 ETFs, 10 combinaciones de thresholds
+
+**Resultado:** IR 0.401 → 0.401 — **CERO mejora en TODAS las combinaciones**
+
+**Causa raíz:** El stress circuit breaker existente en MOM_MACRO (0.3x/0.6x/0.85x scale) ya implementa vol scaling de forma más directa. Las mejoras son REDUNDANTES — se aplican antes del circuit breaker, que luego las sobrescribe.
+
+**Decisión:** Código V2 REVERTIDO. MOM_MACRO queda como está. Documentado en `greybark-asset-allocation/IMPROVEMENTS.md`.
+
+**Lección:** La literatura académica sobre vol scaling asume modelos SIN protección existente. Cuando el modelo ya tiene circuit breaker, el beneficio marginal es cero. Siempre testear contra el modelo completo, no en aislamiento.
+
 ### Sprint 44 — Analyst Calls Integration (Telegram + Substack → Council)
 
 **Trigger:** Nueva fuente `greybark-intelligence` genera `analyst_calls.json` diario con recomendaciones de analistas (Telegram + Substack). 22 calls con: analyst, firm, direction, asset, thesis, conviction.
