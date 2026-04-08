@@ -496,15 +496,16 @@ class AssetAllocationRenderer:
             '''
         replacements['{{scenarios_html}}'] = scenario_html
 
-        # Scenarios table
+        # Scenarios table — only show implicancias if at least one scenario has them
         impl_map = {'UP': '+', 'DOWN': '-', 'SIDEWAYS': '=', 'MIXED': '+/-'}
+        has_impl = any(e.get('implicancias') for e in esc.get('escenarios', []))
         esc_table = ''
         for e in esc.get('escenarios', []):
             impl = e.get('implicancias', {})
-            eq_val = impl.get('equities', 'N/D')
-            bd_val = impl.get('bonds', 'N/D')
-            usd_val = impl.get('usd', 'N/D')
-            cm_val = impl.get('commodities', 'N/D')
+            eq_val = impl.get('equities', '') if has_impl else ''
+            bd_val = impl.get('bonds', '') if has_impl else ''
+            usd_val = impl.get('usd', '') if has_impl else ''
+            cm_val = impl.get('commodities', '') if has_impl else ''
             esc_table += f'''<tr>
                 <td>{_esc(e.get('nombre', ''))}</td>
                 <td><strong>{_esc(e.get('probabilidad', ''))}%</strong></td>
