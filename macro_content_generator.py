@@ -1781,15 +1781,15 @@ class MacroContentGenerator:
         return {
             'titulo': 'Chile - Crecimiento',
             'narrativa': narrativa,
-            'datos': [
-                {'indicador': 'IMACEC', 'valor': imacec_str, 'anterior': self._fmt(cl.get('imacec_yoy_prev')), 'tendencia': '-'},
+            'datos': [d for d in [
+                {'indicador': 'IMACEC (proxy mensual del PIB)', 'valor': imacec_str, 'anterior': self._fmt(cl.get('imacec_yoy_prev')), 'tendencia': '-'},
                 {'indicador': 'GDP Trim (t/t-4)', 'valor': self._fmt(cl.get('pib_trim_yoy'), '%'),
-                 'anterior': self._fmt(cl.get('pib_trim_yoy_prev'), '%'), 'tendencia': '-'},
-                {'indicador': 'Consumo Privado', 'valor': self._fmt(cl.get('consumo_privado_yoy'), '%') + ' a/a' if cl.get('consumo_privado_yoy') is not None else 'N/D',
-                 'anterior': self._fmt(cl.get('consumo_privado_yoy_prev'), '%'), 'tendencia': '-'},
-                {'indicador': 'Inversión (FBCF)', 'valor': self._fmt(cl.get('fbcf_yoy'), '%') + ' a/a' if cl.get('fbcf_yoy') is not None else 'N/D',
-                 'anterior': self._fmt(cl.get('fbcf_yoy_prev'), '%'), 'tendencia': '-'},
-            ],
+                 'anterior': self._fmt(cl.get('pib_trim_yoy_prev'), '%'), 'tendencia': '-'} if cl.get('pib_trim_yoy') is not None else None,
+                {'indicador': 'Consumo Privado', 'valor': self._fmt(cl.get('consumo_privado_yoy'), '%') + ' a/a',
+                 'anterior': self._fmt(cl.get('consumo_privado_yoy_prev'), '%'), 'tendencia': '-'} if cl.get('consumo_privado_yoy') is not None else None,
+                {'indicador': 'Inversión (FBCF)', 'valor': self._fmt(cl.get('fbcf_yoy'), '%') + ' a/a',
+                 'anterior': self._fmt(cl.get('fbcf_yoy_prev'), '%'), 'tendencia': '-'} if cl.get('fbcf_yoy') is not None else None,
+            ] if d is not None],
             'mercado_laboral': [
                 {'indicador': 'Tasa Desempleo', 'valor': desemp_str, 'anterior': self._fmt(cl.get('desempleo_prev'))},
             ]
@@ -2103,6 +2103,12 @@ class MacroContentGenerator:
             'Colombia': ('BanRep (Colombia)', 'BanRep'),
             'Chile': ('BCCh TPM (Chile)', 'BCCh'),
         }
+
+        # Fallback: get Chile inflation from quant_data
+        chile_ipc = self._q('chile', 'ipc_yoy')
+        if chile_ipc is not None:
+            inflation_series['Chile'] = float(chile_ipc)
+
         result = []
         for country, (series_key, rate_name) in rate_map.items():
             series = latam_rates.get(series_key)
@@ -2110,9 +2116,8 @@ class MacroContentGenerator:
             infl = inflation_series.get(country)
             result.append({
                 'pais': country,
-                'gdp': 'N/D',
-                'inflación': f"{infl:.1f}%" if infl is not None else 'N/D',
-                'tasa': f"{tasa:.2f}% ({rate_name})" if tasa is not None else 'N/D',
+                'inflación': f"{infl:.1f}%" if infl is not None else '',
+                'tasa': f"{tasa:.2f}% ({rate_name})" if tasa is not None else '',
                 'outlook': '-',
                 'riesgo_principal': '-',
             })
