@@ -200,7 +200,18 @@ El chart de yield curve del RF report fallaba recurrentemente (Sprints 11, 23, 4
 - `data_manifest.py`: keys deben coincidir EXACTAMENTE con lo que produce el collector (chile.imacec_yoy, no chile.imacec)
 - **PRINCIPIO:** Un council parcial es INFINITAMENTE mejor que reportes con datos inventados
 
-## Recent Changes (2026-04-04)
+### Roadmap hacia reportes perfectos (Goldman Sachs quality)
+**Tier 1 (bugs, fixeados Sprint 47):** HTML roto en narrativas, secciones vacías ocultas, "Puntos Clave" en español, RF probabilidades obligatorias
+**Tier 2 (features por implementar):** "Qué Cambió" tabla structurada, "Qué Está Priceado" sección, conviction tiers (★★★/★★/★), expected value table por escenario, quant signal dashboard, cross-asset implications matrix, copper sensitivity para Chile, z-score table, "Dónde Podemos Estar Equivocados" sección
+**Tier 3 (diseño):** Traffic-light conviction grid, sparklines en tablas, callout boxes (Key Change/Conviction Trade/Risk Alert), pull quotes del CIO, annotated charts
+
+## Recent Changes (2026-04-08)
+### Sprint 47: Report Quality — Tier 1 Fixes
+1. `_esc_narrative()` in 3 renderers — preserves HTML tags in council narratives (fixes `&lt;strong&gt;` rendering as text)
+2. Empty "Aciertos/Errores" section hidden when no data (was showing empty `<ul>`)
+3. "Key Takeaways" → "Puntos Clave" (Spanish consistency)
+4. RF risk probabilities now MANDATORY — prompt changed from "NO inventes" to "OBLIGATORIO: estima rango"
+
 ### Ciclo 9: Herramienta Cuantitativa TAA (Sprint 42)
 1. New module: `taa_data_collector.py` — runs quantitative TAA model (MOM_MACRO: momentum 12-1 + macro signals + stress circuit breaker) and packages results for council
 2. TAA data injected into all 5 panel agents + CIO via `taa_context` in agent_data (formatted text blocks per agent)
