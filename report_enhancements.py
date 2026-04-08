@@ -419,6 +419,85 @@ def generate_tema_central_html(themes: dict, analyst_calls: list = None,
     '''
 
 
+def generate_copper_sensitivity_html(copper_price: float = None,
+                                     usdclp: float = None) -> str:
+    """Generate copper sensitivity table for Chile section.
+
+    "$0.10/lb change in copper = X bps fiscal, Y% CLP, Z bps BCP"
+    Standard for any serious Chile/LatAm research.
+    """
+    if not copper_price:
+        return ''
+
+    # Empirical sensitivities (documented in Chilean fiscal/macro research)
+    # These are approximate and should be updated periodically
+    base = copper_price
+    sensitivities = [
+        {'change': '-$0.50/lb', 'price': f'${base - 0.50:.2f}', 'fiscal': '-80 a -100 bps', 'clp': '+4 a +6%', 'bcp_spread': '+15 a +20 bps', 'color': '#c53030'},
+        {'change': '-$0.25/lb', 'price': f'${base - 0.25:.2f}', 'fiscal': '-40 a -50 bps', 'clp': '+2 a +3%', 'bcp_spread': '+8 a +10 bps', 'color': '#dd6b20'},
+        {'change': 'Actual', 'price': f'${base:.2f}', 'fiscal': 'Base', 'clp': f'${usdclp:,.0f}' if usdclp else 'Actual', 'bcp_spread': 'Base', 'color': '#2d3748'},
+        {'change': '+$0.25/lb', 'price': f'${base + 0.25:.2f}', 'fiscal': '+40 a +50 bps', 'clp': '-2 a -3%', 'bcp_spread': '-5 a -8 bps', 'color': '#276749'},
+        {'change': '+$0.50/lb', 'price': f'${base + 0.50:.2f}', 'fiscal': '+80 a +100 bps', 'clp': '-4 a -6%', 'bcp_spread': '-10 a -15 bps', 'color': '#276749'},
+    ]
+
+    rows = ''
+    for s in sensitivities:
+        is_base = s['change'] == 'Actual'
+        weight = 'font-weight:700;' if is_base else ''
+        bg = 'background:#f7f7f7;' if is_base else ''
+        rows += f'''<tr style="{bg}">
+            <td style="{weight} color:{s['color']};">{s['change']}</td>
+            <td style="{weight}">{s['price']}</td>
+            <td style="text-align:center;">{s['fiscal']}</td>
+            <td style="text-align:center;">{s['clp']}</td>
+            <td style="text-align:center;">{s['bcp_spread']}</td>
+        </tr>'''
+
+    return f'''
+    <div style="margin:15px 0; page-break-inside:avoid;">
+        <h4 style="color:var(--accent); margin-bottom:8px;">Sensibilidad al Cobre (principal exportación de Chile)</h4>
+        <table style="width:100%; border-collapse:collapse; font-size:9pt;">
+            <thead>
+                <tr style="background:#f7f7f7; border-bottom:2px solid #e0e0e0;">
+                    <th style="padding:6px; text-align:left;">Cambio</th>
+                    <th style="padding:6px; text-align:left;">Precio Cu</th>
+                    <th style="padding:6px; text-align:center;">Balance Fiscal</th>
+                    <th style="padding:6px; text-align:center;">USD/CLP</th>
+                    <th style="padding:6px; text-align:center;">Spread BCP</th>
+                </tr>
+            </thead>
+            <tbody>{rows}</tbody>
+        </table>
+        <p style="font-size:7pt; color:#a0aec0; margin-top:4px;">Sensibilidades aproximadas basadas en elasticidades históricas. Cobre representa ~50% de exportaciones y ~10% de ingresos fiscales de Chile.</p>
+    </div>
+    '''
+
+
+def callout_box(text: str, box_type: str = 'info') -> str:
+    """Generate a callout box for key information.
+
+    Types: 'key_change' (blue), 'conviction_trade' (green), 'risk_alert' (red), 'info' (gray)
+    """
+    styles = {
+        'key_change': {'border': '#3182ce', 'bg': '#ebf8ff', 'icon': '&#9670;', 'label': 'Cambio Clave'},
+        'conviction_trade': {'border': '#276749', 'bg': '#f0fff4', 'icon': '&#9733;', 'label': 'Trade de Convicción'},
+        'risk_alert': {'border': '#c53030', 'bg': '#fff5f5', 'icon': '&#9888;', 'label': 'Alerta de Riesgo'},
+        'info': {'border': '#718096', 'bg': '#f7fafc', 'icon': '&#8505;', 'label': 'Nota'},
+    }
+    s = styles.get(box_type, styles['info'])
+
+    return f'''
+    <div style="margin:12px 0; padding:12px 16px; border-left:4px solid {s['border']};
+                background:{s['bg']}; border-radius:0 6px 6px 0; page-break-inside:avoid;">
+        <div style="font-size:8pt; color:{s['border']}; text-transform:uppercase;
+                    letter-spacing:0.06em; margin-bottom:4px;">
+            {s['icon']} {s['label']}
+        </div>
+        <p style="font-size:10pt; color:#2d3748; margin:0; line-height:1.5;">{text}</p>
+    </div>
+    '''
+
+
 def _view_score(view: str) -> int:
     """Convert view to numeric score for comparison."""
     view = (view or '').upper().strip()

@@ -202,8 +202,9 @@ El chart de yield curve del RF report fallaba recurrentemente (Sprints 11, 23, 4
 
 ### Roadmap hacia reportes perfectos (Goldman Sachs quality)
 **Tier 1 (bugs, fixeados Sprint 47):** HTML roto en narrativas, secciones vacías ocultas, "Puntos Clave" en español, RF probabilidades obligatorias
-**Tier 2 (features por implementar):** "Qué Cambió" tabla structurada, "Qué Está Priceado" sección, conviction tiers (★★★/★★/★), expected value table por escenario, quant signal dashboard, cross-asset implications matrix, copper sensitivity para Chile, z-score table, "Dónde Podemos Estar Equivocados" sección
-**Tier 3 (diseño):** Traffic-light conviction grid, sparklines en tablas, callout boxes (Key Change/Conviction Trade/Risk Alert), pull quotes del CIO, annotated charts
+**Tier 2 (implementados Sprint 48):** "Qué Cambió" tabla, "Qué Está Priceado", conviction ★★★, cross-asset matrix, "Dónde Podemos Estar Equivocados", "Foco del Período" (tema dominante del mes), copper sensitivity Chile, callout boxes (4 tipos)
+**Tier 2 (pendiente):** quant signal dashboard, z-score table, expected value table por escenario
+**Tier 3 (pendiente diseño):** Traffic-light conviction grid, sparklines en tablas, pull quotes del CIO, annotated charts
 
 ## Recent Changes (2026-04-08)
 ### Sprint 47: Report Quality — Tier 1 Fixes

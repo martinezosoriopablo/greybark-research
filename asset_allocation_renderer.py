@@ -374,6 +374,15 @@ class AssetAllocationRenderer:
         ])
         replacements['{{chile_tabla}}'] = chile_rows
 
+        # Copper sensitivity for Chile
+        try:
+            from report_enhancements import generate_copper_sensitivity_html
+            copper = self._safe_q('equity', 'bcch_indices', 'copper', 'value')
+            usdclp = self._safe_q('chile', 'usd_clp')
+            replacements['{{copper_sensitivity_html}}'] = generate_copper_sensitivity_html(copper, usdclp)
+        except Exception:
+            replacements['{{copper_sensitivity_html}}'] = ''
+
         # 3. ESCENARIOS
         esc = content.get('escenarios', {})
         escenario_base = esc.get('escenario_base', '')
