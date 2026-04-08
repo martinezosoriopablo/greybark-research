@@ -264,11 +264,13 @@ class AssetAllocationRenderer:
                 arrow_map = {'↑': 'dash-arrow-up', '↓': 'dash-arrow-down',
                              '→': 'dash-arrow-flat', 'NEW': 'dash-arrow-up'}
                 arrow_class = arrow_map.get(item_cambio, 'dash-arrow-flat')
+                from report_enhancements import conviction_stars
+                conv_html = conviction_stars(item.get('conviccion', ''))
                 rows_html += f'''<div class="dashboard-row">
                     <span class="dashboard-asset">{item.get('asset', '')}</span>
                     <span class="{view_class}">{item_view}</span>
                     <span class="dash-arrow {arrow_class}">{item_cambio}</span>
-                    <span class="dash-conviction">{item.get('conviccion', '')}</span>
+                    <span class="dash-conviction">{conv_html}</span>
                 </div>'''
             replacements[f'{{{{{placeholder}}}}}'] = rows_html
 
@@ -528,6 +530,55 @@ class AssetAllocationRenderer:
         # Triggers
         triggers_html = ''.join([f'<li>{_esc(t)}</li>' for t in risks.get('triggers_reconvocatoria', [])])
         replacements['{{triggers_html}}'] = triggers_html
+
+        # 7b. "DÓNDE PODEMOS ESTAR EQUIVOCADOS" (Bridgewater-style)
+        try:
+            from report_enhancements import generate_where_wrong_html
+            # Extract falsifiable conditions from risks
+            where_wrong_risks = []
+            for r in risks.get('top_risks', []):
+                if r.get('senal_temprana') or r.get('hedge'):
+                    where_wrong_risks.append({
+                        'condition': r.get('nombre', ''),
+                        'trigger': r.get('senal_temprana', 'Ver análisis del comité'),
+                        'impact': f"Prob: {r.get('probabilidad', '?')}% — {r.get('impacto', '')}",
+                        'probability': f"{r.get('probabilidad', '?')}%",
+                    })
+            replacements['{{where_wrong_html}}'] = generate_where_wrong_html(where_wrong_risks)
+        except Exception:
+            replacements['{{where_wrong_html}}'] = ''
+
+        # 7c. CROSS-ASSET IMPLICATIONS MATRIX
+        try:
+            from report_enhancements import generate_cross_asset_matrix_html
+            # Build from council scenario base + views
+            base_scenario = content.get('escenarios', {}).get('escenario_base', 'Escenario base del comité')
+            equity_view = content.get('asset_classes', {}).get('renta_variable', {}).get('view_global', '')
+            rf_view = content.get('asset_classes', {}).get('renta_fija', {}).get('view_tasas', '')
+            fx_view = content.get('asset_classes', {}).get('monedas', {}).get('view_usd', '')
+            comm_view = content.get('asset_classes', {}).get('commodities', {}).get('commodities', [{}])
+
+            implications = {}
+            if equity_view:
+                direction = 'down' if 'UW' in equity_view.upper() or 'BAJO' in equity_view.upper() else ('up' if 'OW' in equity_view.upper() else 'neutral')
+                implications['Renta Variable'] = {'direction': direction, 'rationale': equity_view[:100]}
+            if rf_view:
+                direction = 'down' if 'HIGHER' in rf_view.upper() or 'ALZA' in rf_view.upper() else ('up' if 'LOWER' in rf_view.upper() or 'BAJA' in rf_view.upper() else 'neutral')
+                implications['Renta Fija'] = {'direction': direction, 'rationale': rf_view[:100]}
+            if fx_view:
+                implications['USD / FX'] = {'direction': 'neutral', 'rationale': fx_view[:100]}
+            if comm_view:
+                implications['Commodities'] = {'direction': 'neutral', 'rationale': 'Ver detalle por commodity'}
+
+            if implications:
+                replacements['{{cross_asset_html}}'] = generate_cross_asset_matrix_html({
+                    'base_scenario': base_scenario if isinstance(base_scenario, str) else 'Escenario base',
+                    'implications': implications,
+                })
+            else:
+                replacements['{{cross_asset_html}}'] = ''
+        except Exception:
+            replacements['{{cross_asset_html}}'] = ''
 
         # 8. PORTAFOLIOS MODELO
         portfolios = content.get('portafolios_modelo', [])

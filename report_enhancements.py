@@ -222,6 +222,58 @@ def generate_cross_asset_matrix_html(views: Dict) -> str:
     '''
 
 
+def conviction_stars(level: str) -> str:
+    """Convert conviction level to stars: ALTA=★★★, MEDIA=★★, BAJA=★."""
+    level = (level or '').upper().strip()
+    if level in ('ALTA', 'HIGH', '3'):
+        return '<span style="color:#dd6b20; font-size:12pt;" title="Alta convicción">★★★</span>'
+    elif level in ('MEDIA', 'MEDIUM', '2'):
+        return '<span style="color:#dd6b20; font-size:12pt;" title="Media convicción">★★</span>'
+    elif level in ('BAJA', 'LOW', '1'):
+        return '<span style="color:#dd6b20; font-size:12pt;" title="Baja convicción">★</span>'
+    return '<span style="color:#a0aec0; font-size:10pt;">—</span>'
+
+
+def generate_where_wrong_html(risks: list) -> str:
+    """Generate "Dónde Podemos Estar Equivocados" section.
+
+    Each risk has a falsifiable condition with a quantified trigger.
+    Bridgewater-style pre-mortem analysis.
+
+    Args:
+        risks: list of dicts with 'condition', 'trigger', 'impact', 'probability'
+    """
+    if not risks:
+        return ''
+
+    rows = ''
+    for r in risks:
+        prob = r.get('probability', '')
+        prob_color = '#c53030' if '>' in str(prob) and any(c.isdigit() for c in str(prob)) else '#718096'
+
+        rows += f'''
+        <div style="padding: 12px; border-left: 3px solid #c53030; margin-bottom: 10px; background: #fff5f5; border-radius: 0 6px 6px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <strong style="color: #2d3748;">{r.get('condition', '')}</strong>
+                <span style="font-size: 9pt; color: {prob_color};">Prob: {prob}</span>
+            </div>
+            <p style="font-size: 9pt; color: #4a5568; margin: 6px 0 0;">
+                <strong>Trigger:</strong> {r.get('trigger', '')}
+                <br><strong>Impacto:</strong> {r.get('impact', '')}
+            </p>
+        </div>'''
+
+    return f'''
+    <div style="margin: 20px 0; page-break-inside: avoid;">
+        <h3 style="color: #c53030; margin-bottom: 12px;">Dónde Podemos Estar Equivocados</h3>
+        <p style="font-size: 9pt; color: #718096; margin-bottom: 10px;">
+            Condiciones falsificables que invalidarían nuestra tesis. Si se cumplen, revisamos posicionamiento.
+        </p>
+        {rows}
+    </div>
+    '''
+
+
 def _view_score(view: str) -> int:
     """Convert view to numeric score for comparison."""
     view = (view or '').upper().strip()

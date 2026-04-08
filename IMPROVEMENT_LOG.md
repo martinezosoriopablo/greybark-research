@@ -41,6 +41,9 @@
 |---|---------|---------|-----------|
 | 199 | **"Qué Cambió vs Reporte Anterior"** — tabla estructurada Previous View → Current View con flechas (↑↓→). Muestra solo cambios de posición. Usa dashboard views como current y historical store como previous | `report_enhancements.py`, `asset_allocation_renderer.py`, template AA | Goldman Sachs "Global Markets Analyst" abre con delta table |
 | 200 | **"Qué Está Priceado vs Nuestra Visión"** — tabla Fed cuts priced vs nuestros, TPM implied vs nuestro, S&P earnings yield vs UST 10Y. Muestra delta entre consenso de mercado y visión Greybark | `report_enhancements.py`, `asset_allocation_renderer.py`, template AA | Goldman/JP Morgan: "What's priced in" is the delta that generates alpha |
+| 201 | **Conviction tiers ★★★/★★/★** — reemplaza texto "ALTA/MEDIA/BAJA" por estrellas naranjas en el dashboard de posicionamiento. Ortogonal a OW/N/UW: "cuánto apostar" vs "en qué dirección" | `report_enhancements.py:conviction_stars()`, `asset_allocation_renderer.py` | Morgan Stanley: 3-tier conviction system |
+| 202 | **"Dónde Podemos Estar Equivocados"** — sección con condiciones falsificables, triggers cuantificados, probabilidad e impacto. Cards rojos con borde izquierdo. Extraído de top_risks del council | `report_enhancements.py:generate_where_wrong_html()`, template AA | Bridgewater: pre-mortem analysis |
+| 203 | **Cross-asset implications matrix** — "Si nuestra tesis es correcta → equities X, bonds Y, FX Z". Tabla con flechas direccionales y fundamento | `report_enhancements.py:generate_cross_asset_matrix_html()`, template AA | JP Morgan: coherence check at a glance |
 
 **Nuevo módulo:** `report_enhancements.py` — funciones independientes que retornan HTML snippets para inyección en renderers. Diseñado para ser reutilizable en otros reportes.
 
