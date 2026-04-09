@@ -60,6 +60,25 @@
 
 **Validación:** 2/2 archivos compilan OK. Secciones condicionales (backward compatible).
 
+### Sprint 49 — Eliminación DEFINITIVA de celdas vacías (a-b-c)
+
+**PROBLEMA RECURRENTE:** Las celdas vacías se han "arreglado" en Sprints 5, 7, 8, 22, 37, 39, 40, 49. Esta vez se documenta la solución COMPLETA para que NO se repita.
+
+| # | Reporte | Celdas antes | Celdas después | Fix |
+|---|---------|-------------|---------------|-----|
+| RF | 3 (UK Gilt 2Y/5Y/30Y) | 0 | `rf_content_generator.py`: Gilt usa `''` cuando Bloomberg no tiene datos de curva. Solo 10Y (BCCh) se muestra |
+| RV | 7 (Chile stocks sin P/E/yield) | 0 | `rv_content_generator.py`: P/E y div_yield usan `''` en vez de 'N/D'. Rationale fallback usa sector |
+| Macro | 38 | ~15 | `macro_content_generator.py`: Chile GDP Trim/Consumo/Inversión OCULTOS (INE no en APIs). LatAm inflación con fallback quant_data. N/D→blanco |
+| AA | 40 | ~16 | `asset_allocation_renderer.py`: Escenarios sin implicancias → blanco. 16 "Nuevo" en "Qué Cambió" = correcto (primer run) |
+| **Global** | — | — | `html_nd_cleaner.py`: N/D → celda VACÍA (no "—") en todos los reportes |
+
+**Los ~15 (Macro) y ~16 (AA) restantes son columnas "anterior" que se llenan automáticamente en el segundo run** (historical_store.py). NO son bugs.
+
+**3 categorías de celdas vacías documentadas en CLAUDE.md:**
+1. Bug de pipeline (dato existe, no llega) → ARREGLADO
+2. Dato no existe en ninguna API → fila OCULTA
+3. Columna "anterior" sin run previo → se llena sola
+
 ### Sprint 47 — Tier 1 Fixes: HTML, secciones vacías, probabilidades (4 fixes)
 
 | # | Fix | Archivo |

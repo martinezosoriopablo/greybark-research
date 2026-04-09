@@ -237,6 +237,17 @@ Patrón sistémico corregido: datos recolectados en `macro_quant` pero no pasado
 **Regla:** Si un renderer necesita datos que no están en su JSON cacheado, `run_monthly.py` los inyecta
 desde `self.data['macro_quant']`. Verificar SIEMPRE que los datos llegan al renderer.
 
+### CELDAS VACÍAS — Estado Definitivo (Sprint 49)
+
+| Categoría | Qué es | Solución | Estado |
+|-----------|--------|----------|--------|
+| **Bug de pipeline** | Dato existe en API pero no llega al renderer | Trazar ruta collector→run_monthly→renderer→template | ARREGLADO (Sprints 37, 39, 45d, 49b) |
+| **Dato no existe** | Tabla tiene fila para dato que ninguna API produce | Ocultar fila con `if None` | ARREGLADO (Sprint 49b: Chile GDP Trim, LatAm GDP) |
+| **Columna "anterior"** | Necesita run previo para comparar | Primer run vacío, segundo run lleno | POR DISEÑO (historical_store.py) |
+| **Escenarios sin implicancias** | Council no produce equities/bonds/usd/commodities estructurado | Celdas en blanco en vez de N/D | ARREGLADO (Sprint 49c) |
+
+**Resultado visual:** `html_nd_cleaner` convierte 'N/D' → celda vacía (no "—"). Celdas sin dato quedan BLANCAS.
+
 ### ALERTA: Datos Inventados cuando Council No Corre
 
 Si el preflight bloquea el council (NO_GO), los reportes se generan con narrativas GENÉRICAS

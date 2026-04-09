@@ -153,17 +153,45 @@ Para prevenir esto:
 4. Add to coherence validator if cross-report metric
 5. Add to `_prepare_agent_specific_data()` for relevant agents — MORE data is BETTER
 
-### Fixing empty cells in reports
-1. Check `council_result.final_recommendation` — if empty, council didn't run (check preflight)
-2. Check which `{{placeholder}}` is empty in the template
-3. Trace to the content generator method that produces it
-4. **Quality checker** runs post-render in all 4 renderers — shows count of "—" cells in pipeline log
-5. If council didn't run, narratives will be GENERIC — fix the council, don't fix the narrative
+### CELDAS VACÍAS — GUÍA DEFINITIVA (arreglado 100 veces, documentado aquí UNA VEZ)
 
-### Historical data store (for "anterior" columns)
-`historical_store.py` saves ~30 key metrics per run to `output/historical/snapshot_{date}.json`.
-On next run, loads previous snapshot and injects `_prev` values into quant_data before rendering.
-`chart_data_provider.get_usa_latest()` also calculates CPI/PCE prev directly from FRED series.
+**PRINCIPIO:** Si el dato EXISTE en una API, DEBE aparecer en el reporte. Si no aparece, es un BUG.
+
+**Hay 3 categorías de celdas vacías. Cada una tiene una solución diferente:**
+
+#### Categoría 1: DATO EXISTE PERO NO LLEGA AL RENDERER (BUG — arreglar siempre)
+- **Causa:** `run_monthly.py` no inyecta el dato al renderer, o el content generator busca con key incorrecta
+- **Ejemplos resueltos:** macro_quant no llegaba a AA (Sprint 37), CPI colisionaba en deep merge (Sprint 39), sovereign_curves no llegaban a RF (Sprint 45d), Chile inflación no mapeada a tabla LatAm (Sprint 49b)
+- **Cómo diagnosticar:** Buscar el dato en `council_input_*.json` → si existe ahí pero no en el reporte, el pipeline lo pierde
+- **Fix:** Trazar la ruta: `council_input.quantitative.{key}` → `run_monthly.py` → `renderer(market_data=...)` → `content_generator._q(...)` → template
+- **REGLA:** Si agregas un dato nuevo al collector, VERIFICA que llega al renderer. Siempre.
+
+#### Categoría 2: DATO NO EXISTE EN NINGUNA API (no es bug — ocultar la fila)
+- **Causa:** La tabla espera un dato que ninguna API produce (ej: GDP trimestral Chile del INE, consenso por país Europa)
+- **Ejemplos:** Chile GDP Trim/Consumo/Inversión (Sprint 49b), GDP forecast Alemania/Francia (Sprint 39)
+- **Fix:** `if dato is None: no mostrar la fila` — NO usar 'N/D', NO mostrar "—". Ocultar.
+- **REGLA:** NUNCA agregar una fila a una tabla sin verificar que la API produce el dato. Si no hay fuente, no hay fila.
+
+#### Categoría 3: COLUMNAS "ANTERIOR" — dato existirá en segundo run (correcto por diseño)
+- **Causa:** `historical_store.py` necesita un run previo para tener datos de comparación
+- **Ejemplos:** Todas las columnas "anterior", "sorpresa", "cambio vs previo"
+- **Fix:** Primer run muestra celda en blanco. Segundo run en adelante muestra valor del snapshot anterior.
+- **NO es bug.** Desaparece automáticamente después del primer run.
+
+#### Cómo se muestra una celda vacía (Sprint 49):
+- `html_nd_cleaner.py` convierte 'N/D' → celda VACÍA (no "—")
+- Content generators usan `''` (string vacío) en vez de 'N/D' cuando no hay dato
+- El quality checker cuenta celdas vacías en el log pero NO son visibles al usuario
+
+#### APIs que tenemos y qué datos producen para Chile:
+| API | Datos | Frecuencia |
+|-----|-------|-----------|
+| BCCh REST | TPM, IPC YoY, IMACEC, USD/CLP, UF, desempleo, IPEC | Mensual |
+| BCCh Extended | SPC curve, crédito, commodities (Cu/Au/Ag/Oil/Li), EEE expectations, EOF expectations, IMCE | Mensual |
+| yfinance | 21 stocks IPSA (P/E, dividend yield, precio) | Diario |
+| FRED | Selic, Banxico, BanRep (via BCCh international) | Mensual |
+
+**Si alguna celda de Chile está vacía y el dato está en esta tabla → ES UN BUG. Arréglalo.**
 
 ### Modifying council behavior
 - Agent prompts: `prompts/ias_*.txt`
